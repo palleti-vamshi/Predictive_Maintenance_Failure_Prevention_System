@@ -45,3 +45,4 @@ export const GEARBOX_SIGNAL_BOUNDS = Object.freeze({
 
 export const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB limit
 export const ACCEPTED_FILE_EXTENSIONS = Object.freeze(['.csv', '.txt']);
+

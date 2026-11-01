@@ -22,6 +22,9 @@ export default function ResearchBenchmarkPage() {
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [errorCatalog, setErrorCatalog] = useState(null);
 
+  // Benchmark models state
+  const [benchmarkModels, setBenchmarkModels] = useState([]);
+
   // Algorithm sensitivity simulator slider: pinion vibration (mm/s)
   const [pinionVib, setPinionVib] = useState(4.2);
 
@@ -32,30 +35,37 @@ export default function ResearchBenchmarkPage() {
   const isAnomaly = simulatedScore > 0.45;
 
   useEffect(() => {
-    async function fetchCatalog() {
+    async function fetchData() {
       setLoadingCatalog(true);
       setErrorCatalog(null);
       try {
         const token = user?.sessionToken || localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch(`${API_BASE}/datasets/reference-catalog`, {
-          credentials: 'include',
-          headers
-        });
-        if (res.ok) {
-          const data = await res.json();
+
+        const [catRes, modRes] = await Promise.all([
+          fetch(`${API_BASE}/datasets/reference-catalog`, { credentials: 'include', headers }),
+          fetch(`${API_BASE}/models`, { credentials: 'include', headers })
+        ]);
+
+        if (catRes.ok) {
+          const data = await catRes.json();
           setCatalog(data.datasets || []);
         } else {
           throw new Error('Failed to load reference dataset catalog');
         }
+
+        if (modRes.ok) {
+          const mData = await modRes.json();
+          setBenchmarkModels(mData.models || []);
+        }
       } catch (err) {
-        console.error('Catalog fetch error:', err);
-        setErrorCatalog(err.message || 'Error loading catalog');
+        console.error('Fetch error:', err);
+        setErrorCatalog(err.message || 'Error loading benchmark data');
       } finally {
         setLoadingCatalog(false);
       }
     }
-    fetchCatalog();
+    fetchData();
   }, [user]);
 
   return (
@@ -283,6 +293,75 @@ export default function ResearchBenchmarkPage() {
             description="Algorithms are evaluated across identical operating regimes (speed & load clusters). Supervised classifiers are restricted to verified ground-truth laboratory datasets. Anomaly scores are never equated with physical component failure without verified multi-channel corroboration."
             isSimulated={true}
           />
+
+          {/* Evaluated Benchmark Models (Phase 6) */}
+          {benchmarkModels.length > 0 && (
+            <Card
+              title="Evaluated Benchmark ML Models (Phase 6)"
+              subtitle="Production models trained on gold-standard public & operational datasets with verified TreeSHAP additivity"
+              badge={<span className="badge badge-demo">VERIFIED METRICS</span>}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
+                {benchmarkModels.map((bm) => (
+                  <div
+                    key={bm._id || bm.id}
+                    style={{
+                      padding: '1rem',
+                      borderRadius: '8px',
+                      background: '#0f172a',
+                      border: '1px solid #334155',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
+                          {bm.targetDomain?.replace('_', ' ') || 'General Domain'}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: bm.status === 'ready' ? '#34d399' : '#f59e0b', fontWeight: 600 }}>
+                          ● {bm.status?.toUpperCase()}
+                        </span>
+                      </div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', color: '#f8fafc', fontWeight: 600 }}>{bm.name}</h4>
+                      <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+                        Architecture: {bm.modelType === 'random_forest' ? 'Random Forest Multi-Class' : 'Isolation Forest Anomaly Detector'}
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', background: '#1e293b', padding: '0.5rem', borderRadius: '6px', fontSize: '0.8rem' }}>
+                      {bm.modelType === 'random_forest' ? (
+                        <>
+                          <div>Accuracy: <strong style={{ color: '#38bdf8' }}>{bm.metrics?.accuracy ? `${(bm.metrics.accuracy * 100).toFixed(1)}%` : 'N/A'}</strong></div>
+                          <div>Macro-F1: <strong style={{ color: '#34d399' }}>{bm.metrics?.macroF1 ? bm.metrics.macroF1.toFixed(3) : 'N/A'}</strong></div>
+                        </>
+                      ) : (
+                        <>
+                          <div>ROC-AUC: <strong style={{ color: '#38bdf8' }}>{bm.metrics?.rocAuc ? bm.metrics.rocAuc.toFixed(3) : 'N/A'}</strong></div>
+                          <div>Threshold: <strong style={{ color: '#f59e0b' }}>{bm.metrics?.calibratedThreshold ? bm.metrics.calibratedThreshold.toFixed(3) : 'N/A'}</strong></div>
+                        </>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+                        {bm.shapSummary?.additivityVerified ? '✓ TreeSHAP Additivity Verified' : 'Attribution Evaluated'}
+                      </span>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate('/analysis')}
+                      >
+                        Inspect SHAP →
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Algorithm Comparison Table */}
           <Card

@@ -530,3 +530,4 @@ router.delete('/:id', requireManager, async (req, res) => {
 });
 
 export default router;
+

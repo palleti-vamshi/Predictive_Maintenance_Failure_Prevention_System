@@ -10,6 +10,7 @@ export const API_ROUTES = Object.freeze({
   },
   MACHINES: '/api/machines',
   DATASETS: '/api/datasets',
+  MODELS: '/api/models',
   ALERTS: '/api/alerts',
   MAINTENANCE: '/api/maintenance'
 });

@@ -393,3 +393,4 @@ test('Reference Catalog & Safe Download: Manager registers with provenance; Safe
   const downloadedText = await downloadRes.text();
   assert.ok(downloadedText.includes('broken_gear'));
 });
+

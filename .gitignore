@@ -168,3 +168,19 @@ data/uploads/
 
 # macOS system files
 .DS_Store
+
+# Python virtual environments & bytecode
+.venv/
+**/.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Machine learning model artifacts
+*.joblib
+services/ml-service/artifacts/
+**/artifacts/*.joblib
+
+

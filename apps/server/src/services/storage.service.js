@@ -98,3 +98,4 @@ export async function deleteStoredFile(storageKey) {
     throw err;
   }
 }
+
