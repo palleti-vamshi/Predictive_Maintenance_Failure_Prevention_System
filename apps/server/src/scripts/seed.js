@@ -134,8 +134,8 @@ async function seed() {
   const viewerPasswordHash = await User.hashPassword(DEMO_VIEWER_PW);
 
   const managerUser = await User.create({
-    email: 'manager@detroit.factory',
-    username: 'manager_detroit',
+    email: 'manager@pune.bharatdynamics.demo',
+    username: 'manager_pune',
     fullName: 'Sunita Rao',
     passwordHash: managerPasswordHash,
     role: USER_ROLES.FACTORY_MANAGER,
@@ -148,8 +148,8 @@ async function seed() {
   });
 
   const techUser = await User.create({
-    email: 'tech@detroit.factory',
-    username: 'tech_detroit',
+    email: 'tech@pune.bharatdynamics.demo',
+    username: 'tech_pune',
     fullName: 'Rajesh Kumar',
     passwordHash: techPasswordHash,
     role: USER_ROLES.TECHNICIAN,
@@ -163,8 +163,8 @@ async function seed() {
   });
 
   const tech2User = await User.create({
-    email: 'tech2@detroit.factory',
-    username: 'tech2_detroit',
+    email: 'tech2@pune.bharatdynamics.demo',
+    username: 'tech2_pune',
     fullName: 'Vikram Patel',
     passwordHash: techPasswordHash,
     role: USER_ROLES.TECHNICIAN,
@@ -178,8 +178,8 @@ async function seed() {
   });
 
   const tech3User = await User.create({
-    email: 'tech3@detroit.factory',
-    username: 'tech3_detroit',
+    email: 'tech3@pune.bharatdynamics.demo',
+    username: 'tech3_pune',
     fullName: 'Ananya Sharma',
     passwordHash: techPasswordHash,
     role: USER_ROLES.TECHNICIAN,
@@ -193,8 +193,8 @@ async function seed() {
   });
 
   const viewerUser = await User.create({
-    email: 'viewer@detroit.factory',
-    username: 'viewer_detroit',
+    email: 'viewer@pune.bharatdynamics.demo',
+    username: 'viewer_pune',
     fullName: 'Amit Desai',
     passwordHash: viewerPasswordHash,
     role: USER_ROLES.VIEWER,
@@ -832,8 +832,8 @@ async function seed() {
     totalColumns: 5,
     columns: [
       { rawHeader: 'timestamp', mappedSignal: 'timestamp', isTimestamp: true, dataType: 'datetime' },
-      { rawHeader: 'vibration_drive_end', mappedSignal: 'vibration_input_radial', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
-      { rawHeader: 'vibration_fan_end', mappedSignal: 'vibration_output_radial', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'vibration_drive_end', mappedSignal: 'vibration_drive_end', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'vibration_fan_end', mappedSignal: 'vibration_fan_end', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
       { rawHeader: 'rotational_speed', mappedSignal: 'rotational_speed', sourceUnit: 'RPM', targetUnit: 'RPM', dataType: 'numeric' },
       { rawHeader: 'fault_class', mappedSignal: 'label', isLabel: true, sourceUnit: 'class', targetUnit: 'categorical', dataType: 'string' }
     ],
@@ -1399,8 +1399,8 @@ async function seed() {
   });
 
   const techCleveland = await User.create({
-    email: 'tech@cleveland.factory',
-    username: 'tech_cleveland',
+    email: 'tech@chennai.bharatdynamics.demo',
+    username: 'tech_chennai',
     fullName: 'K. Anand',
     passwordHash: techPasswordHash,
     role: USER_ROLES.TECHNICIAN,
@@ -1414,8 +1414,8 @@ async function seed() {
   });
 
   const clevelandManager = await User.create({
-    email: 'manager@cleveland.factory',
-    username: 'manager_cleveland',
+    email: 'manager@chennai.bharatdynamics.demo',
+    username: 'manager_chennai',
     fullName: 'R. Venkatraman',
     passwordHash: managerPasswordHash,
     role: USER_ROLES.FACTORY_MANAGER,
@@ -1494,8 +1494,8 @@ async function seed() {
   });
 
   const techStuttgart = await User.create({
-    email: 'tech@stuttgart.factory',
-    username: 'tech_stuttgart',
+    email: 'tech@hyderabad.bharatdynamics.demo',
+    username: 'tech_hyderabad',
     fullName: 'Mohammed Irfan',
     passwordHash: techPasswordHash,
     role: USER_ROLES.TECHNICIAN,
@@ -1509,8 +1509,8 @@ async function seed() {
   });
 
   const managerStuttgart = await User.create({
-    email: 'manager@stuttgart.factory',
-    username: 'manager_stuttgart',
+    email: 'manager@hyderabad.bharatdynamics.demo',
+    username: 'manager_hyderabad',
     fullName: 'Dr. Suresh Reddy',
     passwordHash: managerPasswordHash,
     role: USER_ROLES.FACTORY_MANAGER,
@@ -1556,36 +1556,36 @@ async function seed() {
   console.log('\n============================================================');
   console.log('Database Seeding Completed Successfully!');
   console.log('============================================================');
-  console.log('Demo Accounts for Factory 1 (Pune Precision Powertrains Plant #2):');
+  console.log('Demo Accounts for Factory 1 (Pune Precision Powertrains Plant #2) [DEMO DATA]:');
   console.log('  1. Factory Manager:');
   console.log('     - Name:     Sunita Rao');
-  console.log('     - Email:    manager@detroit.factory');
-  console.log('     - Username: manager_detroit');
-  console.log(`     - Password: ${DEMO_MANAGER_PW}`);
+  console.log('     - Email:    manager@pune.bharatdynamics.demo');
+  console.log('     - Username: manager_pune');
+  console.log('     - Password: [Protected - configured in .env.test / DEMO_MANAGER_PASSWORD]');
   console.log('     - Scope:    Full access to Pune Plant (GB-104, GB-201, PUMP-301, MTR-102, Sites, Work Orders)');
   console.log('  2. Primary Technician (High Workload):');
   console.log('     - Name:     Rajesh Kumar');
-  console.log('     - Email:    tech@detroit.factory');
-  console.log('     - Username: tech_detroit');
-  console.log(`     - Password: ${DEMO_TECH_PW}`);
+  console.log('     - Email:    tech@pune.bharatdynamics.demo');
+  console.log('     - Username: tech_pune');
+  console.log('     - Password: [Protected - configured in .env.test / DEMO_TECH_PASSWORD]');
   console.log('     - Scope:    Assigned to GB-104; active work orders; dynamic workload: 3');
   console.log('  3. Mechanical Specialist Technician (Assigned):');
   console.log('     - Name:     Vikram Patel');
-  console.log('     - Email:    tech2@detroit.factory');
-  console.log('     - Username: tech2_detroit');
-  console.log(`     - Password: ${DEMO_TECH_PW}`);
+  console.log('     - Email:    tech2@pune.bharatdynamics.demo');
+  console.log('     - Username: tech2_pune');
+  console.log('     - Password: [Protected - configured in .env.test / DEMO_TECH_PASSWORD]');
   console.log('     - Scope:    Assigned to PUMP-301 & GB-201; dynamic workload: 1');
   console.log('  4. Diagnostic & Condition Monitoring Technician (Available):');
   console.log('     - Name:     Ananya Sharma');
-  console.log('     - Email:    tech3@detroit.factory');
-  console.log('     - Username: tech3_detroit');
-  console.log(`     - Password: ${DEMO_TECH_PW}`);
+  console.log('     - Email:    tech3@pune.bharatdynamics.demo');
+  console.log('     - Username: tech3_pune');
+  console.log('     - Password: [Protected - configured in .env.test / DEMO_TECH_PASSWORD]');
   console.log('     - Scope:    Assigned to MTR-102; dynamic workload: 0 (Available)');
   console.log('  5. Plant Viewer:');
   console.log('     - Name:     Amit Desai');
-  console.log('     - Email:    viewer@detroit.factory');
-  console.log('     - Username: viewer_detroit');
-  console.log(`     - Password: ${DEMO_VIEWER_PW}`);
+  console.log('     - Email:    viewer@pune.bharatdynamics.demo');
+  console.log('     - Username: viewer_pune');
+  console.log('     - Password: [Protected - configured in .env.test / DEMO_VIEWER_PASSWORD]');
   console.log('     - Scope:    Read-only assigned equipment; cannot post notes/work orders');
   console.log('\nCross-Factory Test Assets:');
   console.log(`  - Chennai:   GB-999 (ID: ${machineGB999._id}), COMP-204 (ID: ${machineComp204._id})`);

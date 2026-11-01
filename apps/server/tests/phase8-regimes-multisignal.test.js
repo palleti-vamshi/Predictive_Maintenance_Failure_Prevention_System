@@ -8,6 +8,7 @@ import { Machine } from '../src/models/Machine.js';
 import { AnalysisRun } from '../src/models/AnalysisRun.js';
 import { Alert } from '../src/models/Alert.js';
 import { ANALYSIS_RUN_STATUS, MODEL_TYPES } from '@predictive-maintenance/shared';
+import { TEST_CREDS } from './testCredentials.js';
 
 let server;
 let baseUrl;
@@ -38,7 +39,7 @@ async function loginUser(email, password) {
 }
 
 test('Phase 8 Research Comparison Endpoint: Returns verified provenance and baseline comparisons', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   const res = await fetch(`${baseUrl}/api/analysis-runs/research-comparison`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -78,7 +79,7 @@ test('Phase 8 Research Comparison Endpoint: Returns verified provenance and base
 });
 
 test('Phase 8 Operating-Regime-Aware Analysis: Preserves regime, signal paths, and sensor coverage', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   const machineGB104 = await Machine.findOne({ code: 'GB-104' });
   const isoModel = await ModelArtifact.findOne({ modelType: 'isolation_forest' });
@@ -127,7 +128,7 @@ test('Phase 8 Operating-Regime-Aware Analysis: Preserves regime, signal paths, a
 });
 
 test('Phase 8 Alert Detail: Verifies triggering path, detector breakdown, and fusion rationale', async () => {
-  const { token } = await loginUser('tech@detroit.factory', 'Tech123!');
+  const { token } = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
   // Retrieve alert list
   const listRes = await fetch(`${baseUrl}/api/alerts`, {

@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
 import { Dataset, Machine, User } from '../src/models/index.js';
 import { DATASET_TYPES, DATASET_STATUS, AI_TASK_TYPES } from '@predictive-maintenance/shared';
+import { TEST_CREDS } from './testCredentials.js';
 
 let server;
 let baseUrl;
@@ -46,7 +47,7 @@ test.after(async () => {
 });
 
 test('Upload & CSV Security: Handles valid CSVs, detects delimiters, rejects malformed, oversized, and invalid types', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // 1. Valid comma-separated CSV upload
   const validCsv = 'timestamp,vibration_input_axial,temp_gearbox_sump,rotational_speed\n' +
@@ -136,7 +137,7 @@ test('Upload & CSV Security: Handles valid CSVs, detects delimiters, rejects mal
 });
 
 test('Validation & Compatibility: Quality findings and AI task assessments', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // Create a 120-row CSV with:
   // - Out-of-bounds temperature (> 140 degC)
@@ -209,8 +210,8 @@ test('Validation & Compatibility: Quality findings and AI task assessments', asy
 });
 
 test('Operational Dataset Scoping: Technician can upload to assigned machine, rejected on unassigned machine', async () => {
-  const techToken = await loginUser('tech@detroit.factory', 'Tech123!');
-  const viewerToken = await loginUser('viewer@detroit.factory', 'Viewer123!');
+  const techToken = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
+  const viewerToken = await loginUser(TEST_CREDS.viewer.email, TEST_CREDS.viewer.password);
 
   // Upload small CSV
   const csvContent = 'timestamp,vibration_input_axial\n2026-11-01T10:00:00Z,1.1\n2026-11-01T10:01:00Z,1.2\n';
@@ -285,8 +286,8 @@ test('Operational Dataset Scoping: Technician can upload to assigned machine, re
 });
 
 test('Reference Catalog & Safe Download: Manager registers with provenance; Safe streaming without path leakage', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
-  const techToken = await loginUser('tech@detroit.factory', 'Tech123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
+  const techToken = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
   // 1. Upload reference file
   const refCsv = 'timestamp,vibration_ch1,fault_class\n2026-11-01T10:00:00Z,0.5,healthy\n2026-11-01T10:01:00Z,2.4,broken_gear\n';

@@ -136,7 +136,7 @@ If MongoDB is unavailable, the backend gracefully starts and reports `"status": 
 
 ### Seed Local Demo Accounts & Gearbox Assets
 
-Populate development database with Detroit Plant #2 (`manager@detroit.factory`, `tech@detroit.factory`, `viewer@detroit.factory`, `GB-104`, `GB-201`) and Cleveland Plant #1 (`GB-999` for cross-factory isolation tests):
+Populate development database with Pune Plant #2 (`manager@pune.bharatdynamics.demo`, `tech@pune.bharatdynamics.demo`, `viewer@pune.bharatdynamics.demo`, `GB-104`, `GB-201`) and Chennai Plant #1 (`GB-999` for cross-factory isolation tests):
 
 ```bash
 npm run seed

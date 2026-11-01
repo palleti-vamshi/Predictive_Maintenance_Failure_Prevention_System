@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import app from '../src/app.js';
 import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
+import { TEST_CREDS } from './testCredentials.js';
 
 let server;
 let baseUrl;
@@ -43,8 +44,8 @@ test('Authentication Flow: Login with valid credentials returns session and stri
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'tech@detroit.factory',
-      password: 'Tech123!'
+      emailOrUsername: TEST_CREDS.tech.email,
+      password: TEST_CREDS.tech.password
     })
   });
 
@@ -52,7 +53,7 @@ test('Authentication Flow: Login with valid credentials returns session and stri
   const data = await res.json();
   assert.equal(data.success, true);
   assert.ok(data.sessionToken, 'Must provide sessionToken for mobile clients');
-  assert.equal(data.user.email, 'tech@detroit.factory');
+  assert.equal(data.user.email, TEST_CREDS.tech.email);
   assert.equal(data.user.role, 'technician');
   assert.equal(data.user.passwordHash, undefined, 'Must NEVER return passwordHash');
 
@@ -65,7 +66,7 @@ test('Authentication Flow: Invalid password returns 401 Unauthorized', async () 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'tech@detroit.factory',
+      emailOrUsername: TEST_CREDS.tech.email,
       password: 'WrongPassword999!'
     })
   });
@@ -81,8 +82,8 @@ test('Session Lifecycle: Logout immediately revokes server session', async () =>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'tech@detroit.factory',
-      password: 'Tech123!'
+      emailOrUsername: TEST_CREDS.tech.email,
+      password: TEST_CREDS.tech.password
     })
   });
   const { sessionToken } = await loginRes.json();
@@ -107,13 +108,13 @@ test('Session Lifecycle: Logout immediately revokes server session', async () =>
   assert.equal(afterLogoutRes.status, 401);
 });
 
-test('Scoped Access: Factory Manager sees all machines in Detroit', async () => {
+test('Scoped Access: Factory Manager sees all machines in Pune', async () => {
   const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'manager@detroit.factory',
-      password: 'Manager123!'
+      emailOrUsername: TEST_CREDS.manager.email,
+      password: TEST_CREDS.manager.password
     })
   });
   const { sessionToken } = await loginRes.json();
@@ -127,7 +128,7 @@ test('Scoped Access: Factory Manager sees all machines in Detroit', async () => 
 
   assert.ok(machineCodes.includes('GB-104'), 'Manager must see GB-104');
   assert.ok(machineCodes.includes('GB-201'), 'Manager must see GB-201');
-  assert.ok(!machineCodes.includes('GB-999'), 'Detroit manager must NEVER see Cleveland GB-999');
+  assert.ok(!machineCodes.includes('GB-999'), 'Pune manager must NEVER see Chennai GB-999');
 });
 
 test('Scoped Access: Technician sees ONLY assigned machines', async () => {
@@ -135,8 +136,8 @@ test('Scoped Access: Technician sees ONLY assigned machines', async () => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'tech@detroit.factory',
-      password: 'Tech123!'
+      emailOrUsername: TEST_CREDS.tech.email,
+      password: TEST_CREDS.tech.password
     })
   });
   const { sessionToken } = await loginRes.json();
@@ -150,7 +151,7 @@ test('Scoped Access: Technician sees ONLY assigned machines', async () => {
 
   assert.ok(machineCodes.includes('GB-104'), 'Technician must see assigned GB-104');
   assert.ok(!machineCodes.includes('GB-201'), 'Technician must NOT see unassigned GB-201');
-  assert.ok(!machineCodes.includes('GB-999'), 'Technician must NOT see Cleveland GB-999');
+  assert.ok(!machineCodes.includes('GB-999'), 'Technician must NOT see Chennai GB-999');
 });
 
 test('Cross-Factory Isolation: User requesting machine from another factory gets 404', async () => {
@@ -158,13 +159,13 @@ test('Cross-Factory Isolation: User requesting machine from another factory gets
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'manager@detroit.factory',
-      password: 'Manager123!'
+      emailOrUsername: TEST_CREDS.manager.email,
+      password: TEST_CREDS.manager.password
     })
   });
   const { sessionToken } = await loginRes.json();
 
-  // GB-999 exists in Cleveland Factory
+  // GB-999 exists in Chennai Factory
   const res = await fetch(`${baseUrl}/api/machines/GB-999`, {
     headers: { Authorization: `Bearer ${sessionToken}` }
   });
@@ -181,8 +182,8 @@ test('Role Authorization: Manager endpoint rejects Technician and Viewer with 40
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'tech@detroit.factory',
-      password: 'Tech123!'
+      emailOrUsername: TEST_CREDS.tech.email,
+      password: TEST_CREDS.tech.password
     })
   });
   const { sessionToken: techToken } = await techLogin.json();
@@ -197,8 +198,8 @@ test('Role Authorization: Manager endpoint rejects Technician and Viewer with 40
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'manager@detroit.factory',
-      password: 'Manager123!'
+      emailOrUsername: TEST_CREDS.manager.email,
+      password: TEST_CREDS.manager.password
     })
   });
   const { sessionToken: mgrToken } = await managerLogin.json();
@@ -217,8 +218,8 @@ test('Write Authorization: Viewer cannot add maintenance notes (403), Technician
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'viewer@detroit.factory',
-      password: 'Viewer123!'
+      emailOrUsername: TEST_CREDS.viewer.email,
+      password: TEST_CREDS.viewer.password
     })
   });
   const { sessionToken: viewerToken } = await viewerLogin.json();
@@ -239,8 +240,8 @@ test('Write Authorization: Viewer cannot add maintenance notes (403), Technician
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      emailOrUsername: 'tech@detroit.factory',
-      password: 'Tech123!'
+      emailOrUsername: TEST_CREDS.tech.email,
+      password: TEST_CREDS.tech.password
     })
   });
   const { sessionToken: techToken } = await techLogin.json();

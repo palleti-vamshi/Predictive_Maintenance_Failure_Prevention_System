@@ -540,7 +540,7 @@ export default function MaintenancePage() {
           {filteredOrders.map((order) => {
             const isAssignedToUser = (order.assignedTechnicianId?._id || order.assignedTechnicianId)?.toString() === user?._id?.toString();
             const isHistoryOpen = !!expandedHistory[order._id];
-            const hasPendingApproval = order.approvalRequest && order.approvalRequest.status === 'pending';
+            const hasPendingApproval = order.approvalRequest && order.approvalRequest.status === 'pending' && Boolean(order.approvalRequest.requestType);
             const isWorkSubmitted = order.status === WORK_ORDER_STATUS.WORK_SUBMITTED || order.status === WORK_ORDER_STATUS.MANAGER_REVIEW;
 
             return (
@@ -624,7 +624,9 @@ export default function MaintenancePage() {
                         {order.approvalRequest.requestType === 'parts' ? 'Parts Procurement Requested' : 'Manager Permission Requested'}
                       </strong>
                       <span style={{ fontSize: '0.75rem', color: '#92400e' }}>
-                        Requested {new Date(order.approvalRequest.requestedAt).toLocaleTimeString()}
+                        {order.approvalRequest.requestedAt && !isNaN(new Date(order.approvalRequest.requestedAt).getTime())
+                          ? `Requested ${new Date(order.approvalRequest.requestedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+                          : 'Pending Review'}
                       </span>
                     </div>
                     <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: '#78350f' }}>

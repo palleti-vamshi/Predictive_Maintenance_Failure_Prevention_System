@@ -84,7 +84,7 @@ export default function LoginPage() {
                   type="text"
                   className="form-input"
                   autoComplete="username"
-                  placeholder="e.g. manager@detroit.factory"
+                  placeholder="e.g. manager@pune.bharatdynamics.demo"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   disabled={loading}
@@ -101,7 +101,7 @@ export default function LoginPage() {
                   type="password"
                   className="form-input"
                   autoComplete="current-password"
-                  placeholder="Enter your password"
+                  placeholder="Enter your security password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
@@ -123,11 +123,11 @@ export default function LoginPage() {
             {import.meta.env.DEV && (
               <div className="dev-demo-accounts-box">
                 <div className="dev-accounts-header">
-                  <span className="dev-tag">DEVELOPMENT</span>
+                  <span className="dev-tag">DEMO DATA</span>
                   <span className="dev-title">Quick Demo Login</span>
                 </div>
                 <p className="dev-accounts-desc">
-                  Select a seeded prototype account to verify role permissions and scoped factory access:
+                  Select a seeded prototype account to verify role permissions and scoped access to Pune Precision Powertrains Plant #2 [Demo data]:
                 </p>
 
                 <div className="dev-buttons-grid">
@@ -137,9 +137,9 @@ export default function LoginPage() {
                     icon="factory"
                     onClick={() => handleQuickLogin('manager')}
                     disabled={loading}
-                    title="Full management of Detroit Powertrain Plant (fleet, alerts, work orders)"
+                    title="Full management of Pune Powertrain Plant #2 (fleet, alerts, work orders)"
                   >
-                    Factory Manager (Sarah Vance)
+                    Factory Manager (Sunita Rao) [Demo]
                   </Button>
                   <Button
                     variant="secondary"
@@ -149,7 +149,7 @@ export default function LoginPage() {
                     disabled={loading}
                     title="Assigned to GB-104; maintenance work orders and field observations"
                   >
-                    Field Technician (Alex Mercer)
+                    Field Technician (Rajesh Kumar) [Demo]
                   </Button>
                   <Button
                     variant="secondary"
@@ -157,9 +157,9 @@ export default function LoginPage() {
                     icon="layer"
                     onClick={() => handleQuickLogin('viewer')}
                     disabled={loading}
-                    title="Read-only access to assigned assets"
+                    title="Read-only access to assigned Pune assets"
                   >
-                    Factory Viewer (David Sterling)
+                    Factory Viewer (Amit Desai) [Demo]
                   </Button>
                 </div>
               </div>

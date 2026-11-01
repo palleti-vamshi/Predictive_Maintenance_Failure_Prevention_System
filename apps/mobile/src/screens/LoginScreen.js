@@ -80,7 +80,7 @@ export default function LoginScreen() {
                   setEmail(t);
                   if (authError) clearError();
                 }}
-                placeholder="tech@detroit.factory"
+                placeholder="tech@pune.bharatdynamics.demo"
                 placeholderTextColor="#94a3b8"
                 autoCapitalize="none"
                 keyboardType="email-address"
@@ -148,7 +148,7 @@ export default function LoginScreen() {
                       <Text style={styles.pillTextTech}>DEMO ACCOUNT</Text>
                     </View>
                   </View>
-                  <Text style={styles.quickEmailText}>tech@detroit.factory</Text>
+                  <Text style={styles.quickEmailText}>tech@pune.bharatdynamics.demo</Text>
                   <Text style={styles.quickScopeText}>Assigned: GB-104 (Dynamic Workload: 3)</Text>
                 </TouchableOpacity>
 
@@ -165,7 +165,7 @@ export default function LoginScreen() {
                       <Text style={styles.pillTextManager}>FULL ACCESS</Text>
                     </View>
                   </View>
-                  <Text style={styles.quickEmailText}>manager@detroit.factory</Text>
+                  <Text style={styles.quickEmailText}>manager@pune.bharatdynamics.demo</Text>
                   <Text style={styles.quickScopeText}>Pune Plant Fleet: GB-104, GB-201, PUMP-301, MTR-102</Text>
                 </TouchableOpacity>
 
@@ -182,7 +182,7 @@ export default function LoginScreen() {
                       <Text style={styles.pillTextViewer}>READ ONLY</Text>
                     </View>
                   </View>
-                  <Text style={styles.quickEmailText}>viewer@detroit.factory</Text>
+                  <Text style={styles.quickEmailText}>viewer@pune.bharatdynamics.demo</Text>
                   <Text style={styles.quickScopeText}>Read-only assigned telemetry, write blocked</Text>
                 </TouchableOpacity>
               </View>

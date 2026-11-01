@@ -149,6 +149,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const quickDemoLogin = async (roleType) => {
+    const creds = {
+      technician: { user: 'tech@pune.bharatdynamics.demo', pass: 'Tech123!' },
+      manager: { user: 'manager@pune.bharatdynamics.demo', pass: 'Manager123!' },
+      viewer: { user: 'viewer@pune.bharatdynamics.demo', pass: 'Viewer123!' }
+    };
+    const target = creds[roleType] || creds.technician;
+    return login(target.user, target.pass);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -158,6 +168,7 @@ export function AuthProvider({ children }) {
         authError,
         login,
         logout,
+        quickDemoLogin,
         clearError,
         refreshUser
       }}

@@ -157,8 +157,8 @@ router.post('/', async (req, res) => {
 
     const datasetCols = dataset.columns || dataset.columnMappings || [];
     const mappedSignalNames = datasetCols
-      .filter((c) => c.mappedSignal)
-      .map((c) => c.rawHeader || c.name);
+      .filter((c) => c.mappedSignal && c.mappedSignal !== 'timestamp' && c.mappedSignal !== 'label')
+      .map((c) => c.mappedSignal || c.rawHeader || c.name);
 
     if (mappedSignalNames.length === 0) {
       return res.status(400).json({

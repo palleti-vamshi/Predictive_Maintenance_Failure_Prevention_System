@@ -446,8 +446,8 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
   // Signal compatibility pre-check
   const datasetCols = dataset.columns || dataset.columnMappings || [];
   const mappedSignalNames = datasetCols
-    .filter((c) => c.mappedSignal)
-    .map((c) => c.rawHeader || c.name);
+    .filter((c) => c.mappedSignal && c.mappedSignal !== 'timestamp' && c.mappedSignal !== 'label')
+    .map((c) => c.mappedSignal || c.rawHeader || c.name);
 
   if (model.featureNames && model.featureNames.length > 0) {
     const hasSignalMatch = mappedSignalNames.some((sig) =>

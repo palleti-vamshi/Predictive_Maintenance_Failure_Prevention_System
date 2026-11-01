@@ -5,6 +5,7 @@ import app from '../src/app.js';
 import { ModelArtifact } from '../src/models/ModelArtifact.js';
 import { Dataset } from '../src/models/Dataset.js';
 import { MODEL_TYPES, MODEL_STATUS, FAULT_DOMAINS } from '@predictive-maintenance/shared';
+import { TEST_CREDS } from './testCredentials.js';
 
 let server;
 let baseUrl;
@@ -37,9 +38,9 @@ async function loginUser(email, password) {
 }
 
 test('ML Model Listing & Retrieval: Manager retrieves seeded models with verified metrics', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
-  // List all models in Detroit factory
+  // List all models in Pune factory
   const listRes = await fetch(`${baseUrl}/api/models`, {
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -83,7 +84,7 @@ test('ML Model Listing & Retrieval: Manager retrieves seeded models with verifie
 });
 
 test('ML Model Listing & Retrieval: Isolation Forest Anomaly Detector has calibrated threshold', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   const listRes = await fetch(`${baseUrl}/api/models?modelType=isolation_forest`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -100,7 +101,7 @@ test('ML Model Listing & Retrieval: Isolation Forest Anomaly Detector has calibr
 });
 
 test('Dataset Compatibility: Rejects Random Forest training on unlabeled operational dataset', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // Find operational dataset GB-104 (unlabeled telemetry)
   const dsRes = await fetch(`${baseUrl}/api/datasets`, {
@@ -135,7 +136,7 @@ test('Dataset Compatibility: Rejects Random Forest training on unlabeled operati
 });
 
 test('RBAC Enforcement: Technician cannot initiate model training (403 Forbidden)', async () => {
-  const { token } = await loginUser('tech@detroit.factory', 'Tech123!');
+  const { token } = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
   // Technician attempts to start training
   const trainRes = await fetch(`${baseUrl}/api/models/train`, {
@@ -154,18 +155,18 @@ test('RBAC Enforcement: Technician cannot initiate model training (403 Forbidden
   assert.equal(trainRes.status, 403);
 });
 
-test('Cross-Factory Isolation: Cleveland manager cannot access Detroit model', async () => {
-  const { token: detroitToken } = await loginUser('manager@detroit.factory', 'Manager123!');
-  const { token: clevelandToken } = await loginUser('manager@cleveland.factory', 'Manager123!');
+test('Cross-Factory Isolation: Chennai manager cannot access Pune model', async () => {
+  const { token: detroitToken } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
+  const { token: clevelandToken } = await loginUser(TEST_CREDS.chennaiManager.email, TEST_CREDS.chennaiManager.password);
 
-  // Get Detroit model ID
+  // Get Pune model ID
   const detroitList = await fetch(`${baseUrl}/api/models`, {
     headers: { Authorization: `Bearer ${detroitToken}` }
   });
   const { models } = await detroitList.json();
   const detroitModel = models[0];
 
-  // Cleveland manager attempts to view Detroit model
+  // Chennai manager attempts to view Pune model
   const crossRes = await fetch(`${baseUrl}/api/models/${detroitModel._id}`, {
     headers: { Authorization: `Bearer ${clevelandToken}` }
   });
@@ -174,7 +175,7 @@ test('Cross-Factory Isolation: Cleveland manager cannot access Detroit model', a
 });
 
 test('Live Training Pipeline: Manager trains Random Forest on reference dataset with exact TreeSHAP verification', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // Find MFPT reference dataset
   const dsRes = await fetch(`${baseUrl}/api/datasets/reference-catalog`, {

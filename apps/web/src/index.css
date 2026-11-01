@@ -1624,6 +1624,52 @@ code, pre, .mono-code {
 }
 
 @media (max-width: 768px) {
+  .app-header-bar {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .header-right {
+    gap: 0.4rem;
+    flex-wrap: nowrap;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .user-profile-pill .user-details {
+    display: none;
+  }
+
+  .user-profile-pill {
+    padding: 0.25rem;
+  }
+
+  .scope-pill {
+    max-width: 130px;
+    padding: 0.25rem 0.45rem;
+    overflow: hidden;
+  }
+
+  .factory-select-dropdown {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scope-text {
+    max-width: 95px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .api-indicator {
+    display: none;
+  }
+
   .mobile-nav-toggle {
     display: inline-flex;
   }

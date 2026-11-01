@@ -237,7 +237,18 @@ def run_analysis(
         if m.get("isTimestamp"):
             timestamp_col = raw
         elif m.get("mappedSignal"):
-            signal_columns.append(raw)
+            target = m.get("mappedSignal")
+            matching_col = raw
+            if target and target not in ["timestamp", "label"]:
+                if expected_features and any(f.startswith(target) or target in f for f in expected_features):
+                    matching_col = target
+                elif expected_features and any(f.startswith(raw) or raw in f for f in expected_features):
+                    matching_col = raw
+                else:
+                    matching_col = target
+                if matching_col not in df.columns and raw in df.columns:
+                    df[matching_col] = df[raw]
+            signal_columns.append(matching_col)
         elif raw.lower() in ["run_id", "experiment_id", "campaign", "batch"]:
             run_id_col = raw
 

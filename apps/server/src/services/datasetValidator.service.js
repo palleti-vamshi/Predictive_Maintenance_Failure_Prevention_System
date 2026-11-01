@@ -46,13 +46,18 @@ export function validateDatasetContent(rows, columnMappings) {
         continue;
       }
 
-      // Support Unix epoch numeric seconds/ms or ISO/Date string
+      // Support Unix epoch numeric seconds/ms, ISO/Date string, or relative elapsed seconds
       let parsedDate;
-      if (/^\d{10,13}$/.test(val.trim())) {
-        const num = parseInt(val.trim(), 10);
+      const trimmed = val.trim();
+      if (/^\d{10,13}$/.test(trimmed)) {
+        const num = parseInt(trimmed, 10);
         parsedDate = new Date(num > 1e11 ? num : num * 1000);
+      } else if (/^\d+(\.\d+)?$/.test(trimmed)) {
+        // Relative elapsed seconds (e.g. 0.12, 1.5, 72.28 from dyno/simulator recordings)
+        const elapsedSec = parseFloat(trimmed);
+        parsedDate = new Date(Math.round(elapsedSec * 1000));
       } else {
-        parsedDate = new Date(val.trim());
+        parsedDate = new Date(trimmed);
       }
 
       if (isNaN(parsedDate.getTime())) {

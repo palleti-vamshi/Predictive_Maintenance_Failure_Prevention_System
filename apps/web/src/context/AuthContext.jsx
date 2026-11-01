@@ -124,9 +124,18 @@ export function AuthProvider({ children }) {
   // Development Quick-Fill / Demo Logins
   const quickDemoLogin = async (roleType) => {
     const creds = {
-      manager: { user: 'manager@detroit.factory', pass: 'Manager123!' },
-      technician: { user: 'tech@detroit.factory', pass: 'Tech123!' },
-      viewer: { user: 'viewer@detroit.factory', pass: 'Viewer123!' }
+      manager: {
+        user: 'manager@pune.bharatdynamics.demo',
+        pass: import.meta.env.VITE_DEMO_MANAGER_PASSWORD || 'Manager123!'
+      },
+      technician: {
+        user: 'tech@pune.bharatdynamics.demo',
+        pass: import.meta.env.VITE_DEMO_TECH_PASSWORD || 'Tech123!'
+      },
+      viewer: {
+        user: 'viewer@pune.bharatdynamics.demo',
+        pass: import.meta.env.VITE_DEMO_VIEWER_PASSWORD || 'Viewer123!'
+      }
     };
 
     const target = creds[roleType] || creds.technician;

@@ -4,6 +4,7 @@ import app from '../src/app.js';
 import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
 import { Site, Machine, MaintenanceWorkOrder } from '../src/models/index.js';
+import { TEST_CREDS } from './testCredentials.js';
 
 let server;
 let baseUrl;
@@ -53,7 +54,7 @@ test.after(async () => {
 });
 
 test('Site CRUD: Manager can create, read, update, and archive factory sites', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // 1. Create a new site
   const createRes = await fetch(`${baseUrl}/api/sites`, {
@@ -110,7 +111,7 @@ test('Site CRUD: Manager can create, read, update, and archive factory sites', a
   assert.equal(archiveRes.status, 200);
 
   // 5. Technician is rejected from creating a site
-  const techToken = await loginUser('tech@detroit.factory', 'Tech123!');
+  const techToken = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
   const techCreateRes = await fetch(`${baseUrl}/api/sites`, {
     method: 'POST',
     headers: {
@@ -123,7 +124,7 @@ test('Site CRUD: Manager can create, read, update, and archive factory sites', a
 });
 
 test('Gearbox Machine CRUD: Manager can create with stages and soft-decommission', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // Get existing site
   const sitesRes = await fetch(`${baseUrl}/api/sites`, {
@@ -191,8 +192,8 @@ test('Gearbox Machine CRUD: Manager can create with stages and soft-decommission
   assert.equal(badStageRes.status, 400, 'Empty stage ratio must be rejected with 400');
 
   // 3. Reject cross-factory site reference
-  // Note: TEST_BAY_1 belongs to Cleveland
-  const clevelandMgrToken = await loginUser('manager@cleveland.factory', 'Manager123!');
+  // Note: TEST_BAY_1 belongs to Chennai
+  const clevelandMgrToken = await loginUser(TEST_CREDS.chennaiManager.email, TEST_CREDS.chennaiManager.password);
   const clevelandSitesRes = await fetch(`${baseUrl}/api/sites`, {
     headers: { Authorization: `Bearer ${clevelandMgrToken}` }
   });
@@ -229,7 +230,7 @@ test('Gearbox Machine CRUD: Manager can create with stages and soft-decommission
 });
 
 test('Technician Assignment: Manager can assign technicians and reject cross-factory users', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // Get existing site
   const sitesRes = await fetch(`${baseUrl}/api/sites`, {
@@ -260,10 +261,10 @@ test('Technician Assignment: Manager can assign technicians and reject cross-fac
     headers: { Authorization: `Bearer ${mgrToken}` }
   });
   const { users } = await usersRes.json();
-  const detroitTech = users.find((u) => u.email === 'tech@detroit.factory');
+  const detroitTech = users.find((u) => u.email === TEST_CREDS.tech.email);
   assert.ok(detroitTech);
 
-  // 1. Assign Detroit technician to GB-401
+  // 1. Assign Pune technician to GB-401
   const assignRes = await fetch(`${baseUrl}/api/machines/GB-401/assign`, {
     method: 'POST',
     headers: {
@@ -274,15 +275,15 @@ test('Technician Assignment: Manager can assign technicians and reject cross-fac
   });
   assert.equal(assignRes.status, 200);
 
-  // Now Detroit technician must be able to read GB-401
-  const techToken = await loginUser('tech@detroit.factory', 'Tech123!');
+  // Now Pune technician must be able to read GB-401
+  const techToken = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
   const readRes = await fetch(`${baseUrl}/api/machines/GB-401`, {
     headers: { Authorization: `Bearer ${techToken}` }
   });
   assert.equal(readRes.status, 200, 'Technician assigned to GB-401 must have access');
 
   // 2. Reject assigning a technician from another factory
-  const clevelandMgrToken = await loginUser('manager@cleveland.factory', 'Manager123!');
+  const clevelandMgrToken = await loginUser(TEST_CREDS.chennaiManager.email, TEST_CREDS.chennaiManager.password);
   const clevelandUsersRes = await fetch(`${baseUrl}/api/admin/factory-users`, {
     headers: { Authorization: `Bearer ${clevelandMgrToken}` }
   });
@@ -301,15 +302,15 @@ test('Technician Assignment: Manager can assign technicians and reject cross-fac
 });
 
 test('Work Orders: Manager creates task; Technician accepts and completes; Manager reviews', async () => {
-  const mgrToken = await loginUser('manager@detroit.factory', 'Manager123!');
-  const techToken = await loginUser('tech@detroit.factory', 'Tech123!');
+  const mgrToken = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
+  const techToken = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
-  // Get Detroit tech ID
+  // Get Pune tech ID
   const usersRes = await fetch(`${baseUrl}/api/admin/factory-users`, {
     headers: { Authorization: `Bearer ${mgrToken}` }
   });
   const { users } = await usersRes.json();
-  const detroitTech = users.find((u) => u.email === 'tech@detroit.factory');
+  const detroitTech = users.find((u) => u.email === TEST_CREDS.tech.email);
 
   // 1. Manager creates a work order for GB-104 assigned to Alex Mercer
   const createOrderRes = await fetch(`${baseUrl}/api/machines/GB-104/work-orders`, {
@@ -440,7 +441,7 @@ test('Work Orders: Manager creates task; Technician accepts and completes; Manag
   assert.ok(reviewedOrder.workOrder.reviewedAt);
 
   // 8. Viewer is rejected from updating work order status
-  const viewerToken = await loginUser('viewer@detroit.factory', 'Viewer123!');
+  const viewerToken = await loginUser(TEST_CREDS.viewer.email, TEST_CREDS.viewer.password);
   const viewerUpdateRes = await fetch(`${baseUrl}/api/work-orders/${orderId}/status`, {
     method: 'PATCH',
     headers: {

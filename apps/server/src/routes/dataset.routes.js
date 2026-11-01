@@ -273,7 +273,9 @@ router.post('/confirm', requireTechnicianOrManager, async (req, res) => {
       qualityFindings: validation.qualityFindings,
       labelDistribution: validation.labelDistribution,
       aiTaskCompatibility: validation.aiTaskCompatibility,
-      referenceDetails: datasetType === DATASET_TYPES.REFERENCE ? referenceDetails : undefined
+      referenceDetails: datasetType === DATASET_TYPES.REFERENCE ? referenceDetails : undefined,
+      isSimulatorDerived: Boolean(req.body.isSimulatorDerived),
+      isDemoData: Boolean(req.body.isDemoData)
     });
 
     return res.status(201).json({

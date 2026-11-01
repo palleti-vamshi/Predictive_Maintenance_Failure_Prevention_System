@@ -15,6 +15,7 @@ import {
   WORK_ORDER_STATUS,
   WORK_ORDER_PRIORITY
 } from '@predictive-maintenance/shared';
+import { TEST_CREDS } from './testCredentials.js';
 
 let server;
 let baseUrl;
@@ -45,7 +46,7 @@ async function loginUser(email, password) {
 }
 
 test('Pre-flight Rejection: Incompatible dataset and model combinations return 400 with explanation', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   // Find CWRU bearing dataset (vibration_drive_end, vibration_fan_end)
   const cwruDs = await Dataset.findOne({ title: /CWRU/i });
@@ -82,8 +83,8 @@ test('Pre-flight Rejection: Incompatible dataset and model combinations return 4
   );
 });
 
-test('Cross-Factory Isolation: Cleveland user cannot view or run analysis on Detroit assets', async () => {
-  const { token: clevelandToken } = await loginUser('manager@cleveland.factory', 'Manager123!');
+test('Cross-Factory Isolation: Chennai user cannot view or run analysis on Pune assets', async () => {
+  const { token: clevelandToken } = await loginUser(TEST_CREDS.chennaiManager.email, TEST_CREDS.chennaiManager.password);
 
   const machineGB104 = await Machine.findOne({ code: 'GB-104' });
   const rfGearModel = await ModelArtifact.findOne({ name: /Random Forest Gear Fault Classifier/i });
@@ -115,7 +116,7 @@ test('Cross-Factory Isolation: Cleveland user cannot view or run analysis on Det
 });
 
 test('Verified Analysis Run Execution & Immutability: Run outputs frozen with provenance', async () => {
-  const { token } = await loginUser('manager@detroit.factory', 'Manager123!');
+  const { token } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
 
   const machineGB104 = await Machine.findOne({ code: 'GB-104' });
   const isoModel = await ModelArtifact.findOne({ modelType: 'isolation_forest' });
@@ -165,7 +166,7 @@ test('Verified Analysis Run Execution & Immutability: Run outputs frozen with pr
 });
 
 test('Evidence-Based Alerts: Verified intervals serialize contributing signals, SHAP, and disclaimers', async () => {
-  const { token } = await loginUser('tech@detroit.factory', 'Tech123!');
+  const { token } = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
   // Retrieve alert list
   const listRes = await fetch(`${baseUrl}/api/alerts`, {
@@ -218,7 +219,7 @@ test('Evidence-Based Alerts: Verified intervals serialize contributing signals, 
 });
 
 test('Technician Interaction: Acknowledge alert and log observation notes without altering analysis', async () => {
-  const { token: techToken } = await loginUser('tech@detroit.factory', 'Tech123!');
+  const { token: techToken } = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
   const alerts = await Alert.find({ status: ALERT_STATUSES.OPEN });
   assert.ok(alerts.length > 0, 'At least one open alert must be available');
@@ -260,14 +261,14 @@ test('Technician Interaction: Acknowledge alert and log observation notes withou
 });
 
 test('Work Order Creation from Alert: Manager creates task; enforces technician machine assignment', async () => {
-  const { token: mgrToken } = await loginUser('manager@detroit.factory', 'Manager123!');
-  const { token: techToken } = await loginUser('tech@detroit.factory', 'Tech123!');
+  const { token: mgrToken } = await loginUser(TEST_CREDS.manager.email, TEST_CREDS.manager.password);
+  const { token: techToken } = await loginUser(TEST_CREDS.tech.email, TEST_CREDS.tech.password);
 
   const alert = await Alert.findOne({ maintenanceWorkOrderId: null });
   assert.ok(alert, 'Unlinked alert must exist');
 
-  const techUser = await mongoose.model('User').findOne({ email: 'tech@detroit.factory' });
-  assert.ok(techUser, 'Detroit technician must exist');
+  const techUser = await mongoose.model('User').findOne({ email: TEST_CREDS.tech.email });
+  assert.ok(techUser, 'Pune technician must exist');
 
   // Non-manager (technician) cannot create work order from alert (403 Forbidden)
   const forbiddenRes = await fetch(`${baseUrl}/api/alerts/${alert._id}/work-order`, {
