@@ -146,6 +146,15 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Machine Type vs Model Specialization Pre-Flight Check
+    const machineType = (machine.type || 'gearbox').toLowerCase();
+    if (modelComponent.includes('gear') && machineType !== 'gearbox') {
+      return res.status(400).json({
+        error: 'IncompatibleMachineError',
+        message: `Incompatible machine profile: Model "${model.name}" is specialized for industrial gearboxes, but selected machine "${machine.name} (${machine.code})" is configured as "${machine.type}". Please select a compatible gearbox asset or train a dedicated model for ${machine.type}.`
+      });
+    }
+
     const datasetCols = dataset.columns || dataset.columnMappings || [];
     const mappedSignalNames = datasetCols
       .filter((c) => c.mappedSignal)

@@ -10,14 +10,6 @@ export default function Shell({ children, apiStatus }) {
 
   return (
     <div className="app-shell-root">
-      {/* Top Universal Demo Mode Banner */}
-      <div className="demo-global-banner" role="status">
-        <span className="banner-tag" aria-hidden="true">BENCHMARK & DEMO ENVIRONMENT</span>
-        <span className="banner-message">
-          Phase 9 Industrial Command Center • Telemetry and alerts reflect verified research benchmarks & seeded specimens. Seeded records are tagged [SIMULATED].
-        </span>
-      </div>
-
       {/* Main App Header */}
       <Header
         onToggleMobileNav={() => setMobileNavOpen((prev) => !prev)}
@@ -37,10 +29,10 @@ export default function Shell({ children, apiStatus }) {
 
           <footer className="shell-footer">
             <div className="footer-left">
-              <span>Predictive Maintenance & Failure Prevention System • Phase 9 Industrial Command Center</span>
+              <span>Presight — AI Predictive Maintenance & Failure Prevention System</span>
             </div>
             <div className="footer-right">
-              <span>Verified API & Role Scoped • Next: Phase 10 Native Mobile Workflows</span>
+              <span>Multi-Signal Telemetry • Gearbox Kinematic Surveillance</span>
             </div>
           </footer>
         </main>

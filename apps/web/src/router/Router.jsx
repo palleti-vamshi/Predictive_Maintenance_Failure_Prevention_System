@@ -6,6 +6,7 @@ export const ROUTES = Object.freeze({
   OVERVIEW: '#/',
   MACHINES: '#/machines',
   MACHINE_DETAIL: '#/machines/:id',
+  MAINTENANCE: '#/maintenance',
   DATASETS_UPLOAD: '#/datasets/upload',
   ANALYSIS: '#/analysis',
   ALERTS: '#/alerts',
@@ -16,52 +17,59 @@ export const ROUTES = Object.freeze({
 export const NAV_ITEMS = Object.freeze([
   {
     key: 'overview',
-    label: 'Factory Overview',
+    label: 'Overview',
     hash: ROUTES.OVERVIEW,
-    icon: '📊',
-    description: 'Plant status & machine fleet summary'
+    icon: 'dashboard',
+    description: 'Fleet condition & critical alerts'
   },
   {
     key: 'machines',
-    label: 'Machines & Profiles',
+    label: 'Machines',
     hash: ROUTES.MACHINES,
-    icon: '⚙️',
-    description: 'Gearbox registry & stage specifications'
+    icon: 'machine',
+    description: 'Transmission registry & kinematics'
+  },
+  {
+    key: 'maintenance',
+    label: 'Maintenance',
+    hash: ROUTES.MAINTENANCE,
+    icon: 'wrench',
+    description: 'Lifecycle dispatch & work reports'
+  },
+  {
+    key: 'alerts',
+    label: 'Alerts & Anomalies',
+    hash: ROUTES.ALERTS,
+    icon: 'alert',
+    description: 'Evidence-based alerts & actions'
   },
   {
     key: 'datasets',
     label: 'Dataset Ingestion',
     hash: ROUTES.DATASETS_UPLOAD,
-    icon: '📁',
-    description: 'CSV upload, column mapping & validation'
+    icon: 'dataset',
+    description: 'Signal validation & profiling'
   },
   {
     key: 'analysis',
     label: 'Analysis & Trends',
     hash: ROUTES.ANALYSIS,
-    icon: '📈',
-    description: 'Vibration & thermal condition trends'
-  },
-  {
-    key: 'alerts',
-    label: 'Alerts & Maintenance',
-    hash: ROUTES.ALERTS,
-    icon: '🚨',
-    description: 'Explainable alerts & field technician notes'
+    icon: 'analysis',
+    description: 'Multi-signal regime trends'
   },
   {
     key: 'research',
     label: 'Research Benchmark',
     hash: ROUTES.RESEARCH,
-    icon: '🔬',
-    description: 'Method comparison & sensitivity explorer'
+    icon: 'research',
+    description: 'Reference datasets & evaluation'
   },
   {
     key: 'settings',
-    label: 'Factory & Access Scope',
+    label: 'Factory Scope',
     hash: ROUTES.SETTINGS,
-    icon: '🏢',
-    description: 'Factory scopes, user roles & API config'
+    icon: 'settings',
+    description: 'Access scopes & system config'
   }
 ]);
 
@@ -113,6 +121,7 @@ export function RouterProvider({ children }) {
     }
 
     if (pathPart === ROUTES.MACHINES) return { routeKey: 'machines', baseRoute: ROUTES.MACHINES, params: {}, queryParams };
+    if (pathPart === ROUTES.MAINTENANCE) return { routeKey: 'maintenance', baseRoute: ROUTES.MAINTENANCE, params: {}, queryParams };
     if (pathPart === ROUTES.DATASETS_UPLOAD) return { routeKey: 'datasets', baseRoute: ROUTES.DATASETS_UPLOAD, params: {}, queryParams };
     if (pathPart === ROUTES.ANALYSIS) return { routeKey: 'analysis', baseRoute: ROUTES.ANALYSIS, params: {}, queryParams };
     if (pathPart === ROUTES.ALERTS) return { routeKey: 'alerts', baseRoute: ROUTES.ALERTS, params: {}, queryParams };

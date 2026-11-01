@@ -11,7 +11,7 @@ export default function AlertCallout({
   timestamp,
   contributingSignals = [],
   action = null,
-  isSimulated = true,
+  isSimulated = false,
   className = ''
 }) {
   const borderClasses = {

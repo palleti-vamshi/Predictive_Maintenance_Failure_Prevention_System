@@ -75,6 +75,7 @@ export async function authenticate(req, res, next) {
     const user = await User.findById(session.userId)
       .populate('factoryId', 'name code location')
       .populate('organizationId', 'name code')
+      .populate('authorizedFactories', 'name code location')
       .populate('assignedSites', 'name code')
       .populate('assignedMachines', 'code name status');
 

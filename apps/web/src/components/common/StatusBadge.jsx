@@ -27,7 +27,7 @@ export default function StatusBadge({ status = 'info', label, isSimulated = fals
     >
       <span className="badge-dot" aria-hidden="true" />
       <span>{displayLabel}</span>
-      {isSimulated && <span className="badge-subtag" aria-hidden="true">SIM</span>}
+      {isSimulated && <span className="badge-subtag" aria-hidden="true">DEMO DATA</span>}
     </span>
   );
 }

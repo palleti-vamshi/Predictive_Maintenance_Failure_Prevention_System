@@ -177,6 +177,14 @@ const datasetSchema = new mongoose.Schema(
       [AI_TASK_TYPES.FAULT_CLASSIFICATION]: taskCompatibilitySchema,
       [AI_TASK_TYPES.REMAINING_USEFUL_LIFE]: taskCompatibilitySchema
     },
+    isSimulatorDerived: {
+      type: Boolean,
+      default: false
+    },
+    isDemoData: {
+      type: Boolean,
+      default: false
+    },
     referenceDetails: referenceDetailsSchema
   },
   { timestamps: true }

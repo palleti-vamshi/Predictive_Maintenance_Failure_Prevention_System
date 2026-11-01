@@ -40,7 +40,7 @@ export default function Button({
       accessibilityRole="button"
     >
       {loading ? (
-        <ActivityIndicator color="#ffffff" size="small" />
+        <ActivityIndicator color={variant === 'primary' ? '#ffffff' : '#7c3aed'} size="small" />
       ) : (
         <Text style={[styles.textBase, textVariants[variant] || styles.textSecondary, textStyle]}>
           {title}
@@ -52,15 +52,39 @@ export default function Button({
 
 const styles = StyleSheet.create({
   btnBase: {
-    minHeight: 46,
+    minHeight: 48,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+  },
+  btnPrimary: {
+    backgroundColor: '#7c3aed',
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  btnSecondary: {
+    backgroundColor: '#f5f3ff',
+    borderColor: '#ddd6fe',
     borderWidth: 1,
-    borderColor: 'transparent',
+  },
+  btnOutline: {
+    backgroundColor: 'transparent',
+    borderColor: '#ddd6fe',
+    borderWidth: 1,
+  },
+  btnDanger: {
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
+    borderWidth: 1,
+  },
+  btnGhost: {
+    backgroundColor: 'transparent',
   },
   btnDisabled: {
     opacity: 0.5,
@@ -68,41 +92,21 @@ const styles = StyleSheet.create({
   textBase: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  btnPrimary: {
-    backgroundColor: '#0284c7',
-    borderColor: '#0369a1',
+    letterSpacing: -0.1,
   },
   textPrimary: {
     color: '#ffffff',
   },
-  btnSecondary: {
-    backgroundColor: '#1a2744',
-    borderColor: '#334155',
-  },
   textSecondary: {
-    color: '#f8fafc',
-  },
-  btnOutline: {
-    backgroundColor: 'transparent',
-    borderColor: 'rgba(56, 189, 248, 0.4)',
+    color: '#7c3aed',
   },
   textOutline: {
-    color: '#38bdf8',
-  },
-  btnDanger: {
-    backgroundColor: '#be123c',
-    borderColor: '#9f1239',
+    color: '#7c3aed',
   },
   textDanger: {
-    color: '#ffffff',
-  },
-  btnGhost: {
-    backgroundColor: 'transparent',
-    borderColor: 'transparent',
+    color: '#dc2626',
   },
   textGhost: {
-    color: '#94a3b8',
+    color: '#64748b',
   },
 });
-

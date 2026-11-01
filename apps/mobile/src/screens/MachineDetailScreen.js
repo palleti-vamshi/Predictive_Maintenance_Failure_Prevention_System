@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
@@ -179,7 +180,10 @@ export default function MachineDetailScreen({
       {/* Decommission Notice */}
       {isDecomm && (
         <View style={styles.decommBanner}>
-          <Text style={styles.decommTitle}>🛑 Soft-Decommissioned Gearbox</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="alert-octagon" size={15} color="#dc2626" />
+            <Text style={styles.decommTitle}>Soft-Decommissioned Gearbox</Text>
+          </View>
           <Text style={styles.decommDesc}>
             This gearbox has been taken out of active operational rotation. Uploads and new work orders are disabled.
           </Text>
@@ -327,7 +331,10 @@ export default function MachineDetailScreen({
         <Card title="Log Field Observation" subtitle="Record physical inspection findings to permanent machine history">
           {noteSuccess && (
             <View style={styles.noteSuccessBox}>
-              <Text style={styles.noteSuccessText}>✓ Field observation note logged to server.</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="check" size={14} color="#16a34a" />
+                <Text style={styles.noteSuccessText}>Field observation note logged to server.</Text>
+              </View>
             </View>
           )}
           <TextInput
@@ -424,23 +431,31 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 14,
     paddingBottom: 32,
+    backgroundColor: '#f6f5fb',
   },
   backBtn: {
     alignSelf: 'flex-start',
-    minHeight: 36,
+    minHeight: 44,
     paddingHorizontal: 0,
+    justifyContent: 'center',
   },
   backBtnText: {
-    color: '#38bdf8',
+    color: '#7c3aed',
     fontSize: 13,
+    fontWeight: '600',
   },
   headerCard: {
-    backgroundColor: '#131d33',
-    borderColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    borderColor: '#ede9f6',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     gap: 4,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -452,30 +467,30 @@ const styles = StyleSheet.create({
   machineId: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#1e1b4b',
     fontFamily: 'monospace',
   },
   operationalBadge: {
-    backgroundColor: 'rgba(2, 132, 199, 0.25)',
+    backgroundColor: '#f5f3ff',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 3,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.4)',
+    borderColor: '#ddd6fe',
   },
   operationalBadgeText: {
-    color: '#38bdf8',
+    color: '#7c3aed',
     fontSize: 9,
     fontWeight: '800',
   },
   machineName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   subtext: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#64748b',
   },
   locationText: {
     fontSize: 12,
@@ -483,32 +498,32 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   decommBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     gap: 4,
   },
   decommTitle: {
-    color: '#fca5a5',
+    color: '#b91c1c',
     fontWeight: '700',
     fontSize: 13,
   },
   decommDesc: {
-    color: '#cbd5e1',
+    color: '#7f1d1d',
     fontSize: 11,
     lineHeight: 16,
   },
   emptyText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
   },
   orderBox: {
-    backgroundColor: '#070b14',
-    borderColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    borderColor: '#ede9f6',
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 12,
     gap: 6,
     marginBottom: 8,
@@ -522,7 +537,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'monospace',
     fontWeight: '700',
-    color: '#38bdf8',
+    color: '#7c3aed',
   },
   orderBadges: {
     flexDirection: 'row',
@@ -534,18 +549,18 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   prioHigh: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    backgroundColor: '#fee2e2',
   },
   prioMed: {
-    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    backgroundColor: '#fef3c7',
   },
   prioText: {
     fontSize: 8,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   statusBadge: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 3,
@@ -553,16 +568,16 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 8,
     fontWeight: '800',
-    color: '#cbd5e1',
+    color: '#475569',
   },
   orderTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   orderDesc: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     lineHeight: 16,
   },
   orderDue: {
@@ -570,65 +585,68 @@ const styles = StyleSheet.create({
     color: '#64748b',
   },
   feedbackBox: {
-    backgroundColor: '#0f172a',
-    borderRadius: 4,
+    backgroundColor: '#f5f3ff',
+    borderColor: '#ddd6fe',
+    borderWidth: 1,
+    borderRadius: 6,
     padding: 8,
     marginTop: 4,
   },
   feedbackTitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#38bdf8',
+    color: '#7c3aed',
   },
   feedbackText: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#475569',
     marginTop: 2,
   },
   orderActionBtn: {
     marginTop: 6,
   },
   completionForm: {
-    backgroundColor: '#0f172a',
-    borderColor: '#1e293b',
+    backgroundColor: '#f8fafc',
+    borderColor: '#ede9f6',
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 10,
     marginTop: 6,
     gap: 6,
   },
   inputLabel: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#334155',
     fontWeight: '600',
   },
   textInput: {
-    backgroundColor: '#070b14',
-    borderColor: '#334155',
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     fontSize: 13,
-    color: '#f8fafc',
+    color: '#1e1b4b',
+    minHeight: 48,
   },
   noteSuccessBox: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10b981',
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
     borderWidth: 1,
-    borderRadius: 4,
+    borderRadius: 6,
     padding: 8,
     marginBottom: 8,
   },
   noteSuccessText: {
-    color: '#34d399',
+    color: '#16a34a',
     fontSize: 11,
     fontWeight: '600',
   },
   stageItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#ede9f6',
     gap: 2,
   },
   stageHeader: {
@@ -639,17 +657,17 @@ const styles = StyleSheet.create({
   stageTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   stageRatio: {
     fontSize: 12,
     fontFamily: 'monospace',
     fontWeight: '700',
-    color: '#38bdf8',
+    color: '#7c3aed',
   },
   stageCondition: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
   },
   overallRatioBox: {
     flexDirection: 'row',
@@ -660,29 +678,29 @@ const styles = StyleSheet.create({
   overallLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#cbd5e1',
+    color: '#334155',
   },
   overallVal: {
     fontSize: 13,
     fontFamily: 'monospace',
     fontWeight: '700',
-    color: '#38bdf8',
+    color: '#7c3aed',
   },
   specRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#ede9f6',
   },
   specKey: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
   },
   specValue: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   signalRow: {
     flexDirection: 'row',
@@ -690,7 +708,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#ede9f6',
   },
   signalMain: {
     flex: 1,
@@ -698,7 +716,7 @@ const styles = StyleSheet.create({
   signalLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   signalKey: {
     fontSize: 11,
@@ -717,22 +735,22 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   catVib: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    backgroundColor: '#e0f2fe',
   },
   catTherm: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: '#fef3c7',
   },
   catReg: {
-    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    backgroundColor: '#f3e8ff',
   },
   catText: {
     fontSize: 9,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   unitText: {
     fontSize: 11,
-    color: '#cbd5e1',
+    color: '#64748b',
     fontFamily: 'monospace',
     minWidth: 40,
     textAlign: 'right',

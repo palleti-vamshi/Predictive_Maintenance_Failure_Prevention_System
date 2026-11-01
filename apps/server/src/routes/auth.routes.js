@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { User } from '../models/User.js';
+import { Factory } from '../models/Factory.js';
 import { Session } from '../models/Session.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { env } from '../config/env.js';
+import { USER_ROLES } from '@predictive-maintenance/shared';
 
 const router = Router();
 
@@ -34,6 +36,7 @@ router.post('/login', async (req, res) => {
       .select('+passwordHash')
       .populate('factoryId', 'name code location')
       .populate('organizationId', 'name code')
+      .populate('authorizedFactories', 'name code location')
       .populate('assignedSites', 'name code')
       .populate('assignedMachines', 'code name status');
 
@@ -105,6 +108,88 @@ router.get('/me', authenticate, async (req, res) => {
       createdAt: req.session.createdAt
     }
   });
+});
+
+/**
+ * POST /api/auth/switch-factory
+ * Allows managers to switch their active factory scope among authorized factories.
+ */
+router.post('/switch-factory', authenticate, async (req, res) => {
+  try {
+    if (req.user.role !== USER_ROLES.FACTORY_MANAGER) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only Factory Managers can switch factory scopes.'
+      });
+    }
+
+    const { factoryId } = req.body;
+    if (!factoryId) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'Target factoryId is required.'
+      });
+    }
+
+    // Verify factory exists
+    const targetFactory = await Factory.findById(factoryId);
+    if (!targetFactory) {
+      return res.status(404).json({
+        error: 'NotFound',
+        message: 'Specified factory not found.'
+      });
+    }
+
+    // Check authorization: must match organization and either be in authorizedFactories or be part of organization
+    const orgId = req.user.organizationId?._id || req.user.organizationId;
+    if (targetFactory.organizationId.toString() !== orgId.toString()) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'You are not authorized to access factories outside your organization.'
+      });
+    }
+
+    // If user has specific authorizedFactories array, ensure targetFactory is in it
+    if (req.user.authorizedFactories && req.user.authorizedFactories.length > 0) {
+      const isAuthorized = req.user.authorizedFactories.some(
+        (f) => (f._id || f).toString() === factoryId.toString()
+      );
+      if (!isAuthorized) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Access denied. You are not authorized for this specific factory.'
+        });
+      }
+    }
+
+    // Update session active factory
+    req.session.factoryId = targetFactory._id;
+    await req.session.save();
+
+    // Update user active factory
+    req.user.factoryId = targetFactory;
+    await User.findByIdAndUpdate(req.user._id, { factoryId: targetFactory._id });
+
+    // Reload user with updated population
+    const updatedUser = await User.findById(req.user._id)
+      .populate('factoryId', 'name code location')
+      .populate('organizationId', 'name code')
+      .populate('authorizedFactories', 'name code location')
+      .populate('assignedSites', 'name code')
+      .populate('assignedMachines', 'code name status');
+
+    return res.status(200).json({
+      success: true,
+      message: `Active factory scope switched to ${targetFactory.name}.`,
+      user: updatedUser.toJSON()
+    });
+  } catch (err) {
+    console.error('[AuthRoute:SwitchFactory] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to switch factory scope.'
+    });
+  }
 });
 
 /**

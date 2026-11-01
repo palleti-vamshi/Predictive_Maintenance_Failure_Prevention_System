@@ -3,11 +3,16 @@ import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Button from '../components/common/Button.jsx';
 import AlertCallout from '../components/common/AlertCallout.jsx';
+import Icon from '../components/common/Icon.jsx';
 import {
   USER_ROLES,
   OPERATIONAL_STATUS,
   GEARBOX_ARRANGEMENTS,
-  ISO_VG_GRADES
+  ISO_VG_GRADES,
+  MACHINE_TYPES,
+  MACHINE_TYPE_LABELS,
+  INDUSTRIES,
+  INDUSTRY_LABELS
 } from '@predictive-maintenance/shared';
 import { useRouter } from '../router/Router.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -28,6 +33,8 @@ export default function MachinesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [siteFilter, setSiteFilter] = useState('all');
   const [operationalFilter, setOperationalFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [industryFilter, setIndustryFilter] = useState('all');
   const [includeDecommissioned, setIncludeDecommissioned] = useState(true);
 
   // Modals state
@@ -40,6 +47,9 @@ export default function MachinesPage() {
   const [newMachine, setNewMachine] = useState({
     code: '',
     name: '',
+    type: MACHINE_TYPES.GEARBOX,
+    industry: INDUSTRIES.MANUFACTURING,
+    operatingContext: '',
     siteId: '',
     manufacturer: '',
     model: '',
@@ -164,6 +174,9 @@ export default function MachinesPage() {
       const payload = {
         code: newMachine.code.trim().toUpperCase(),
         name: newMachine.name.trim(),
+        type: newMachine.type,
+        industry: newMachine.industry,
+        operatingContext: newMachine.operatingContext.trim(),
         siteId: newMachine.siteId,
         manufacturer: newMachine.manufacturer.trim(),
         model: newMachine.model.trim(),
@@ -172,13 +185,13 @@ export default function MachinesPage() {
         gearRatio: newMachine.gearRatio.trim(),
         ratedSpeedRpm: Number(newMachine.ratedSpeedRpm) || undefined,
         ratedTorqueNm: Number(newMachine.ratedTorqueNm) || undefined,
-        stages: newMachine.stages,
-        lubrication: {
+        stages: newMachine.type === MACHINE_TYPES.GEARBOX ? newMachine.stages : [],
+        lubrication: newMachine.type === MACHINE_TYPES.GEARBOX ? {
           oilType: newMachine.lubrication.oilType,
           isoVgGrade: newMachine.lubrication.isoVgGrade,
           capacityLiters: Number(newMachine.lubrication.capacityLiters) || undefined,
           serviceIntervalHours: Number(newMachine.lubrication.serviceIntervalHours) || undefined
-        },
+        } : undefined,
         assignedTechnicians: newMachine.assignedTechnicians
       };
 
@@ -202,6 +215,9 @@ export default function MachinesPage() {
       setNewMachine({
         code: '',
         name: '',
+        type: MACHINE_TYPES.GEARBOX,
+        industry: INDUSTRIES.MANUFACTURING,
+        operatingContext: '',
         siteId: sites[0]?._id || '',
         manufacturer: '',
         model: '',
@@ -268,6 +284,8 @@ export default function MachinesPage() {
     if (statusFilter !== 'all' && m.status !== statusFilter) return false;
     if (siteFilter !== 'all' && (m.siteId?._id !== siteFilter && m.siteId !== siteFilter)) return false;
     if (operationalFilter !== 'all' && m.operationalStatus !== operationalFilter) return false;
+    if (typeFilter !== 'all' && (m.type || MACHINE_TYPES.GEARBOX) !== typeFilter) return false;
+    if (industryFilter !== 'all' && (m.industry || INDUSTRIES.MANUFACTURING) !== industryFilter) return false;
     return true;
   });
 
@@ -282,9 +300,9 @@ export default function MachinesPage() {
             </span>
             <span className="badge badge-demo">ROLE: {user?.role?.toUpperCase()}</span>
           </div>
-          <h1 className="page-title">Machines & Gearbox Profiles</h1>
+          <h1 className="page-title">Machines & Asset Fleet</h1>
           <p className="page-subtitle">
-            Server-enforced equipment registry for <strong>{user?.fullName}</strong>. Physical kinematics, multi-stage ratios, lubrication specifications, and operational statuses.
+            Server-enforced equipment registry for <strong>{user?.fullName}</strong>. Multi-industry asset kinematics, operating context, and sensor signal profiles.
           </p>
         </div>
 
@@ -298,7 +316,7 @@ export default function MachinesPage() {
                 setShowSiteModal(true);
               }}
             >
-              + Add Factory Site
+              <Icon name="plus" size={14} style={{ marginRight: 6 }} /> Add Factory Site
             </Button>
             <Button
               variant="primary"
@@ -306,9 +324,8 @@ export default function MachinesPage() {
                 setFormError(null);
                 setShowMachineModal(true);
               }}
-              icon="⚙️"
             >
-              + Register Gearbox Profile
+              <Icon name="machine" size={15} style={{ marginRight: 6 }} /> Register Machine Profile
             </Button>
           </div>
         )}
@@ -323,7 +340,7 @@ export default function MachinesPage() {
               className="form-select"
               value={siteFilter}
               onChange={(e) => setSiteFilter(e.target.value)}
-              style={{ minWidth: 180 }}
+              style={{ minWidth: 160 }}
             >
               <option value="all">All Factory Sites ({sites.length})</option>
               {sites.map((s) => (
@@ -335,12 +352,42 @@ export default function MachinesPage() {
           </div>
 
           <div>
+            <label className="form-label" style={{ marginBottom: 4, display: 'block' }}>Machine Type:</label>
+            <select
+              className="form-select"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              style={{ minWidth: 160 }}
+            >
+              <option value="all">All Machine Types</option>
+              {Object.entries(MACHINE_TYPE_LABELS).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ marginBottom: 4, display: 'block' }}>Industry Sector:</label>
+            <select
+              className="form-select"
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              style={{ minWidth: 170 }}
+            >
+              <option value="all">All Industries</option>
+              {Object.entries(INDUSTRY_LABELS).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="form-label" style={{ marginBottom: 4, display: 'block' }}>Operational Status:</label>
             <select
               className="form-select"
               value={operationalFilter}
               onChange={(e) => setOperationalFilter(e.target.value)}
-              style={{ minWidth: 160 }}
+              style={{ minWidth: 150 }}
             >
               <option value="all">All Operational States</option>
               <option value={OPERATIONAL_STATUS.OPERATIONAL}>Operational</option>
@@ -356,7 +403,7 @@ export default function MachinesPage() {
               className="form-select"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: 150 }}
+              style={{ minWidth: 130 }}
             >
               <option value="all">All Conditions</option>
               <option value="healthy">Nominal</option>
@@ -373,7 +420,7 @@ export default function MachinesPage() {
                 onChange={(e) => setIncludeDecommissioned(e.target.checked)}
                 style={{ marginRight: 6 }}
               />
-              Include Soft-Decommissioned Gearboxes
+              Include Decommissioned Assets
             </label>
           </div>
         </div>
@@ -381,11 +428,11 @@ export default function MachinesPage() {
 
       {/* Machines Grid */}
       {loading ? (
-        <p className="text-secondary">Loading factory gearbox profiles from API...</p>
+        <p className="text-secondary">Loading factory equipment profiles from API...</p>
       ) : filteredMachines.length === 0 ? (
         <Card title="No Matching Machines Found">
           <p className="text-secondary">
-            No gearboxes match the selected filter criteria within your factory scope.
+            No equipment matches the selected filter criteria within your factory scope.
           </p>
         </Card>
       ) : (
@@ -398,9 +445,12 @@ export default function MachinesPage() {
               <Card
                 key={machine._id || machineId}
                 title={`${machineId}: ${machine.name}`}
-                subtitle={`${machine.manufacturer || 'Industrial'} • Model ${machine.model || 'Standard'}`}
+                subtitle={`${machine.manufacturer || 'Industrial'} • Model ${machine.model || 'Standard'} • ${MACHINE_TYPE_LABELS[machine.type] || machine.type || 'Equipment'}`}
                 badge={
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className="badge badge-info" style={{ fontSize: 10 }}>
+                      {INDUSTRY_LABELS[machine.industry] || machine.industry || 'Manufacturing'}
+                    </span>
                     <span className={`badge ${isDecomm ? 'badge-critical' : 'badge-info'}`}>
                       {machine.operationalStatus?.toUpperCase() || 'OPERATIONAL'}
                     </span>
@@ -421,69 +471,93 @@ export default function MachinesPage() {
                       size="sm"
                       onClick={() => navigate(`#/machines/${machineId}`)}
                     >
-                      View Gearbox Profile →
+                      <span>View Machine Profile</span>
+                      <Icon name="arrowRight" size={13} style={{ marginLeft: 6 }} />
                     </Button>
                   </div>
                 }
               >
                 {isDecomm && (
                   <div style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                    borderColor: '#ef4444',
+                    backgroundColor: '#fef2f2',
+                    borderColor: '#fecaca',
                     borderWidth: 1,
                     borderStyle: 'solid',
                     borderRadius: 6,
                     padding: '8px 12px',
                     marginBottom: 12,
                     fontSize: 12,
-                    color: '#fca5a5'
+                    color: '#991b1b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
                   }}>
-                    ⚠️ <strong>Soft-Decommissioned:</strong> Unavailable for new operational analysis runs.
-                    {machine.decommissionReason && <div>Reason: {machine.decommissionReason}</div>}
+                    <Icon name="alert" size={14} color="#dc2626" />
+                    <div>
+                      <strong>Soft-Decommissioned:</strong> Unavailable for new operational analysis runs.
+                      {machine.decommissionReason && <div>Reason: {machine.decommissionReason}</div>}
+                    </div>
+                  </div>
+                )}
+
+                {machine.operatingContext && (
+                  <div style={{
+                    fontSize: 12,
+                    color: '#94a3b8',
+                    marginBottom: 10,
+                    padding: '6px 10px',
+                    borderRadius: 4,
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    borderLeft: '3px solid #8b5cf6'
+                  }}>
+                    <strong style={{ color: '#c4b5fd' }}>Operating Context:</strong> {machine.operatingContext}
                   </div>
                 )}
 
                 <div className="machine-spec-grid">
                   <div className="spec-item">
-                    <span className="spec-label">Arrangement</span>
-                    <span className="spec-value">{machine.arrangement || 'Helical-Planetary'}</span>
+                    <span className="spec-label">Machine Type</span>
+                    <span className="spec-value" style={{ fontSize: 12 }}>{MACHINE_TYPE_LABELS[machine.type] || machine.type || 'Gearbox'}</span>
                   </div>
                   <div className="spec-item">
-                    <span className="spec-label">Overall Ratio</span>
-                    <span className="spec-value">{machine.gearRatio || '14.2:1'}</span>
+                    <span className="spec-label">{machine.type === MACHINE_TYPES.GEARBOX ? 'Arrangement' : 'Kinematics'}</span>
+                    <span className="spec-value">{machine.arrangement || 'Direct Drive'}</span>
                   </div>
                   <div className="spec-item">
                     <span className="spec-label">Rated Speed</span>
                     <span className="spec-value">{machine.ratedSpeedRpm || 1780} RPM</span>
                   </div>
                   <div className="spec-item">
-                    <span className="spec-label">Rated Torque</span>
-                    <span className="spec-value">{machine.ratedTorqueNm || 480} Nm</span>
+                    <span className="spec-label">{machine.type === MACHINE_TYPES.GEARBOX ? 'Overall Ratio' : 'Load / Rating'}</span>
+                    <span className="spec-value">{machine.gearRatio || (machine.ratedTorqueNm ? `${machine.ratedTorqueNm} Nm` : 'Nominal')}</span>
                   </div>
                   <div className="spec-item">
-                    <span className="spec-label">Lubricant Grade</span>
-                    <span className="spec-value">{machine.lubrication?.isoVgGrade || machine.lubricantType || 'ISO VG 220'}</span>
+                    <span className="spec-label">{machine.type === MACHINE_TYPES.GEARBOX ? 'Lubricant' : 'Monitored Signals'}</span>
+                    <span className="spec-value">{machine.type === MACHINE_TYPES.GEARBOX ? (machine.lubrication?.isoVgGrade || 'ISO VG 220') : `${machine.monitoredSignals?.length || 6} Channels`}</span>
                   </div>
                   <div className="spec-item">
-                    <span className="spec-label">Reduction Stages</span>
-                    <span className="spec-value">{machine.stages?.length || 2} Stages</span>
+                    <span className="spec-label">{machine.type === MACHINE_TYPES.GEARBOX ? 'Reduction Stages' : 'Asset Status'}</span>
+                    <span className="spec-value">{machine.type === MACHINE_TYPES.GEARBOX ? `${machine.stages?.length || 2} Stages` : 'Active Telemetry'}</span>
                   </div>
                 </div>
 
                 {/* Assigned Technicians */}
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #1e293b' }}>
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #ede9f6' }}>
                   <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Assigned Field Technicians:
                   </span>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
                     {machine.assignedTechnicians && machine.assignedTechnicians.length > 0 ? (
                       machine.assignedTechnicians.map((t) => (
-                        <span key={t._id || t} className="badge badge-info" style={{ fontSize: 11 }}>
-                          👤 {t.fullName || t.name || 'Technician'}
+                        <span key={t._id || t} className="badge badge-info" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="user" size={12} /> {t.fullName || t.name || 'Technician'}
+                          {(t.isDemoAccount || t.email?.includes('.factory')) && (
+                            <span className="badge badge-demo" style={{ marginLeft: 3, padding: '1px 4px', fontSize: 9 }}>Demo</span>
+                          )}
                         </span>
                       ))
                     ) : (
-                      <span style={{ fontSize: 12, color: '#94a3b8' }}>None currently assigned (Manager scope only)</span>
+                      <span style={{ fontSize: 12, color: '#64748b' }}>None currently assigned (Manager scope only)</span>
                     )}
                   </div>
                 </div>
@@ -493,28 +567,74 @@ export default function MachinesPage() {
         </div>
       )}
 
-      {/* ================= MODAL: Register New Gearbox ================= */}
+      {/* ================= MODAL: Register New Machine ================= */}
       {showMachineModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title-gearbox">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title-machine">
           <div className="modal-card" style={{ maxWidth: 720, maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-header">
-              <h2 id="modal-title-gearbox" className="modal-title">Register Industrial Gearbox Profile</h2>
+              <h2 id="modal-title-machine" className="modal-title">Register Industrial Asset Profile</h2>
               <button
                 className="modal-close-btn"
                 onClick={() => setShowMachineModal(false)}
                 aria-label="Close modal"
               >
-                ✕
+                <Icon name="close" size={16} />
               </button>
             </div>
 
             {formError && (
-              <div className="login-error-alert" role="alert" style={{ marginBottom: 12 }}>
-                <span>⚠️ {formError}</span>
+              <div className="login-error-alert" role="alert" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="alert" size={15} color="#dc2626" />
+                <span>{formError}</span>
               </div>
             )}
 
             <form onSubmit={handleCreateMachine} className="modal-form">
+              {/* Asset Type & Industry Sector */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="m-type">Machine Asset Type *</label>
+                  <select
+                    id="m-type"
+                    className="form-select"
+                    value={newMachine.type}
+                    onChange={(e) => setNewMachine({ ...newMachine, type: e.target.value })}
+                    required
+                  >
+                    {Object.entries(MACHINE_TYPE_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="m-industry">Industry Sector *</label>
+                  <select
+                    id="m-industry"
+                    className="form-select"
+                    value={newMachine.industry}
+                    onChange={(e) => setNewMachine({ ...newMachine, industry: e.target.value })}
+                    required
+                  >
+                    {Object.entries(INDUSTRY_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Operating Regime and Production Context */}
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label" htmlFor="m-context">Operating Regime & Production Context</label>
+                <input
+                  id="m-context"
+                  type="text"
+                  className="form-select"
+                  placeholder="e.g. Continuous high-pressure boiler feedwater circulation at 2950 RPM"
+                  value={newMachine.operatingContext}
+                  onChange={(e) => setNewMachine({ ...newMachine, operatingContext: e.target.value })}
+                />
+              </div>
+
               {/* Identity Row */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: 12 }}>
                 <div className="form-group">
@@ -523,7 +643,7 @@ export default function MachinesPage() {
                     id="m-code"
                     type="text"
                     className="form-select"
-                    placeholder="e.g. GB-301"
+                    placeholder="e.g. GB-301, PUMP-302"
                     value={newMachine.code}
                     onChange={(e) => setNewMachine({ ...newMachine, code: e.target.value })}
                     required
@@ -535,7 +655,7 @@ export default function MachinesPage() {
                     id="m-name"
                     type="text"
                     className="form-select"
-                    placeholder="e.g. Extruder Secondary Pinion"
+                    placeholder="e.g. Secondary Polymer Extruder Pinion"
                     value={newMachine.name}
                     onChange={(e) => setNewMachine({ ...newMachine, name: e.target.value })}
                     required
@@ -567,7 +687,7 @@ export default function MachinesPage() {
                     id="m-mfg"
                     type="text"
                     className="form-select"
-                    placeholder="e.g. Siemens / Flender"
+                    placeholder="e.g. Elecon / Kirloskar / BHEL"
                     value={newMachine.manufacturer}
                     onChange={(e) => setNewMachine({ ...newMachine, manufacturer: e.target.value })}
                   />
@@ -578,7 +698,7 @@ export default function MachinesPage() {
                     id="m-model"
                     type="text"
                     className="form-select"
-                    placeholder="e.g. B3SH-10"
+                    placeholder="e.g. B3SH-10 / DB-Series"
                     value={newMachine.model}
                     onChange={(e) => setNewMachine({ ...newMachine, model: e.target.value })}
                   />
@@ -589,171 +709,198 @@ export default function MachinesPage() {
                     id="m-sn"
                     type="text"
                     className="form-select"
-                    placeholder="e.g. SN-FL-2024-11"
+                    placeholder="e.g. SN-IN-2024-8841"
                     value={newMachine.serialNumber}
                     onChange={(e) => setNewMachine({ ...newMachine, serialNumber: e.target.value })}
                   />
                 </div>
               </div>
 
-              {/* Kinematics Specifications */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Arrangement</label>
-                  <select
-                    className="form-select"
-                    value={newMachine.arrangement}
-                    onChange={(e) => setNewMachine({ ...newMachine, arrangement: e.target.value })}
-                  >
-                    {GEARBOX_ARRANGEMENTS.map((arr) => (
-                      <option key={arr} value={arr}>{arr}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Overall Ratio</label>
-                  <input
-                    type="text"
-                    className="form-select"
-                    placeholder="e.g. 14.2:1"
-                    value={newMachine.gearRatio}
-                    onChange={(e) => setNewMachine({ ...newMachine, gearRatio: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Rated Speed (RPM)</label>
-                  <input
-                    type="number"
-                    className="form-select"
-                    placeholder="e.g. 1780"
-                    value={newMachine.ratedSpeedRpm}
-                    onChange={(e) => setNewMachine({ ...newMachine, ratedSpeedRpm: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Rated Torque (Nm)</label>
-                  <input
-                    type="number"
-                    className="form-select"
-                    placeholder="e.g. 480"
-                    value={newMachine.ratedTorqueNm}
-                    onChange={(e) => setNewMachine({ ...newMachine, ratedTorqueNm: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              {/* Stages List Editor */}
-              <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <label className="form-label" style={{ fontWeight: 700 }}>
-                    Gear Stages Breakdown ({newMachine.stages.length} Stages)
-                  </label>
-                  <Button type="button" variant="secondary" size="sm" onClick={handleAddStage}>
-                    + Add Stage
-                  </Button>
-                </div>
-
-                {newMachine.stages.map((stg, idx) => (
-                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 2fr 1fr 2fr 40px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: '#94a3b8' }}>Stg {idx + 1}</span>
-                    <input
-                      type="text"
-                      className="form-select"
-                      placeholder="Stage Type (e.g. Planetary)"
-                      value={stg.type}
-                      onChange={(e) => handleStageChange(idx, 'type', e.target.value)}
-                      required
-                    />
-                    <input
-                      type="text"
-                      className="form-select"
-                      placeholder="Ratio (3.5:1)"
-                      value={stg.ratio}
-                      onChange={(e) => handleStageChange(idx, 'ratio', e.target.value)}
-                      required
-                    />
-                    <input
-                      type="text"
-                      className="form-select"
-                      placeholder="Notes (e.g. Nominal tooth mesh)"
-                      value={stg.conditionNotes}
-                      onChange={(e) => handleStageChange(idx, 'conditionNotes', e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                      onClick={() => handleRemoveStage(idx)}
-                      title="Remove stage"
-                    >
-                      ✕
-                    </button>
+              {/* Kinematics Specifications (for Gearbox) */}
+              {newMachine.type === MACHINE_TYPES.GEARBOX ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                    <div className="form-group">
+                      <label className="form-label">Arrangement</label>
+                      <select
+                        className="form-select"
+                        value={newMachine.arrangement}
+                        onChange={(e) => setNewMachine({ ...newMachine, arrangement: e.target.value })}
+                      >
+                        {GEARBOX_ARRANGEMENTS.map((arr) => (
+                          <option key={arr} value={arr}>{arr}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Overall Ratio</label>
+                      <input
+                        type="text"
+                        className="form-select"
+                        placeholder="e.g. 14.2:1"
+                        value={newMachine.gearRatio}
+                        onChange={(e) => setNewMachine({ ...newMachine, gearRatio: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Rated Speed (RPM)</label>
+                      <input
+                        type="number"
+                        className="form-select"
+                        placeholder="e.g. 1780"
+                        value={newMachine.ratedSpeedRpm}
+                        onChange={(e) => setNewMachine({ ...newMachine, ratedSpeedRpm: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Rated Torque (Nm)</label>
+                      <input
+                        type="number"
+                        className="form-select"
+                        placeholder="e.g. 480"
+                        value={newMachine.ratedTorqueNm}
+                        onChange={(e) => setNewMachine({ ...newMachine, ratedTorqueNm: e.target.value })}
+                      />
+                    </div>
                   </div>
-                ))}
-              </div>
 
-              {/* Lubrication Specifications */}
-              <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Lubricating Oil Type</label>
-                  <input
-                    type="text"
-                    className="form-select"
-                    placeholder="e.g. Synthetic Polyalphaolefin"
-                    value={newMachine.lubrication.oilType}
-                    onChange={(e) => setNewMachine({
-                      ...newMachine,
-                      lubrication: { ...newMachine.lubrication, oilType: e.target.value }
-                    })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">ISO VG Grade</label>
-                  <select
-                    className="form-select"
-                    value={newMachine.lubrication.isoVgGrade}
-                    onChange={(e) => setNewMachine({
-                      ...newMachine,
-                      lubrication: { ...newMachine.lubrication, isoVgGrade: e.target.value }
-                    })}
-                  >
-                    {ISO_VG_GRADES.map((grade) => (
-                      <option key={grade} value={grade}>{grade}</option>
+                  {/* Stages List Editor */}
+                  <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <label className="form-label" style={{ fontWeight: 700 }}>
+                        Gear Stages Breakdown ({newMachine.stages.length} Stages)
+                      </label>
+                      <Button type="button" variant="secondary" size="sm" onClick={handleAddStage}>
+                        + Add Stage
+                      </Button>
+                    </div>
+
+                    {newMachine.stages.map((stg, idx) => (
+                      <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 2fr 1fr 2fr 40px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Stg {idx + 1}</span>
+                        <input
+                          type="text"
+                          className="form-select"
+                          placeholder="Stage Type (e.g. Planetary)"
+                          value={stg.type}
+                          onChange={(e) => handleStageChange(idx, 'type', e.target.value)}
+                          required
+                        />
+                        <input
+                          type="text"
+                          className="form-select"
+                          placeholder="Ratio (3.5:1)"
+                          value={stg.ratio}
+                          onChange={(e) => handleStageChange(idx, 'ratio', e.target.value)}
+                          required
+                        />
+                        <input
+                          type="text"
+                          className="form-select"
+                          placeholder="Notes (e.g. Nominal tooth mesh)"
+                          value={stg.conditionNotes}
+                          onChange={(e) => handleStageChange(idx, 'conditionNotes', e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                          onClick={() => handleRemoveStage(idx)}
+                          title="Remove stage"
+                        >
+                          <Icon name="close" size={14} color="#ef4444" />
+                        </button>
+                      </div>
                     ))}
-                  </select>
+                  </div>
+
+                  {/* Lubrication Specifications */}
+                  <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12, display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 12 }}>
+                    <div className="form-group">
+                      <label className="form-label">Lubricating Oil Type</label>
+                      <input
+                        type="text"
+                        className="form-select"
+                        placeholder="e.g. Synthetic Polyalphaolefin"
+                        value={newMachine.lubrication.oilType}
+                        onChange={(e) => setNewMachine({
+                          ...newMachine,
+                          lubrication: { ...newMachine.lubrication, oilType: e.target.value }
+                        })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">ISO VG Grade</label>
+                      <select
+                        className="form-select"
+                        value={newMachine.lubrication.isoVgGrade}
+                        onChange={(e) => setNewMachine({
+                          ...newMachine,
+                          lubrication: { ...newMachine.lubrication, isoVgGrade: e.target.value }
+                        })}
+                      >
+                        {ISO_VG_GRADES.map((grade) => (
+                          <option key={grade} value={grade}>{grade}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Sump Capacity (L)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        className="form-select"
+                        placeholder="18.5"
+                        value={newMachine.lubrication.capacityLiters}
+                        onChange={(e) => setNewMachine({
+                          ...newMachine,
+                          lubrication: { ...newMachine.lubrication, capacityLiters: e.target.value }
+                        })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Service Window (Hrs)</label>
+                      <input
+                        type="number"
+                        className="form-select"
+                        placeholder="4000"
+                        value={newMachine.lubrication.serviceIntervalHours}
+                        onChange={(e) => setNewMachine({
+                          ...newMachine,
+                          lubrication: { ...newMachine.lubrication, serviceIntervalHours: e.target.value }
+                        })}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, borderTop: '1px solid #1e293b', paddingTop: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Operating Speed (RPM)</label>
+                    <input
+                      type="number"
+                      className="form-select"
+                      placeholder="e.g. 2950"
+                      value={newMachine.ratedSpeedRpm}
+                      onChange={(e) => setNewMachine({ ...newMachine, ratedSpeedRpm: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Power / Torque Rating</label>
+                    <input
+                      type="text"
+                      className="form-select"
+                      placeholder="e.g. 55 kW or 480 Nm"
+                      value={newMachine.gearRatio}
+                      onChange={(e) => setNewMachine({ ...newMachine, gearRatio: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Sump Capacity (L)</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    className="form-select"
-                    placeholder="18.5"
-                    value={newMachine.lubrication.capacityLiters}
-                    onChange={(e) => setNewMachine({
-                      ...newMachine,
-                      lubrication: { ...newMachine.lubrication, capacityLiters: e.target.value }
-                    })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Service Window (Hrs)</label>
-                  <input
-                    type="number"
-                    className="form-select"
-                    placeholder="4000"
-                    value={newMachine.lubrication.serviceIntervalHours}
-                    onChange={(e) => setNewMachine({
-                      ...newMachine,
-                      lubrication: { ...newMachine.lubrication, serviceIntervalHours: e.target.value }
-                    })}
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Technician Assignment */}
               <div style={{ borderTop: '1px solid #1e293b', paddingTop: 12 }}>
                 <label className="form-label" style={{ marginBottom: 4, display: 'block' }}>
-                  Assign Authorized Technicians (Detroit Plant #2):
+                  Assign Field Technicians:
                 </label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {technicians.map((t) => {
@@ -772,7 +919,16 @@ export default function MachinesPage() {
                           }));
                         }}
                       >
-                        {isSelected ? '✓ ' : '+ '} {t.fullName} ({t.email})
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {isSelected && <Icon name="check" size={12} color="var(--primary)" />}
+                          {isSelected ? '' : '+ '} {t.fullName}
+                          {(t.isDemoAccount || t.email?.includes('.factory')) && (
+                            <span className="badge badge-demo" style={{ marginLeft: 3, padding: '1px 4px', fontSize: 9 }}>Demo</span>
+                          )}
+                          <span style={{ opacity: 0.7, fontSize: 11 }}>
+                            ({t.activeWorkload !== undefined ? `${t.activeWorkload} active` : t.availability})
+                          </span>
+                        </span>
                       </button>
                     );
                   })}
@@ -784,7 +940,7 @@ export default function MachinesPage() {
                   Cancel
                 </Button>
                 <Button type="submit" variant="primary" loading={formSubmitting}>
-                  Register Gearbox Specimen
+                  Register Asset Profile
                 </Button>
               </div>
             </form>
@@ -803,13 +959,14 @@ export default function MachinesPage() {
                 onClick={() => setShowSiteModal(false)}
                 aria-label="Close modal"
               >
-                ✕
+                <Icon name="close" size={16} />
               </button>
             </div>
 
             {formError && (
-              <div className="login-error-alert" role="alert" style={{ marginBottom: 12 }}>
-                <span>⚠️ {formError}</span>
+              <div className="login-error-alert" role="alert" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="alert" size={15} color="#dc2626" />
+                <span>{formError}</span>
               </div>
             )}
 

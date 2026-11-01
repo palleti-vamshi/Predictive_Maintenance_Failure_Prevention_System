@@ -9,28 +9,20 @@ export default function AlertCallout({
   timestamp,
   contributingSignals = [],
   action,
-  isSimulated = true
+  isSimulated = false
 }) {
   const borderColors = {
-    critical: 'rgba(244, 63, 94, 0.4)',
-    warning: 'rgba(245, 158, 11, 0.4)',
-    info: 'rgba(14, 165, 233, 0.4)',
-    demo: 'rgba(168, 85, 247, 0.4)'
-  };
-
-  const bgColors = {
-    critical: 'rgba(244, 63, 94, 0.08)',
-    warning: 'rgba(245, 158, 11, 0.08)',
-    info: 'rgba(14, 165, 233, 0.08)',
-    demo: 'rgba(168, 85, 247, 0.08)'
+    critical: '#dc2626',
+    warning: '#d97706',
+    info: '#7c3aed',
+    demo: '#7c3aed'
   };
 
   return (
     <View style={[
       styles.container,
       {
-        borderColor: borderColors[severity] || borderColors.info,
-        backgroundColor: bgColors[severity] || bgColors.info
+        borderLeftColor: borderColors[severity] || borderColors.info,
       }
     ]}>
       <View style={styles.header}>
@@ -63,10 +55,18 @@ export default function AlertCallout({
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: '#ffffff',
     borderWidth: 1,
+    borderColor: '#ede9f6',
+    borderLeftWidth: 4,
     borderRadius: 8,
     padding: 14,
     gap: 8,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   header: {
     flexDirection: 'row',
@@ -74,31 +74,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   time: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#64748b',
-    fontFamily: 'monospace',
   },
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   desc: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#475569',
     lineHeight: 18,
   },
   signalsContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 6,
-    padding: 8,
-    gap: 4,
-    marginTop: 2,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopColor: '#f1f5f9',
+    borderTopWidth: 1,
+    gap: 6,
   },
   signalsHeader: {
     fontSize: 10,
     color: '#64748b',
-    fontWeight: '600',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   signalsList: {
     flexDirection: 'row',
@@ -106,33 +106,31 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   signalPill: {
-    backgroundColor: '#1a2744',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
     flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     alignItems: 'center',
     gap: 4,
   },
   signalName: {
     fontSize: 10,
-    color: '#94a3b8',
+    color: '#64748b',
   },
   signalVal: {
     fontSize: 10,
-    color: '#f8fafc',
+    color: '#1e1b4b',
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   signalDelta: {
     fontSize: 9,
-    color: '#f59e0b',
-    fontWeight: '700',
+    color: '#d97706',
+    fontWeight: '600',
   },
   actionSlot: {
-    marginTop: 4,
+    marginTop: 6,
   },
 });
-

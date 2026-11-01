@@ -16,6 +16,7 @@ import { startModelTrainingJob, startAnalysisRunJob } from '../services/mlJob.se
 import {
   USER_ROLES,
   MACHINE_TYPES,
+  INDUSTRIES,
   SIGNAL_CATEGORIES,
   OPERATIONAL_STATUS,
   WORK_ORDER_STATUS,
@@ -72,22 +73,36 @@ async function seed() {
   ]);
 
   // 1. Create Organization
-  console.log('[Seed] Creating Organization...');
+  console.log('[Seed] Creating Organization (Bharat Industrial Dynamics)...');
   const org = await Organization.create({
-    name: 'Apex Industrial Manufacturing',
-    code: 'APEX_MFG'
+    name: 'Bharat Heavy Powertrain Dynamics Ltd. (Apex BHPD)',
+    code: 'BHARAT_DYNAMICS'
   });
 
-  // 2. Create Factory 1 (Detroit Plant #2)
-  console.log('[Seed] Creating Factory 1 (Detroit)...');
+  // 2. Create 3 Demonstrator Factories (Pune #2, Chennai #1, Hyderabad #3)
+  console.log('[Seed] Creating 3 Factories (Pune #2, Chennai #1, Hyderabad #3)...');
   const factoryDetroit = await Factory.create({
     organizationId: org._id,
-    name: 'Detroit Powertrain Plant #2',
-    code: 'DETROIT_02',
-    location: 'Detroit, MI, USA'
+    name: 'Pune Precision Powertrains Plant #2',
+    code: 'PUNE_02',
+    location: 'Chakan Industrial Corridor, Pune, Maharashtra, India'
   });
 
-  // 3. Create Sites in Factory 1
+  const factoryCleveland = await Factory.create({
+    organizationId: org._id,
+    name: 'Chennai Heavy Transmissions & Drives #1',
+    code: 'CHENNAI_01',
+    location: 'Sriperumbudur Industrial Park, Chennai, Tamil Nadu, India'
+  });
+
+  const factoryStuttgart = await Factory.create({
+    organizationId: org._id,
+    name: 'Hyderabad Hydraulic & Turbo Machinery #3',
+    code: 'HYDERABAD_03',
+    location: 'Sanath Nagar Industrial Estate, Hyderabad, Telangana, India'
+  });
+
+  // 3. Create Sites in Factory 1 (Pune)
   const siteLine4 = await Site.create({
     factoryId: factoryDetroit._id,
     name: 'Extrusion Line 4',
@@ -112,8 +127,8 @@ async function seed() {
     description: 'Heavy gantry milling machine gearboxes'
   });
 
-  // 4. Create Passwords & Users for Detroit
-  console.log('[Seed] Creating Factory 1 Users...');
+  // 4. Create Passwords & Users for Pune (Factory 1)
+  console.log('[Seed] Creating Factory 1 (Pune) Users...');
   const managerPasswordHash = await User.hashPassword(DEMO_MANAGER_PW);
   const techPasswordHash = await User.hashPassword(DEMO_TECH_PW);
   const viewerPasswordHash = await User.hashPassword(DEMO_VIEWER_PW);
@@ -121,50 +136,88 @@ async function seed() {
   const managerUser = await User.create({
     email: 'manager@detroit.factory',
     username: 'manager_detroit',
-    fullName: 'Sarah Vance',
+    fullName: 'Sunita Rao',
     passwordHash: managerPasswordHash,
     role: USER_ROLES.FACTORY_MANAGER,
     organizationId: org._id,
     factoryId: factoryDetroit._id,
+    authorizedFactories: [factoryDetroit._id, factoryCleveland._id, factoryStuttgart._id],
     assignedSites: [siteLine4._id, siteBayB._id, siteMachining._id],
-    assignedMachines: []
+    assignedMachines: [],
+    isDemoAccount: true
   });
 
   const techUser = await User.create({
     email: 'tech@detroit.factory',
     username: 'tech_detroit',
-    fullName: 'Alex Mercer',
+    fullName: 'Rajesh Kumar',
     passwordHash: techPasswordHash,
     role: USER_ROLES.TECHNICIAN,
     organizationId: org._id,
     factoryId: factoryDetroit._id,
+    skills: ['Vibration Analysis ISO 18436 CAT II', 'Gearbox Overhaul & Backlash', 'Thermography Level 1'],
+    availability: 'assigned',
     assignedSites: [siteLine4._id],
-    assignedMachines: []
+    assignedMachines: [],
+    isDemoAccount: true
+  });
+
+  const tech2User = await User.create({
+    email: 'tech2@detroit.factory',
+    username: 'tech2_detroit',
+    fullName: 'Vikram Patel',
+    passwordHash: techPasswordHash,
+    role: USER_ROLES.TECHNICIAN,
+    organizationId: org._id,
+    factoryId: factoryDetroit._id,
+    skills: ['Dynamic Balancing & Laser Alignment', 'Centrifugal Pump Overhaul', 'Lubrication Tribology'],
+    availability: 'available',
+    assignedSites: [siteLine4._id, siteBayB._id],
+    assignedMachines: [],
+    isDemoAccount: true
+  });
+
+  const tech3User = await User.create({
+    email: 'tech3@detroit.factory',
+    username: 'tech3_detroit',
+    fullName: 'Ananya Sharma',
+    passwordHash: techPasswordHash,
+    role: USER_ROLES.TECHNICIAN,
+    organizationId: org._id,
+    factoryId: factoryDetroit._id,
+    skills: ['Acoustic Emission Testing', 'Electric Motor Diagnostic & Megger Testing', 'Oil Condition Monitoring'],
+    availability: 'available',
+    assignedSites: [siteLine4._id, siteMachining._id],
+    assignedMachines: [],
+    isDemoAccount: true
   });
 
   const viewerUser = await User.create({
     email: 'viewer@detroit.factory',
     username: 'viewer_detroit',
-    fullName: 'David Sterling',
+    fullName: 'Amit Desai',
     passwordHash: viewerPasswordHash,
     role: USER_ROLES.VIEWER,
     organizationId: org._id,
     factoryId: factoryDetroit._id,
     assignedSites: [siteLine4._id, siteBayB._id],
-    assignedMachines: []
+    assignedMachines: [],
+    isDemoAccount: true
   });
 
-  // 5. Create Machines in Factory 1
-  console.log('[Seed] Creating Gearbox Specimens in Detroit...');
+  // 5. Create Machines in Factory 1 (Pune)
+  console.log('[Seed] Creating Multi-Industry Machine Assets in Pune...');
   const machineGB104 = await Machine.create({
     factoryId: factoryDetroit._id,
     siteId: siteLine4._id,
     code: 'GB-104',
     name: 'Main Extruder Drive Gearbox',
     type: MACHINE_TYPES.GEARBOX,
-    manufacturer: 'Siemens / Flender Helical-Planetary',
+    industry: INDUSTRIES.MANUFACTURING,
+    operatingContext: 'Continuous polymer extrusion compounding line; operating speed 1495 RPM, rated load 480 Nm',
+    manufacturer: 'Elecon Engineering / Siemens Flender',
     model: 'B3SH-10',
-    serialNumber: 'SN-FL-2023-8841',
+    serialNumber: 'SN-ELE-2023-8841',
     operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
     status: 'warning',
     isDecommissioned: false,
@@ -228,7 +281,7 @@ async function seed() {
     assignedTechnicians: [techUser._id],
     notes: [
       {
-        author: 'Alex Mercer (technician)',
+        author: 'Rajesh Kumar (technician)',
         authorId: techUser._id,
         category: 'Field Inspection',
         content: 'Inspected drive-end labyrinth seal for weeping. Replenished 250ml synthetic gear oil.',
@@ -243,9 +296,11 @@ async function seed() {
     code: 'GB-201',
     name: 'Cooling Water Circulator Gearbox',
     type: MACHINE_TYPES.GEARBOX,
-    manufacturer: 'SEW-Eurodrive Bevel-Helical',
+    industry: INDUSTRIES.MANUFACTURING,
+    operatingContext: 'Secondary cooling recirculation circuit, Utility Bay B',
+    manufacturer: 'Premium Transmission / SEW-Eurodrive',
     model: 'K77-DRE132',
-    serialNumber: 'SN-SEW-2022-1092',
+    serialNumber: 'SN-PREM-2022-1092',
     operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
     status: 'healthy',
     isDecommissioned: false,
@@ -279,15 +334,71 @@ async function seed() {
     notes: []
   });
 
+  const machinePump301 = await Machine.create({
+    factoryId: factoryDetroit._id,
+    siteId: siteBayB._id,
+    code: 'PUMP-301',
+    name: 'High-Pressure Boiler Feed Water Pump',
+    type: MACHINE_TYPES.CENTRIFUGAL_PUMP,
+    industry: INDUSTRIES.WATER_WASTEWATER,
+    operatingContext: 'High pressure raw water intake and boiler feedwater circulation',
+    manufacturer: 'Kirloskar Brothers Limited (KBL)',
+    model: 'DB Series End-Suction',
+    serialNumber: 'SN-KBL-2024-4412',
+    operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
+    status: 'healthy',
+    isDecommissioned: false,
+    ratedSpeedRpm: 2950,
+    monitoredSignals: [
+      { key: 'flow_rate', label: 'Discharge Flow Rate', unit: 'm³/h', category: SIGNAL_CATEGORIES.FLOW },
+      { key: 'suction_pressure', label: 'Suction Line Pressure', unit: 'bar', category: SIGNAL_CATEGORIES.PRESSURE },
+      { key: 'discharge_pressure', label: 'Discharge Line Pressure', unit: 'bar', category: SIGNAL_CATEGORIES.PRESSURE },
+      { key: 'vibration_casing_radial', label: 'Pump Casing Vibration', unit: 'mm/s', category: SIGNAL_CATEGORIES.VIBRATION },
+      { key: 'temp_bearing_de', label: 'DE Bearing Temperature', unit: '°C', category: SIGNAL_CATEGORIES.THERMAL },
+      { key: 'rotational_speed', label: 'Pump Shaft Speed', unit: 'RPM', category: SIGNAL_CATEGORIES.OPERATING_REGIME }
+    ],
+    assignedTechnicians: [tech2User._id],
+    notes: []
+  });
+
+  const machineMotor102 = await Machine.create({
+    factoryId: factoryDetroit._id,
+    siteId: siteLine4._id,
+    code: 'MTR-102',
+    name: 'Primary Induction Drive Motor',
+    type: MACHINE_TYPES.ELECTRIC_MOTOR,
+    industry: INDUSTRIES.ENERGY_UTILITIES,
+    operatingContext: 'Three-phase grid connected drive motor coupled to Extrusion Line 4',
+    manufacturer: 'Bharat Heavy Electricals Limited (BHEL)',
+    model: 'IE3 Ultra-Premium Induction',
+    serialNumber: 'SN-BHEL-2023-7721',
+    operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
+    status: 'healthy',
+    isDecommissioned: false,
+    ratedSpeedRpm: 1500,
+    monitoredSignals: [
+      { key: 'motor_current_phase_a', label: 'Phase A Current', unit: 'A', category: SIGNAL_CATEGORIES.ELECTRICAL },
+      { key: 'motor_voltage_line', label: 'Line Voltage', unit: 'V', category: SIGNAL_CATEGORIES.ELECTRICAL },
+      { key: 'motor_active_power', label: 'Active Power Consumption', unit: 'kW', category: SIGNAL_CATEGORIES.ELECTRICAL },
+      { key: 'temp_winding_u', label: 'Stator Winding U Temp', unit: '°C', category: SIGNAL_CATEGORIES.THERMAL },
+      { key: 'vibration_de_radial', label: 'Drive-End Radial Vibration', unit: 'mm/s', category: SIGNAL_CATEGORIES.VIBRATION },
+      { key: 'rotational_speed', label: 'Rotor Speed', unit: 'RPM', category: SIGNAL_CATEGORIES.OPERATING_REGIME }
+    ],
+    assignedTechnicians: [tech3User._id],
+    notes: []
+  });
+
   // Assign machines to users
-  managerUser.assignedMachines = [machineGB104._id, machineGB201._id];
-  techUser.assignedMachines = [machineGB104._id]; // Assigned exclusively to GB-104!
-  viewerUser.assignedMachines = [machineGB104._id, machineGB201._id];
+  managerUser.assignedMachines = [machineGB104._id, machineGB201._id, machinePump301._id, machineMotor102._id];
+  techUser.assignedMachines = [machineGB104._id]; // Assigned to GB-104
+  tech2User.assignedMachines = [machineGB201._id, machinePump301._id]; // Assigned to GB-201 and PUMP-301
+  tech3User.assignedMachines = [machineMotor102._id]; // Assigned to MTR-102
+  viewerUser.assignedMachines = [machineGB104._id, machineGB201._id, machinePump301._id, machineMotor102._id];
 
-  await Promise.all([managerUser.save(), techUser.save(), viewerUser.save()]);
+  await Promise.all([managerUser.save(), techUser.save(), tech2User.save(), tech3User.save(), viewerUser.save()]);
 
-  // 6. Create Maintenance Work Orders in Detroit
-  console.log('[Seed] Creating Maintenance Work Orders in Detroit...');
+  // 6. Create Maintenance Work Orders in Pune
+  console.log('[Seed] Creating Maintenance Work Orders in Pune...');
   const order1 = await MaintenanceWorkOrder.create({
     factoryId: factoryDetroit._id,
     machineId: machineGB104._id,
@@ -306,7 +417,7 @@ async function seed() {
         changedByName: managerUser.fullName,
         changedByRole: managerUser.role,
         timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        note: 'Work order created and assigned to Alex Mercer.'
+        note: 'Work order created and assigned to Rajesh Kumar.'
       },
       {
         status: WORK_ORDER_STATUS.IN_PROGRESS,
@@ -364,6 +475,84 @@ async function seed() {
         changedByRole: managerUser.role,
         timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
         note: 'Reviewed and closed by plant manager.'
+      }
+    ]
+  });
+
+  const order3 = await MaintenanceWorkOrder.create({
+    factoryId: factoryDetroit._id,
+    machineId: machineGB104._id,
+    orderNumber: 'WO-GB104-003',
+    title: 'Replacement Output Labyrinth Oil Seals',
+    description: 'Procure and replace weeping drive-end nitrile lip seal (SKF 110x140x12 HMS5 RG) before next extrusion campaign.',
+    priority: WORK_ORDER_PRIORITY.HIGH,
+    status: WORK_ORDER_STATUS.WAITING_FOR_PARTS,
+    dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    assignedTechnicianId: techUser._id,
+    createdById: managerUser._id,
+    approvalRequest: {
+      requestType: 'parts',
+      reason: 'Standard stock depleted. Need 2x SKF 110x140x12 HMS5 RG viton lip seals for high-temperature service. Estimated spare part cost: ₹18,500.',
+      requestedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+      requestedById: techUser._id,
+      requestedByName: techUser.fullName,
+      status: 'pending'
+    },
+    statusHistory: [
+      {
+        status: WORK_ORDER_STATUS.OPEN,
+        changedById: managerUser._id,
+        changedByName: managerUser.fullName,
+        changedByRole: managerUser.role,
+        timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000),
+        note: 'Work order created.'
+      },
+      {
+        status: WORK_ORDER_STATUS.IN_PROGRESS,
+        changedById: techUser._id,
+        changedByName: techUser.fullName,
+        changedByRole: techUser.role,
+        timestamp: new Date(Date.now() - 10 * 60 * 60 * 1000),
+        note: 'Technician inspected seal and identified worn lip.'
+      },
+      {
+        status: WORK_ORDER_STATUS.WAITING_FOR_PARTS,
+        changedById: techUser._id,
+        changedByName: techUser.fullName,
+        changedByRole: techUser.role,
+        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
+        note: 'Technician submitted parts request for 2x Viton lip seals.'
+      }
+    ]
+  });
+
+  const orderPump = await MaintenanceWorkOrder.create({
+    factoryId: factoryDetroit._id,
+    machineId: machinePump301._id,
+    orderNumber: 'WO-PUMP301-001',
+    title: 'Inspect Mechanical Seal Flush Piping & Dynamic Laser Alignment',
+    description: 'Perform laser shaft alignment between motor and pump casing; verify Plan 11 seal flush piping differential pressure.',
+    priority: WORK_ORDER_PRIORITY.MEDIUM,
+    status: WORK_ORDER_STATUS.IN_PROGRESS,
+    dueDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
+    assignedTechnicianId: tech2User._id,
+    createdById: managerUser._id,
+    statusHistory: [
+      {
+        status: WORK_ORDER_STATUS.OPEN,
+        changedById: managerUser._id,
+        changedByName: managerUser.fullName,
+        changedByRole: managerUser.role,
+        timestamp: new Date(Date.now() - 14 * 60 * 60 * 1000),
+        note: 'Work order created for routine centrifugal pump inspection.'
+      },
+      {
+        status: WORK_ORDER_STATUS.IN_PROGRESS,
+        changedById: tech2User._id,
+        changedByName: tech2User.fullName,
+        changedByRole: tech2User.role,
+        timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
+        note: 'Technician commenced laser alignment check.'
       }
     ]
   });
@@ -430,8 +619,10 @@ async function seed() {
     siteId: siteLine4._id,
     machineId: machineGB104._id,
     datasetType: DATASET_TYPES.OPERATIONAL,
-    title: 'GB-104 Extruder Baseline Steady-State Telemetry',
-    description: '300-minute high-fidelity steady state operational run under 485 Nm rated nominal load at 1495 RPM.',
+    title: 'GB-104 Extruder Simulator Test Telemetry [Demo Data]',
+    description: '300-minute high-fidelity simulated steady-state and stepped anomaly test telemetry for GB-104 extruder drive under 480 Nm rated nominal load at 1495 RPM [Demo Data].',
+    isSimulatorDerived: true,
+    isDemoData: true,
     status: DATASET_STATUS.READY,
     uploadedById: techUser._id,
     uploadedByName: techUser.fullName,
@@ -1145,19 +1336,14 @@ async function seed() {
     }
   });
 
-  // 8. Create Factory 2 (Cleveland Plant #1) for Cross-Factory Scoping Tests
-  console.log('[Seed] Creating Factory 2 (Cleveland) for Cross-Factory Authorization Tests...');
-  const factoryCleveland = await Factory.create({
-    organizationId: org._id,
-    name: 'Cleveland Gear Works #1',
-    code: 'CLEVELAND_01',
-    location: 'Cleveland, OH, USA'
-  });
-
+  // 8. Configure Factory 2 (Chennai Heavy Transmissions & Drives #1)
+  console.log('[Seed] Configuring Factory 2 (Chennai Heavy Transmissions & Drives #1)...');
   const siteClevelandBay = await Site.create({
     factoryId: factoryCleveland._id,
     name: 'Testing Bay 1',
-    code: 'TEST_BAY_1'
+    code: 'TEST_BAY_1',
+    area: 'High Speed Dynamics',
+    description: 'Pinion and bevel testing rigs'
   });
 
   const machineGB999 = await Machine.create({
@@ -1166,52 +1352,244 @@ async function seed() {
     code: 'GB-999',
     name: 'High-Speed Pinion Rig',
     type: MACHINE_TYPES.GEARBOX,
-    manufacturer: 'Horsburgh & Scott',
-    model: 'HS-Test-4',
-    serialNumber: 'SN-HS-TEST-99',
+    industry: INDUSTRIES.MANUFACTURING,
+    operatingContext: 'Endurance test rig for heavy automotive transmissions',
+    manufacturer: 'Shanthi Gears / Murugappa Group',
+    model: 'SG-Test-4',
+    serialNumber: 'SN-SG-TEST-99',
     status: 'healthy',
     operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
+    arrangement: 'Parallel Helical',
+    stageCount: 1,
     gearRatio: '8.4:1',
     ratedSpeedRpm: 2400,
     ratedTorqueNm: 600,
-    stages: [],
-    monitoredSignals: []
+    stages: [
+      { stage: 1, type: 'Helical Reduction Stage', ratio: '8.4:1', teethPinion: 15, teethGear: 126, conditionNotes: 'Tooth mesh verified [DEMO]' }
+    ],
+    monitoredSignals: [
+      { key: 'vibration_input_radial', label: 'Input Radial Vibration', unit: 'mm/s', category: SIGNAL_CATEGORIES.VIBRATION },
+      { key: 'temp_gearbox_sump', label: 'Sump Temperature', unit: '°C', category: SIGNAL_CATEGORIES.THERMAL },
+      { key: 'rotational_speed', label: 'Shaft Speed', unit: 'RPM', category: SIGNAL_CATEGORIES.OPERATING_REGIME }
+    ]
+  });
+
+  const machineComp204 = await Machine.create({
+    factoryId: factoryCleveland._id,
+    siteId: siteClevelandBay._id,
+    code: 'COMP-204',
+    name: 'Two-Stage Rotary Screw Gas Compressor',
+    type: MACHINE_TYPES.COMPRESSOR,
+    industry: INDUSTRIES.CHEMICAL_PROCESS,
+    operatingContext: 'Process gas blanket compression for chemical reactor vessels',
+    manufacturer: 'ELGi Equipments Limited',
+    model: 'EG Series 55 kW Screw Compressor',
+    serialNumber: 'SN-ELGI-2024-1104',
+    status: 'healthy',
+    operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
+    ratedSpeedRpm: 3000,
+    monitoredSignals: [
+      { key: 'stage1_discharge_pressure', label: 'Stage 1 Discharge Pressure', unit: 'bar', category: SIGNAL_CATEGORIES.PRESSURE },
+      { key: 'stage2_discharge_pressure', label: 'Stage 2 Discharge Pressure', unit: 'bar', category: SIGNAL_CATEGORIES.PRESSURE },
+      { key: 'discharge_air_temp', label: 'Discharge Air Temperature', unit: '°C', category: SIGNAL_CATEGORIES.THERMAL },
+      { key: 'vibration_airend_radial', label: 'Airend Radial Vibration', unit: 'mm/s', category: SIGNAL_CATEGORIES.VIBRATION },
+      { key: 'oil_injection_temp', label: 'Lube Oil Injection Temp', unit: '°C', category: SIGNAL_CATEGORIES.THERMAL },
+      { key: 'rotational_speed', label: 'Male Rotor Speed', unit: 'RPM', category: SIGNAL_CATEGORIES.OPERATING_REGIME }
+    ]
+  });
+
+  const techCleveland = await User.create({
+    email: 'tech@cleveland.factory',
+    username: 'tech_cleveland',
+    fullName: 'K. Anand',
+    passwordHash: techPasswordHash,
+    role: USER_ROLES.TECHNICIAN,
+    organizationId: org._id,
+    factoryId: factoryCleveland._id,
+    skills: ['Compressor Maintenance', 'Laser Alignment', 'Oil Sampling'],
+    availability: 'available',
+    assignedSites: [siteClevelandBay._id],
+    assignedMachines: [machineGB999._id, machineComp204._id],
+    isDemoAccount: true
   });
 
   const clevelandManager = await User.create({
     email: 'manager@cleveland.factory',
     username: 'manager_cleveland',
-    fullName: 'Elena Rostova',
+    fullName: 'R. Venkatraman',
     passwordHash: managerPasswordHash,
     role: USER_ROLES.FACTORY_MANAGER,
     organizationId: org._id,
     factoryId: factoryCleveland._id,
+    authorizedFactories: [factoryCleveland._id, factoryDetroit._id, factoryStuttgart._id],
     assignedSites: [siteClevelandBay._id],
-    assignedMachines: [machineGB999._id]
+    assignedMachines: [machineGB999._id, machineComp204._id],
+    isDemoAccount: true
+  });
+
+  await MaintenanceWorkOrder.create({
+    factoryId: factoryCleveland._id,
+    machineId: machineGB999._id,
+    orderNumber: 'WO-GB999-001',
+    title: 'Inspect High-Speed Pinion Flank Finish',
+    description: 'Perform optical tooth surface inspection following 500-hour endurance test.',
+    priority: WORK_ORDER_PRIORITY.MEDIUM,
+    status: WORK_ORDER_STATUS.OPEN,
+    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    assignedTechnicianId: techCleveland._id,
+    createdById: clevelandManager._id,
+    statusHistory: [
+      {
+        status: WORK_ORDER_STATUS.OPEN,
+        changedById: clevelandManager._id,
+        changedByName: clevelandManager.fullName,
+        changedByRole: clevelandManager.role,
+        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        note: 'Scheduled post-run inspection.'
+      }
+    ]
+  });
+
+  // 9. Configure Factory 3 (Hyderabad Hydraulic & Turbo Machinery #3)
+  console.log('[Seed] Configuring Factory 3 (Hyderabad Hydraulic & Turbo Machinery #3)...');
+  const siteStuttgartCell = await Site.create({
+    factoryId: factoryStuttgart._id,
+    name: 'Test Cell 3',
+    code: 'TEST_CELL_3',
+    area: 'Heavy Dyno Testing',
+    description: 'High-torque multi-megawatt transmission dyno facility'
+  });
+
+  const machineGB501 = await Machine.create({
+    factoryId: factoryStuttgart._id,
+    siteId: siteStuttgartCell._id,
+    code: 'GB-501',
+    name: 'High-Torque Planetary Test Rig',
+    type: MACHINE_TYPES.GEARBOX,
+    industry: INDUSTRIES.MINING_HEAVY_ENG,
+    operatingContext: 'Heavy mining conveyor planetary reduction testing',
+    manufacturer: 'Elecon Engineering / TRF Tata',
+    model: 'P2SB-18 Mining Spec',
+    serialNumber: 'SN-ELE-2024-0319',
+    operationalStatus: OPERATIONAL_STATUS.OPERATIONAL,
+    status: 'healthy',
+    isDecommissioned: false,
+    arrangement: 'Multi-Stage Planetary',
+    stageCount: 3,
+    gearRatio: '28.5:1',
+    ratedSpeedRpm: 1200,
+    ratedTorqueNm: 850,
+    stages: [
+      { stage: 1, type: 'Planetary Input Stage', ratio: '4.2:1', conditionNotes: 'Sun pinion verified nominal [DEMO]' },
+      { stage: 2, type: 'Intermediate Planetary Stage', ratio: '3.8:1', conditionNotes: 'Carrier ring nominal [DEMO]' },
+      { stage: 3, type: 'Output Helical Stage', ratio: '1.78:1', conditionNotes: 'Low speed output nominal [DEMO]' }
+    ],
+    monitoredSignals: [
+      { key: 'vibration_input_radial', label: 'Input Shaft Radial Vibration', unit: 'mm/s', category: SIGNAL_CATEGORIES.VIBRATION },
+      { key: 'vibration_carrier_radial', label: 'Planetary Carrier Vibration', unit: 'mm/s', category: SIGNAL_CATEGORIES.VIBRATION },
+      { key: 'temp_gearbox_sump', label: 'Oil Sump Temperature', unit: '°C', category: SIGNAL_CATEGORIES.THERMAL },
+      { key: 'rotational_speed', label: 'Shaft Speed', unit: 'RPM', category: SIGNAL_CATEGORIES.OPERATING_REGIME },
+      { key: 'load_torque', label: 'Dyno Load Torque', unit: 'Nm', category: SIGNAL_CATEGORIES.OPERATING_REGIME }
+    ]
+  });
+
+  const techStuttgart = await User.create({
+    email: 'tech@stuttgart.factory',
+    username: 'tech_stuttgart',
+    fullName: 'Mohammed Irfan',
+    passwordHash: techPasswordHash,
+    role: USER_ROLES.TECHNICIAN,
+    organizationId: org._id,
+    factoryId: factoryStuttgart._id,
+    skills: ['Vibration Analysis ISO CAT III', 'Heavy Mining Gearbox Overhaul', 'Endoscopy'],
+    availability: 'available',
+    assignedSites: [siteStuttgartCell._id],
+    assignedMachines: [machineGB501._id],
+    isDemoAccount: true
+  });
+
+  const managerStuttgart = await User.create({
+    email: 'manager@stuttgart.factory',
+    username: 'manager_stuttgart',
+    fullName: 'Dr. Suresh Reddy',
+    passwordHash: managerPasswordHash,
+    role: USER_ROLES.FACTORY_MANAGER,
+    organizationId: org._id,
+    factoryId: factoryStuttgart._id,
+    authorizedFactories: [factoryStuttgart._id, factoryDetroit._id, factoryCleveland._id],
+    assignedSites: [siteStuttgartCell._id],
+    assignedMachines: [machineGB501._id],
+    isDemoAccount: true
+  });
+
+  await MaintenanceWorkOrder.create({
+    factoryId: factoryStuttgart._id,
+    machineId: machineGB501._id,
+    orderNumber: 'WO-GB501-001',
+    title: 'Borescope Inspection of Planetary Pinion Teeth',
+    description: 'High-resolution videoprobe inspection of planet gear sun mesh through inspection port A.',
+    priority: WORK_ORDER_PRIORITY.LOW,
+    status: WORK_ORDER_STATUS.ASSIGNED,
+    dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+    assignedTechnicianId: techStuttgart._id,
+    createdById: managerStuttgart._id,
+    statusHistory: [
+      {
+        status: WORK_ORDER_STATUS.OPEN,
+        changedById: managerStuttgart._id,
+        changedByName: managerStuttgart.fullName,
+        changedByRole: managerStuttgart.role,
+        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
+        note: 'Assigned for upcoming maintenance cycle.'
+      },
+      {
+        status: WORK_ORDER_STATUS.ASSIGNED,
+        changedById: managerStuttgart._id,
+        changedByName: managerStuttgart.fullName,
+        changedByRole: managerStuttgart.role,
+        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
+        note: 'Assigned to Mohammed Irfan.'
+      }
+    ]
   });
 
   console.log('\n============================================================');
   console.log('Database Seeding Completed Successfully!');
   console.log('============================================================');
-  console.log('Demo Accounts for Factory 1 (Detroit Powertrain Plant #2):');
+  console.log('Demo Accounts for Factory 1 (Pune Precision Powertrains Plant #2):');
   console.log('  1. Factory Manager:');
+  console.log('     - Name:     Sunita Rao');
   console.log('     - Email:    manager@detroit.factory');
   console.log('     - Username: manager_detroit');
   console.log(`     - Password: ${DEMO_MANAGER_PW}`);
-  console.log('     - Scope:    Full access to Detroit Plant (GB-104, GB-201, Sites, Work Orders)');
-  console.log('  2. Technician:');
+  console.log('     - Scope:    Full access to Pune Plant (GB-104, GB-201, PUMP-301, MTR-102, Sites, Work Orders)');
+  console.log('  2. Primary Technician (High Workload):');
+  console.log('     - Name:     Rajesh Kumar');
   console.log('     - Email:    tech@detroit.factory');
   console.log('     - Username: tech_detroit');
   console.log(`     - Password: ${DEMO_TECH_PW}`);
-  console.log('     - Scope:    Assigned to GB-104 only; assigned WO-GB104-001; write notes');
-  console.log('  3. Viewer:');
+  console.log('     - Scope:    Assigned to GB-104; active work orders; dynamic workload: 3');
+  console.log('  3. Mechanical Specialist Technician (Assigned):');
+  console.log('     - Name:     Vikram Patel');
+  console.log('     - Email:    tech2@detroit.factory');
+  console.log('     - Username: tech2_detroit');
+  console.log(`     - Password: ${DEMO_TECH_PW}`);
+  console.log('     - Scope:    Assigned to PUMP-301 & GB-201; dynamic workload: 1');
+  console.log('  4. Diagnostic & Condition Monitoring Technician (Available):');
+  console.log('     - Name:     Ananya Sharma');
+  console.log('     - Email:    tech3@detroit.factory');
+  console.log('     - Username: tech3_detroit');
+  console.log(`     - Password: ${DEMO_TECH_PW}`);
+  console.log('     - Scope:    Assigned to MTR-102; dynamic workload: 0 (Available)');
+  console.log('  5. Plant Viewer:');
+  console.log('     - Name:     Amit Desai');
   console.log('     - Email:    viewer@detroit.factory');
   console.log('     - Username: viewer_detroit');
   console.log(`     - Password: ${DEMO_VIEWER_PW}`);
   console.log('     - Scope:    Read-only assigned equipment; cannot post notes/work orders');
-  console.log('\nCross-Factory Test Asset in Factory 2 (Cleveland):');
-  console.log(`  - Machine:  GB-999 (ID: ${machineGB999._id})`);
-  console.log('  - Detroit users attempting to access GB-999 will receive 404 Not Found.');
+  console.log('\nCross-Factory Test Assets:');
+  console.log(`  - Chennai:   GB-999 (ID: ${machineGB999._id}), COMP-204 (ID: ${machineComp204._id})`);
+  console.log(`  - Hyderabad: GB-501 (ID: ${machineGB501._id})`);
   console.log('============================================================\n');
 
   await mongoose.disconnect();

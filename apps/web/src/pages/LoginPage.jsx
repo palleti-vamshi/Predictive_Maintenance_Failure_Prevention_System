@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import Button from '../components/common/Button.jsx';
 import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
+import Icon from '../components/common/Icon.jsx';
 
 /**
  * LoginPage: Professional industrial login interface with accessible form controls
@@ -46,35 +47,29 @@ export default function LoginPage() {
 
   return (
     <div className="login-page-root">
-      {/* Top Banner */}
-      <div className="demo-global-banner">
-        <span className="banner-tag" aria-hidden="true">AUTHENTICATED ACCESS</span>
-        <span>
-          Phase 9 Industrial Command Center • Server-enforced sessions & scoped factory access.
-        </span>
-      </div>
-
       <div className="login-center-wrapper">
         <div className="login-box">
           {/* Brand Header */}
           <div className="login-brand-header">
-            <span className="brand-logo-icon" aria-hidden="true">⚙️</span>
+            <div className="brand-logo-badge" style={{ width: '40px', height: '40px' }}>
+              <Icon name="brandMark" size={26} color="#ffffff" />
+            </div>
             <div>
-              <h1 className="login-brand-title">Predictive Maintenance System</h1>
+              <h1 className="login-brand-title">Presight</h1>
               <p className="login-brand-subtitle">
-                Mechanical Systems Condition Monitoring & Failure Prevention
+                Predictive Maintenance & Failure Prevention
               </p>
             </div>
           </div>
 
           <Card
-            title="Authorized Factory Login"
-            subtitle="Sign in with your organization or factory credentials"
+            title="Authorized Factory Sign In"
+            subtitle="Access mechanical telemetry, alerts, and maintenance work orders"
             badge={<StatusBadge status="info" label="SECURE SESSION" />}
           >
             {errorMessage && (
               <div className="login-error-alert" role="alert">
-                <span className="error-icon" aria-hidden="true">⚠️</span>
+                <Icon name="alert" size={16} color="var(--status-critical)" />
                 <span>{errorMessage}</span>
               </div>
             )}
@@ -87,9 +82,9 @@ export default function LoginPage() {
                 <input
                   id="user-identifier"
                   type="text"
-                  className="form-select"
+                  className="form-input"
                   autoComplete="username"
-                  placeholder="e.g. tech@detroit.factory"
+                  placeholder="e.g. manager@detroit.factory"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   disabled={loading}
@@ -104,7 +99,7 @@ export default function LoginPage() {
                 <input
                   id="user-password"
                   type="password"
-                  className="form-select"
+                  className="form-input"
                   autoComplete="current-password"
                   placeholder="Enter your password"
                   value={password}
@@ -124,49 +119,48 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Development Quick-Login Drawer (Rendered strictly in development builds) */}
+            {/* Development Quick-Login Drawer */}
             {import.meta.env.DEV && (
               <div className="dev-demo-accounts-box">
                 <div className="dev-accounts-header">
-                  <span className="dev-tag">DEVELOPMENT ONLY</span>
+                  <span className="dev-tag">DEVELOPMENT</span>
                   <span className="dev-title">Quick Demo Login</span>
                 </div>
                 <p className="dev-accounts-desc">
-                  Log in as a seeded local prototype account to test role permissions and factory access boundaries:
+                  Select a seeded prototype account to verify role permissions and scoped factory access:
                 </p>
 
                 <div className="dev-buttons-grid">
                   <Button
                     variant="secondary"
                     size="sm"
+                    icon="factory"
                     onClick={() => handleQuickLogin('manager')}
                     disabled={loading}
-                    title="Full management of Detroit Plant #2 (users, machines, alerts)"
+                    title="Full management of Detroit Powertrain Plant (fleet, alerts, work orders)"
                   >
-                    🏢 Factory Manager (Sarah Vance)
+                    Factory Manager (Sarah Vance)
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
+                    icon="wrench"
                     onClick={() => handleQuickLogin('technician')}
                     disabled={loading}
-                    title="Assigned to GB-104 only; write notes; no user admin"
+                    title="Assigned to GB-104; maintenance work orders and field observations"
                   >
-                    🔧 Field Technician (Alex Mercer)
+                    Field Technician (Alex Mercer)
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
+                    icon="layer"
                     onClick={() => handleQuickLogin('viewer')}
                     disabled={loading}
                     title="Read-only access to assigned assets"
                   >
-                    👁️ Factory Viewer (David Sterling)
+                    Factory Viewer (David Sterling)
                   </Button>
-                </div>
-
-                <div className="dev-notice-text">
-                  Passwords seeded via <code>npm run seed</code>. User IDs from different factories cannot access each other's data.
                 </div>
               </div>
             )}

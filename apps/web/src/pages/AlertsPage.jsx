@@ -5,6 +5,7 @@ import Button from '../components/common/Button.jsx';
 import AlertCallout from '../components/common/AlertCallout.jsx';
 import EmptyState from '../components/common/EmptyState.jsx';
 import LoadingSkeleton from '../components/common/LoadingSkeleton.jsx';
+import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   ALERT_SEVERITIES,
@@ -236,31 +237,32 @@ export default function AlertsPage() {
       <div className="page-header">
         <div>
           <div className="specimen-tag-row">
-            <span className="mono-code">CONDITION MONITORING</span>
-            <span className="badge badge-demo">PHASE 7: EVIDENCE-BASED ALERTS</span>
+            <span className="mono-code">ANOMALY SURVEILLANCE</span>
+            <span className="badge badge-info">EVIDENCE-BASED ATTRIBUTION</span>
           </div>
-          <h1 className="page-title">Condition Warnings & Explainable Evidence</h1>
+          <h1 className="page-title">Condition Warnings & Actionable Alerts</h1>
           <p className="page-subtitle">
-            Calibrated anomaly intervals, physical sensor deviations, verified SHAP attributions, and maintenance workflows.
+            Calibrated anomaly intervals, physical sensor deviations, verified TreeSHAP attributions, and maintenance workflows.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <Button variant="secondary" onClick={fetchAlerts}>
-            🔄 Refresh Alerts
+            <Icon name="refresh" size={15} style={{ marginRight: '6px' }} /> Refresh Alerts
           </Button>
         </div>
       </div>
 
       {actionNotice && (
-        <div className="action-toast" role="status">
-          ✓ {actionNotice}
+        <div className="action-toast" role="status" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Icon name="check" size={16} color="#16a34a" />
+          <span>{actionNotice}</span>
         </div>
       )}
 
       {/* Filter Chips Bar */}
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>SEVERITY:</span>
+          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>SEVERITY:</span>
           {['all', 'warning', 'critical', 'info'].map((sev) => (
             <button
               key={sev}
@@ -273,7 +275,7 @@ export default function AlertsPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>STATUS:</span>
+          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>STATUS:</span>
           {['all', 'open', 'acknowledged'].map((st) => (
             <button
               key={st}
@@ -318,17 +320,22 @@ export default function AlertsPage() {
                           fontWeight: 700,
                           background:
                             alert.triggeringPath === 'thermal_path'
-                              ? 'rgba(251,146,60,0.2)'
+                              ? '#fff7ed'
                               : alert.triggeringPath === 'fused_multisignal'
-                              ? 'rgba(168,85,247,0.2)'
-                              : 'rgba(56,189,248,0.2)',
+                              ? '#f5f3ff'
+                              : '#eff6ff',
                           color:
                             alert.triggeringPath === 'thermal_path'
-                              ? '#fb923c'
+                              ? '#c2410c'
                               : alert.triggeringPath === 'fused_multisignal'
-                              ? '#d8b4fe'
-                              : '#38bdf8',
-                          border: '1px solid currentColor'
+                              ? '#6d28d9'
+                              : '#1d4ed8',
+                          border:
+                            alert.triggeringPath === 'thermal_path'
+                              ? '1px solid #fed7aa'
+                              : alert.triggeringPath === 'fused_multisignal'
+                              ? '1px solid #ddd6fe'
+                              : '1px solid #bfdbfe'
                         }}
                       >
                         {alert.triggeringPath === 'thermal_path'
@@ -344,9 +351,9 @@ export default function AlertsPage() {
                           padding: '0.2rem 0.5rem',
                           borderRadius: '4px',
                           fontSize: '0.75rem',
-                          background: '#1e293b',
-                          color: '#94a3b8',
-                          border: '1px solid #334155'
+                          background: '#f8fafc',
+                          color: '#475569',
+                          border: '1px solid #e2e8f0'
                         }}
                       >
                         {alert.operatingRegime.regimeId}
@@ -362,8 +369,9 @@ export default function AlertsPage() {
                         borderRadius: '4px',
                         fontSize: '0.75rem',
                         fontWeight: 600,
-                        background: isAcknowledged ? '#064e3b' : '#78350f',
-                        color: isAcknowledged ? '#34d399' : '#fde68a'
+                        background: isAcknowledged ? '#ecfdf5' : '#fef3c7',
+                        color: isAcknowledged ? '#047857' : '#b45309',
+                        border: isAcknowledged ? '1px solid #a7f3d0' : '1px solid #fde68a'
                       }}
                     >
                       {alert.status.toUpperCase()}
@@ -375,8 +383,9 @@ export default function AlertsPage() {
                           borderRadius: '4px',
                           fontSize: '0.75rem',
                           fontWeight: 600,
-                          background: '#1e3a8a',
-                          color: '#93c5fd'
+                          background: '#eff6ff',
+                          color: '#1d4ed8',
+                          border: '1px solid #bfdbfe'
                         }}
                       >
                         WO: {wo.orderNumber || 'ASSIGNED'}
@@ -387,38 +396,39 @@ export default function AlertsPage() {
               >
                 {/* Multi-Signal Fusion Rationale */}
                 {alert.fusionRationale && (
-                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '6px', fontSize: '0.8rem', color: '#e9d5ff', marginBottom: '1rem' }}>
+                  <div style={{ padding: '0.75rem 1rem', background: '#f5f3ff', border: '1px solid rgba(124, 58, 237, 0.2)', borderRadius: '6px', fontSize: '0.85rem', color: '#5b21b6', marginBottom: '1rem' }}>
                     <strong>Multi-Signal Fusion Rationale:</strong> {alert.fusionRationale}
                   </div>
                 )}
 
                 {/* Scientific Disclaimer & Severity Note */}
-                <div style={{ padding: '0.75rem', background: '#0f172a', borderRadius: '6px', borderLeft: '4px solid #f59e0b', marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
-                    ⚠️ {alert.severityNote || 'Statistical Anomaly Identified'}
+                <div style={{ padding: '0.85rem', background: '#fffbeb', borderRadius: '6px', borderLeft: '4px solid #f59e0b', border: '1px solid #fef3c7', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#92400e', fontWeight: 600 }}>
+                    <Icon name="alert" size={16} color="#d97706" />
+                    <span>{alert.severityNote || 'Statistical Anomaly Identified'}</span>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#78350f', marginTop: '0.35rem' }}>
                     Model Method: <strong>{alert.severityMethod}</strong> • Calibrated Score: <strong>{alert.scores?.peakScore?.toFixed(4) || '—'}</strong> (Threshold: {alert.scores?.calibratedThreshold?.toFixed(4) || '—'}) • Continuous prediction, not physical proof of mechanical failure.
                   </div>
                 </div>
 
                 {/* Interval Timing Metadata */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1rem', background: '#1e293b', padding: '0.75rem', borderRadius: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1rem', background: '#f8fafc', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6' }}>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Detected Time Interval:</span>
-                    <div style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Detected Time Interval:</span>
+                    <div style={{ fontSize: '0.85rem', color: '#1e1b4b', fontWeight: 600 }}>
                       {alert.interval?.startTime ? `${new Date(alert.interval.startTime).toLocaleTimeString()} – ${new Date(alert.interval.endTime).toLocaleTimeString()}` : `Samples ${alert.interval?.startIdx} – ${alert.interval?.endIdx}`}
                     </div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Sample Range:</span>
-                    <div style={{ fontSize: '0.85rem', color: '#f8fafc' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Sample Range:</span>
+                    <div style={{ fontSize: '0.85rem', color: '#1e1b4b' }}>
                       {alert.interval?.sampleCount || (alert.interval?.endIdx - alert.interval?.startIdx) || 0} samples
                     </div>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Data Sufficiency:</span>
-                    <div style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Data Sufficiency:</span>
+                    <div style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600 }}>
                       {((alert.dataQuality?.sufficiencyScore ?? 1.0) * 100).toFixed(1)}% Steady-State
                     </div>
                   </div>
@@ -427,22 +437,22 @@ export default function AlertsPage() {
                 {/* Contributing Physical Signals */}
                 {alert.contributingSignals && alert.contributingSignals.length > 0 && (
                   <div style={{ marginBottom: '1rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b' }}>
                       Contributing Sensor Channels & Physical Baseline Delta:
                     </span>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
                       {alert.contributingSignals.map((cs, idx) => (
-                        <div key={idx} style={{ padding: '0.6rem 0.8rem', background: '#0f172a', borderRadius: '6px', border: '1px solid #334155' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#93c5fd' }}>{cs.signal}</div>
+                        <div key={idx} style={{ padding: '0.65rem 0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4338ca' }}>{cs.signal}</div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.25rem' }}>
-                            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#ffffff' }}>
+                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
                               {cs.peakValue?.toFixed ? cs.peakValue.toFixed(2) : cs.peakValue} {cs.unit}
                             </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: (cs.deviationRatio || 0) > 0 ? '#ef4444' : '#10b981' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: (cs.deviationRatio || 0) > 0 ? '#dc2626' : '#16a34a' }}>
                               {cs.deviationRatio !== undefined ? `${(cs.deviationRatio * 100).toFixed(1)}% vs baseline` : ''}
                             </span>
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.2rem' }}>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
                             Baseline: {cs.baselineMean?.toFixed ? cs.baselineMean.toFixed(2) : cs.baselineMean} {cs.unit}
                           </div>
                         </div>
@@ -454,34 +464,38 @@ export default function AlertsPage() {
                 {/* Multi-Signal Detector Breakdown */}
                 {alert.detectorBreakdown && (
                   <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
-                    <div style={{ padding: '0.6rem 0.8rem', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8' }}>⚙️ Mechanical Vibration Path</div>
-                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                    <div style={{ padding: '0.75rem 0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700, color: '#0284c7' }}>
+                        <Icon name="activity" size={14} color="#0284c7" /> Mechanical Vibration Path
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: '0.25rem' }}>
                         Detector:{' '}
-                        <strong style={{ color: alert.detectorBreakdown.vibrationDetector?.isAnomalous ? '#f87171' : '#34d399' }}>
+                        <strong style={{ color: alert.detectorBreakdown.vibrationDetector?.isAnomalous ? '#dc2626' : '#16a34a' }}>
                           {alert.detectorBreakdown.vibrationDetector?.isAnomalous ? 'ANOMALOUS DEVIATION' : 'NOMINAL'}
                         </strong>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
                         Score: {Number(alert.detectorBreakdown.vibrationDetector?.score || 0).toFixed(4)} (Threshold: {Number(alert.detectorBreakdown.vibrationDetector?.threshold || 0).toFixed(4)})
                       </div>
                     </div>
 
-                    <div style={{ padding: '0.6rem 0.8rem', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fb923c' }}>🌡️ Thermal Path</div>
-                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                    <div style={{ padding: '0.75rem 0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700, color: '#ea580c' }}>
+                        <Icon name="thermometer" size={14} color="#ea580c" /> Thermal Path
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: '0.25rem' }}>
                         Detector:{' '}
-                        <strong style={{ color: alert.detectorBreakdown.thermalDetector?.isAnomalous ? '#f87171' : '#34d399' }}>
+                        <strong style={{ color: alert.detectorBreakdown.thermalDetector?.isAnomalous ? '#dc2626' : '#16a34a' }}>
                           {alert.detectorBreakdown.thermalDetector?.isAnomalous ? 'THERMAL RUNAWAY / DRIFT' : 'NORMAL'}
                         </strong>
                       </div>
                       {alert.detectorBreakdown.thermalDetector?.temperatureMean !== undefined && (
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
                           Temp Mean: {alert.detectorBreakdown.thermalDetector.temperatureMean} °C • Drift: {alert.detectorBreakdown.thermalDetector.driftRateCPerMin} °C/min
                         </div>
                       )}
                       {alert.detectorBreakdown.thermalDetector?.findings && (
-                        <div style={{ fontSize: '0.7rem', color: '#fb923c', marginTop: '0.2rem' }}>
+                        <div style={{ fontSize: '0.72rem', color: '#ea580c', marginTop: '0.25rem' }}>
                           {alert.detectorBreakdown.thermalDetector.findings}
                         </div>
                       )}
@@ -491,22 +505,22 @@ export default function AlertsPage() {
 
                 {/* Contributing Features & SHAP Explanations */}
                 {alert.shapAttribution && alert.shapAttribution.featureContributions && alert.shapAttribution.featureContributions.length > 0 && (
-                  <div style={{ marginBottom: '1rem', background: '#1e293b', padding: '0.75rem', borderRadius: '6px' }}>
+                  <div style={{ marginBottom: '1rem', background: '#f8f7fc', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b' }}>
                         Feature Attribution ({alert.shapAttribution.explainerType || 'TreeSHAP'}):
                       </span>
                       {alert.shapAttribution.additivityVerified && (
-                        <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>
-                          ✓ Exact Additivity Verified
+                        <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <Icon name="check" size={13} color="#16a34a" /> Exact Additivity Verified
                         </span>
                       )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
                       {alert.shapAttribution.featureContributions.slice(0, 4).map((fc, idx) => (
                         <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                          <span style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>{fc.feature}</span>
-                          <span style={{ color: fc.attribution > 0 ? '#f87171' : '#34d399', fontWeight: 600 }}>
+                          <span style={{ color: '#475569', fontFamily: 'monospace' }}>{fc.feature}</span>
+                          <span style={{ color: fc.attribution > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                             {fc.attribution > 0 ? `+${fc.attribution.toFixed(4)}` : fc.attribution?.toFixed(4)}
                           </span>
                         </div>
@@ -517,18 +531,18 @@ export default function AlertsPage() {
 
                 {/* Technician Observations Log */}
                 {alert.technicianObservations && alert.technicianObservations.length > 0 && (
-                  <div style={{ marginBottom: '1rem', borderTop: '1px solid #334155', paddingTop: '0.75rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc' }}>
+                  <div style={{ marginBottom: '1rem', borderTop: '1px solid #ede9f6', paddingTop: '0.75rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b' }}>
                       Technician Field Observations ({alert.technicianObservations.length}):
                     </span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
                       {alert.technicianObservations.map((obs, idx) => (
-                        <div key={idx} style={{ padding: '0.5rem 0.75rem', background: '#0f172a', borderRadius: '4px', fontSize: '0.8rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '0.75rem' }}>
+                        <div key={idx} style={{ padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '4px', fontSize: '0.82rem', border: '1px solid #ede9f6' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.75rem' }}>
                             <strong>{obs.technicianName}</strong>
-                            <span>{new Date(obs.loggedAt).toLocaleString()}</span>
+                            <span>{new Date(obs.loggedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
-                          <div style={{ color: '#f8fafc', marginTop: '0.25rem' }}>{obs.note}</div>
+                          <div style={{ color: '#1e1b4b', marginTop: '0.25rem' }}>{obs.note}</div>
                         </div>
                       ))}
                     </div>
@@ -537,8 +551,8 @@ export default function AlertsPage() {
 
                 {/* Add Observation Inline Form */}
                 {activeObservationAlertId === alert._id ? (
-                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#0f172a', borderRadius: '6px', border: '1px solid #334155' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#f8fafc', marginBottom: '0.4rem' }}>
+                  <div style={{ marginTop: '0.75rem', padding: '0.85rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #ede9f6' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.4rem' }}>
                       Record Field Inspection Note:
                     </label>
                     <textarea
@@ -573,7 +587,7 @@ export default function AlertsPage() {
                 ) : null}
 
                 {/* Action Buttons Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #334155', paddingTop: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #ede9f6', paddingTop: '0.75rem' }}>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {!isViewer && activeObservationAlertId !== alert._id && (
                       <Button
@@ -584,7 +598,7 @@ export default function AlertsPage() {
                           setObservationInput('');
                         }}
                       >
-                        📝 Add Observation
+                        <Icon name="edit" size={14} style={{ marginRight: '5px' }} /> Add Observation
                       </Button>
                     )}
                     {isManager && !hasWorkOrder && (
@@ -593,7 +607,7 @@ export default function AlertsPage() {
                         variant="primary"
                         onClick={() => openWorkOrderModal(alert)}
                       >
-                        🔧 Create Work Order
+                        <Icon name="wrench" size={14} style={{ marginRight: '5px' }} /> Create Work Order
                       </Button>
                     )}
                   </div>
@@ -606,11 +620,11 @@ export default function AlertsPage() {
                         onClick={() => handleAcknowledge(alert._id)}
                         disabled={isViewer}
                       >
-                        ✓ Acknowledge Alert
+                        <Icon name="check" size={14} style={{ marginRight: '4px' }} /> Acknowledge Alert
                       </Button>
                     ) : (
-                      <span style={{ fontSize: '0.8rem', color: '#10b981' }}>
-                        ✓ Acknowledged {alert.acknowledgedByName ? `by ${alert.acknowledgedByName}` : ''}
+                      <span style={{ fontSize: '0.8rem', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icon name="check" size={14} color="#16a34a" /> Acknowledged {alert.acknowledgedByName ? `by ${alert.acknowledgedByName}` : ''}
                       </span>
                     )}
                   </div>
@@ -630,8 +644,9 @@ export default function AlertsPage() {
               <button
                 className="modal-close-btn"
                 onClick={() => setWorkOrderModalAlert(null)}
+                aria-label="Close modal"
               >
-                ✕
+                <Icon name="close" size={16} />
               </button>
             </div>
 

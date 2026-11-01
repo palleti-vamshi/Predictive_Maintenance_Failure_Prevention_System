@@ -6,21 +6,21 @@ import { ALERT_SEVERITIES, ALERT_STATUSES, ANALYSIS_METHODS } from './alerts.js'
 import { MACHINE_TYPES, SIGNAL_CATEGORIES } from './signals.js';
 
 export const DEMO_FACTORY = Object.freeze({
-  id: 'fac-detroit-02',
-  name: 'Detroit Powertrain Plant #2',
-  scopeLabel: 'Factory Scope: Detroit #2 [DEMO]',
-  organization: 'Apex Industrial Manufacturing [DEMO]',
-  location: 'Detroit, MI, USA',
+  id: 'fac-pune-02',
+  name: 'Pune Precision Powertrains Plant #2',
+  scopeLabel: 'Factory Scope: Pune #2 [DEMO]',
+  organization: 'Bharat Heavy Powertrain Dynamics Ltd. [DEMO]',
+  location: 'Chakan Industrial Corridor, Pune, Maharashtra, India',
   isDemo: true
 });
 
 export const DEMO_USER = Object.freeze({
   id: 'usr-demo-01',
-  name: 'Alex Mercer',
+  name: 'Rajesh Kumar',
   role: 'technician',
   roleDisplay: 'Lead Reliability Technician',
-  factoryId: 'fac-detroit-02',
-  assignedMachines: ['GB-104', 'GB-201'],
+  factoryId: 'fac-pune-02',
+  assignedMachines: ['GB-104'],
   badgeLabel: 'DEMO USER (Technician)',
   isDemo: true
 });
@@ -35,7 +35,7 @@ export const DEMO_MACHINES = Object.freeze([
     statusLabel: 'Attention Recommended [DEMO]',
     isDemo: true,
     simulationLabel: 'DEMO SPECIMEN',
-    manufacturer: 'Siemens / Flender Helical-Planetary',
+    manufacturer: 'Elecon Engineering / Siemens Flender',
     model: 'B3SH-10',
     gearRatio: '14.2:1',
     ratedSpeedRpm: 1780,
@@ -43,7 +43,7 @@ export const DEMO_MACHINES = Object.freeze([
     lubricantType: 'ISO VG 220 Synthetic',
     installDate: '2022-03-15',
     lastDatasetUpload: '2026-10-28 14:30 UTC',
-    assignedTechnician: 'Alex Mercer (Lead Reliability Technician)',
+    assignedTechnician: 'Rajesh Kumar (Lead Reliability Technician)',
     stages: [
       { stage: 1, type: 'Planetary Stage', ratio: '3.5:1', condition: 'Nominal [DEMO]' },
       { stage: 2, type: 'Helical Output Stage', ratio: '4.06:1', condition: 'Elevated Radial Motion [DEMO]' }
@@ -75,7 +75,7 @@ export const DEMO_MACHINES = Object.freeze([
     lubricantType: 'ISO VG 150 Mineral',
     installDate: '2023-08-10',
     lastDatasetUpload: '2026-10-25 09:12 UTC',
-    assignedTechnician: 'Alex Mercer (Lead Reliability Technician)',
+    assignedTechnician: 'Rajesh Kumar (Lead Reliability Technician)',
     stages: [
       { stage: 1, type: 'Bevel Stage', ratio: '2.5:1', condition: 'Nominal [DEMO]' },
       { stage: 2, type: 'Helical Stage', ratio: '3.92:1', condition: 'Nominal [DEMO]' }

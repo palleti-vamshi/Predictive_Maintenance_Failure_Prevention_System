@@ -12,7 +12,8 @@ import {
   OPERATIONAL_STATUS,
   WORK_ORDER_PRIORITY,
   WORK_ORDER_STATUS,
-  MACHINE_TYPES
+  MACHINE_TYPES,
+  INDUSTRIES
 } from '@predictive-maintenance/shared';
 
 const router = Router();
@@ -75,6 +76,9 @@ router.post('/', requireManager, async (req, res) => {
     const {
       code,
       name,
+      type,
+      industry,
+      operatingContext,
       siteId,
       manufacturer,
       model,
@@ -179,7 +183,9 @@ router.post('/', requireManager, async (req, res) => {
       siteId,
       code: formattedCode,
       name: name.trim(),
-      type: MACHINE_TYPES.GEARBOX,
+      type: type && Object.values(MACHINE_TYPES).includes(type) ? type : MACHINE_TYPES.GEARBOX,
+      industry: industry && Object.values(INDUSTRIES).includes(industry) ? industry : INDUSTRIES.MANUFACTURING,
+      operatingContext: operatingContext?.trim() || '',
       manufacturer: manufacturer?.trim() || '',
       model: model?.trim() || '',
       serialNumber: serialNumber?.trim() || '',

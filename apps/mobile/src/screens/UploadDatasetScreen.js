@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import Card from '../components/Card.js';
 import Button from '../components/Button.js';
@@ -239,7 +240,10 @@ export default function UploadDatasetScreen() {
       {confirmedDataset ? (
         <Card title="Ingestion Confirmed">
           <View style={styles.successBanner}>
-            <Text style={styles.successTitle}>✓ {confirmedDataset.title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="check" size={14} color="#16a34a" />
+              <Text style={styles.successTitle}>{confirmedDataset.title}</Text>
+            </View>
             <Text style={styles.successSub}>
               {confirmedDataset.totalRows} observations registered. Modality: {confirmedDataset.modality}.
             </Text>
@@ -314,7 +318,7 @@ export default function UploadDatasetScreen() {
               onPress={handlePickDocument}
               activeOpacity={0.7}
             >
-              <Text style={styles.dropzoneIcon}>📁</Text>
+              <Feather name="upload-cloud" size={36} color="#7c3aed" style={{ marginBottom: 6 }} />
               <Text style={styles.dropzoneTitle}>
                 {pickedFile ? pickedFile.name : 'Tap to Choose CSV File'}
               </Text>
@@ -341,7 +345,10 @@ export default function UploadDatasetScreen() {
 
             {uploadedSession && (
               <View style={styles.profileBox}>
-                <Text style={styles.profileTitle}>✓ Headers & Delimiter Verified</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="check" size={13} color="#16a34a" />
+                  <Text style={styles.profileTitle}>Headers & Delimiter Verified</Text>
+                </View>
                 <Text style={styles.profileText}>
                   {uploadedSession.totalRows} rows • {uploadedSession.totalColumns} cols • Delimiter: &apos;{uploadedSession.delimiter}&apos;
                 </Text>

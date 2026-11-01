@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
@@ -222,7 +223,10 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
         {alert.detectorBreakdown && (
           <View style={styles.detectorGrid}>
             <View style={styles.detectorCard}>
-              <Text style={styles.detectorTitle}>⚙️ Vibration Detector</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="activity" size={14} color="#7c3aed" />
+                <Text style={styles.detectorTitle}>Vibration Detector</Text>
+              </View>
               <Text style={styles.detectorSub}>
                 Status: {alert.detectorBreakdown.vibrationDetector?.isAnomalous ? 'ANOMALOUS' : 'NOMINAL'}
               </Text>
@@ -232,7 +236,10 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
             </View>
 
             <View style={styles.detectorCard}>
-              <Text style={styles.detectorTitle}>🌡️ Thermal Detector</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Feather name="thermometer" size={14} color="#d97706" />
+                <Text style={styles.detectorTitle}>Thermal Detector</Text>
+              </View>
               <Text style={styles.detectorSub}>
                 Status: {alert.detectorBreakdown.thermalDetector?.isAnomalous ? 'ANOMALOUS' : 'NORMAL'}
               </Text>
@@ -255,9 +262,12 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
       {/* Verified SHAP Model Attribution */}
       <Card title="SHAP Model Attribution & Verification">
         <View style={styles.shapBadgeRow}>
-          <Text style={styles.shapVerifiedText}>
-            ✓ {explainerType} (|Σ φi + φ0 - f(x)| &lt; 10⁻⁴)
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="check" size={13} color="#16a34a" />
+            <Text style={styles.shapVerifiedText}>
+              {explainerType} (|Σ φi + φ0 - f(x)| &lt; 10⁻⁴)
+            </Text>
+          </View>
         </View>
         <Text style={styles.shapModelMeta}>
           Architecture: {alert.modelType || 'Random Forest'} • Domain: Gearbox Mechanical Meshing
@@ -304,9 +314,12 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
       <Card title="Field Technician Action">
         {isAcknowledged ? (
           <View style={styles.ackDoneBox}>
-            <Text style={styles.ackDoneText}>
-              ✓ Alert Acknowledged by {acknowledgedByName || user?.fullName || 'Technician'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="check" size={14} color="#16a34a" />
+              <Text style={styles.ackDoneText}>
+                Alert Acknowledged by {acknowledgedByName || user?.fullName || 'Technician'}
+              </Text>
+            </View>
           </View>
         ) : (
           <Button
@@ -347,9 +360,12 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
           />
 
           {noteSuccess && (
-            <Text style={styles.noteSuccessText}>
-              ✓ Field observation recorded successfully.
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="check" size={13} color="#16a34a" />
+              <Text style={styles.noteSuccessText}>
+                Field observation recorded successfully.
+              </Text>
+            </View>
           )}
 
           <Button

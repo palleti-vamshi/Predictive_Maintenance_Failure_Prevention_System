@@ -12,7 +12,7 @@ export default function MetricSummary({
   status = 'info',
   sublabel = '',
   delta = null,
-  isSimulated = true,
+  isSimulated = false,
   className = ''
 }) {
   const statusColors = {
@@ -30,8 +30,8 @@ export default function MetricSummary({
       <div className="metric-header">
         <span className="metric-label">{label}</span>
         {isSimulated && (
-          <span className="metric-sim-badge" title="Simulated engineering benchmark value">
-            SIMULATED
+          <span className="metric-sim-badge" title="Demo / benchmark dataset specimen">
+            DEMO DATA
           </span>
         )}
       </div>

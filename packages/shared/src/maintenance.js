@@ -5,8 +5,13 @@
 
 export const WORK_ORDER_STATUS = Object.freeze({
   OPEN: 'open',
+  ASSIGNED: 'assigned',
   ACCEPTED: 'accepted',
   IN_PROGRESS: 'in_progress',
+  WAITING_FOR_PARTS: 'waiting_for_parts',
+  WAITING_FOR_APPROVAL: 'waiting_for_approval',
+  WORK_SUBMITTED: 'work_submitted',
+  MANAGER_REVIEW: 'manager_review',
   COMPLETED: 'completed',
   REVIEWED: 'reviewed'
 });

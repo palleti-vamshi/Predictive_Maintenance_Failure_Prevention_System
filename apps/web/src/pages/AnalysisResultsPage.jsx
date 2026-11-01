@@ -6,6 +6,7 @@ import AlertCallout from '../components/common/AlertCallout.jsx';
 import Button from '../components/common/Button.jsx';
 import EmptyState from '../components/common/EmptyState.jsx';
 import LoadingSkeleton from '../components/common/LoadingSkeleton.jsx';
+import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   MODEL_TYPES,
@@ -204,6 +205,7 @@ export default function AnalysisResultsPage() {
   const preflightCheck = useMemo(() => {
     const selectedDs = availableDatasets.find((d) => (d._id || d.id) === runForm.datasetId);
     const selectedMd = models.find((m) => (m._id || m.id) === runForm.modelArtifactId);
+    const selectedMach = availableMachines.find((m) => (m._id || m.id) === runForm.machineId);
 
     if (!selectedDs || !selectedMd) {
       return { valid: false, message: 'Please select a dataset and model to check compatibility.' };
@@ -216,6 +218,7 @@ export default function AnalysisResultsPage() {
     ).toLowerCase();
 
     const mdComponent = (selectedMd.componentType || 'gearbox').toLowerCase();
+    const machType = (selectedMach?.type || 'gearbox').toLowerCase();
 
     if (
       (dsComponent.includes('bearing') && mdComponent.includes('gear')) ||
@@ -224,6 +227,14 @@ export default function AnalysisResultsPage() {
       return {
         valid: false,
         message: `Component Type Mismatch: Model "${selectedMd.name}" targets ${mdComponent}, while dataset "${selectedDs.title}" contains ${dsComponent} signals.`
+      };
+    }
+
+    // Machine Type Specialization Check
+    if (mdComponent.includes('gear') && machType !== 'gearbox') {
+      return {
+        valid: false,
+        message: `Machine Asset Incompatible: Model "${selectedMd.name}" is specialized for industrial gearboxes, but selected machine "${selectedMach?.code || 'Selected'}" is configured as ${machType.replace('_', ' ')}. Please select a compatible gearbox asset.`
       };
     }
 
@@ -245,11 +256,13 @@ export default function AnalysisResultsPage() {
       };
     }
 
+    const demoNotice = selectedDs.isSimulatorDerived || selectedDs.isDemoData || selectedDs.title?.includes('[Demo Data]') ? ' [Demo / Simulator Test Telemetry]' : '';
+
     return {
       valid: true,
-      message: `✓ Compatible: ${mdComponent.toUpperCase()} architecture with verified vibration telemetry [${mappedSignals.join(', ')}].`
+      message: `Compatible: ${mdComponent.toUpperCase()} architecture with verified vibration telemetry [${mappedSignals.join(', ')}] on ${selectedMach?.code || 'Asset'}.${demoNotice}`
     };
-  }, [runForm.datasetId, runForm.modelArtifactId, availableDatasets, models]);
+  }, [runForm.datasetId, runForm.modelArtifactId, runForm.machineId, availableDatasets, models, availableMachines]);
 
   // Execute Analysis Run Handler
   const handleRunSubmit = async (e) => {
@@ -370,7 +383,7 @@ export default function AnalysisResultsPage() {
         <div>
           <div className="specimen-tag-row">
             <span className="mono-code">AI INFERENCE RUNNER</span>
-            <span className="badge badge-demo">PHASE 7: VERIFIED ANALYSIS RUNS</span>
+            <span className="badge badge-info">VERIFIED ANALYSIS RUNS</span>
           </div>
           <h1 className="page-title">Condition Analysis Runs & Explainable Insights</h1>
           <p className="page-subtitle">
@@ -380,12 +393,12 @@ export default function AnalysisResultsPage() {
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {(isManager || isTechnician) && (
             <Button variant="primary" onClick={openRunModal}>
-              ▶ Run New Analysis
+              <Icon name="play" size={13} style={{ marginRight: 6 }} /> Run New Analysis
             </Button>
           )}
           {isManager && (
             <Button variant="secondary" onClick={openTrainModal}>
-              🚀 Train Model
+              <Icon name="plus" size={14} style={{ marginRight: 6 }} /> Train Model
             </Button>
           )}
           <Button
@@ -395,31 +408,33 @@ export default function AnalysisResultsPage() {
               fetchModels();
             }}
           >
-            🔄 Refresh
+            <Icon name="refresh" size={14} style={{ marginRight: 6 }} /> Refresh
           </Button>
         </div>
       </div>
 
       {/* Top Tab Switcher */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #1e293b', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #ede9f6', paddingBottom: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveTab('runs')}
           style={{
-            padding: '0.5rem 1.25rem',
-            background: activeTab === 'runs' ? '#1e293b' : 'transparent',
-            border: activeTab === 'runs' ? '1px solid #38bdf8' : '1px solid transparent',
-            borderRadius: '6px',
-            color: activeTab === 'runs' ? '#38bdf8' : '#94a3b8',
+            padding: '0.55rem 1.25rem',
+            background: activeTab === 'runs' ? '#ffffff' : '#f8f7fc',
+            border: activeTab === 'runs' ? '1px solid #7c3aed' : '1px solid #ede9f6',
+            boxShadow: activeTab === 'runs' ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+            borderRadius: '8px',
+            color: activeTab === 'runs' ? '#7c3aed' : '#64748b',
             fontWeight: 700,
-            fontSize: '0.9rem',
+            fontSize: '0.875rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem'
           }}
         >
-          <span>📊 Analysis Runs</span>
-          <span style={{ fontSize: '0.75rem', background: '#0f172a', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
+          <Icon name="analysis" size={15} color={activeTab === 'runs' ? '#7c3aed' : '#64748b'} />
+          <span>Analysis Runs</span>
+          <span style={{ fontSize: '0.75rem', background: activeTab === 'runs' ? '#f5f3ff' : '#ede9f6', color: activeTab === 'runs' ? '#7c3aed' : '#64748b', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
             {runs.length}
           </span>
         </button>
@@ -427,21 +442,23 @@ export default function AnalysisResultsPage() {
         <button
           onClick={() => setActiveTab('models')}
           style={{
-            padding: '0.5rem 1.25rem',
-            background: activeTab === 'models' ? '#1e293b' : 'transparent',
-            border: activeTab === 'models' ? '1px solid #38bdf8' : '1px solid transparent',
-            borderRadius: '6px',
-            color: activeTab === 'models' ? '#38bdf8' : '#94a3b8',
+            padding: '0.55rem 1.25rem',
+            background: activeTab === 'models' ? '#ffffff' : '#f8f7fc',
+            border: activeTab === 'models' ? '1px solid #7c3aed' : '1px solid #ede9f6',
+            boxShadow: activeTab === 'models' ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+            borderRadius: '8px',
+            color: activeTab === 'models' ? '#7c3aed' : '#64748b',
             fontWeight: 700,
-            fontSize: '0.9rem',
+            fontSize: '0.875rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem'
           }}
         >
-          <span>🔬 Model Evaluation & SHAP</span>
-          <span style={{ fontSize: '0.75rem', background: '#0f172a', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
+          <Icon name="research" size={15} color={activeTab === 'models' ? '#7c3aed' : '#64748b'} />
+          <span>Model Evaluation & SHAP</span>
+          <span style={{ fontSize: '0.75rem', background: activeTab === 'models' ? '#f5f3ff' : '#ede9f6', color: activeTab === 'models' ? '#7c3aed' : '#64748b', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
             {models.length}
           </span>
         </button>
@@ -449,20 +466,22 @@ export default function AnalysisResultsPage() {
         <button
           onClick={() => setActiveTab('research')}
           style={{
-            padding: '0.5rem 1.25rem',
-            background: activeTab === 'research' ? '#1e293b' : 'transparent',
-            border: activeTab === 'research' ? '1px solid #a855f7' : '1px solid transparent',
-            borderRadius: '6px',
-            color: activeTab === 'research' ? '#c084fc' : '#94a3b8',
+            padding: '0.55rem 1.25rem',
+            background: activeTab === 'research' ? '#ffffff' : '#f8f7fc',
+            border: activeTab === 'research' ? '1px solid #7c3aed' : '1px solid #ede9f6',
+            boxShadow: activeTab === 'research' ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+            borderRadius: '8px',
+            color: activeTab === 'research' ? '#7c3aed' : '#64748b',
             fontWeight: 700,
-            fontSize: '0.9rem',
+            fontSize: '0.875rem',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem'
           }}
         >
-          <span>🌐 Benchmark Provenance & Multi-Signal Evaluation</span>
+          <Icon name="layer" size={15} color={activeTab === 'research' ? '#7c3aed' : '#64748b'} />
+          <span>Benchmark Provenance & Multi-Signal Evaluation</span>
         </button>
       </div>
 
@@ -493,22 +512,23 @@ export default function AnalysisResultsPage() {
                       key={r._id || r.id}
                       onClick={() => setSelectedRunId(r._id || r.id)}
                       style={{
-                        padding: '0.75rem 1rem',
+                        padding: '0.85rem 1rem',
                         borderRadius: '8px',
-                        border: isSelected ? '2px solid #38bdf8' : '1px solid #1e293b',
-                        background: isSelected ? '#1e293b' : '#0f172a',
-                        color: isSelected ? '#ffffff' : '#94a3b8',
+                        border: isSelected ? '2px solid #7c3aed' : '1px solid #ede9f6',
+                        background: '#ffffff',
+                        boxShadow: isSelected ? '0 2px 8px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
+                        color: '#1e1b4b',
                         cursor: 'pointer',
                         textAlign: 'left',
                         minWidth: '240px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.35rem',
-                        transition: 'border 0.2s'
+                        transition: 'all 0.2s'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="mono-code" style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 700 }}>
+                        <span className="mono-code" style={{ fontSize: '0.75rem', color: '#7c3aed', fontWeight: 700 }}>
                           {r.machineId?.code || r.componentType?.toUpperCase()}
                         </span>
                         <StatusBadge
@@ -516,15 +536,19 @@ export default function AnalysisResultsPage() {
                           label={r.status.toUpperCase()}
                         />
                       </div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {r.datasetTitle}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                         Model: {r.modelName}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>
-                        <span>{intCount > 0 ? `🚨 ${intCount} interval(s)` : '✓ Nominal'}</span>
-                        <span style={{ color: '#a855f7' }}>🔒 Immutable</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        <span style={{ fontWeight: 600, color: intCount > 0 ? '#b45309' : '#16a34a' }}>
+                          {intCount > 0 ? `${intCount} interval(s)` : 'Nominal'}
+                        </span>
+                        <span style={{ color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <Icon name="shield" size={11} color="#7c3aed" /> Immutable
+                        </span>
                       </div>
                     </button>
                   );
@@ -540,8 +564,8 @@ export default function AnalysisResultsPage() {
                     subtitle={`Execution ID: ${selectedRun._id || selectedRun.id} • Pipeline v${selectedRun.featurePipelineVersion}`}
                     badge={
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'rgba(168,85,247,0.2)', color: '#d8b4fe', borderRadius: '4px', border: '1px solid #a855f7' }}>
-                          🔒 IMMUTABLE AUDIT RECORD
+                        <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#f5f3ff', color: '#6d28d9', borderRadius: '4px', border: '1px solid #ddd6fe', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="shield" size={12} color="#7c3aed" /> IMMUTABLE AUDIT RECORD
                         </span>
                         <StatusBadge
                           status={selectedRun.status === 'completed' ? 'healthy' : selectedRun.status === 'failed' ? 'critical' : 'warning'}
@@ -553,28 +577,28 @@ export default function AnalysisResultsPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
                       <div>
                         <span className="spec-label">Assigned Machine:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#f8fafc' }}>
+                        <span className="mono-code" style={{ display: 'block', color: '#1e1b4b', fontWeight: 600 }}>
                           {selectedRun.machineId?.code || 'N/A'} ({selectedRun.machineId?.name || selectedRun.componentType})
                         </span>
                       </div>
 
                       <div>
                         <span className="spec-label">Dataset SHA256 Checksum:</span>
-                        <span className="mono-code" style={{ display: 'block', fontSize: '0.75rem', color: '#38bdf8', wordBreak: 'break-all' }} title={selectedRun.fileChecksumSha256}>
+                        <span className="mono-code" style={{ display: 'block', fontSize: '0.75rem', color: '#7c3aed', wordBreak: 'break-all' }} title={selectedRun.fileChecksumSha256}>
                           {selectedRun.fileChecksumSha256 ? `${selectedRun.fileChecksumSha256.substring(0, 16)}...` : 'Pre-computed Hash'}
                         </span>
                       </div>
 
                       <div>
                         <span className="spec-label">Model Artifact & Version:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#f8fafc' }}>
+                        <span className="mono-code" style={{ display: 'block', color: '#1e1b4b' }}>
                           {selectedRun.modelName} (v{selectedRun.modelVersion})
                         </span>
                       </div>
 
                       <div>
                         <span className="spec-label">Architecture / Domain:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#94a3b8' }}>
+                        <span className="mono-code" style={{ display: 'block', color: '#64748b' }}>
                           {selectedRun.modelType === MODEL_TYPES.RANDOM_FOREST ? 'Random Forest (Supervised)' : 'Isolation Forest (Anomaly)'} • {selectedRun.targetDomain}
                         </span>
                       </div>
@@ -583,7 +607,7 @@ export default function AnalysisResultsPage() {
                         <span className="spec-label">Mapped Sensor Signals:</span>
                         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                           {(selectedRun.mappedSignals || []).map((sig) => (
-                            <span key={sig} className="mono-code" style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', background: '#1e293b', borderRadius: '4px', border: '1px solid #334155' }}>
+                            <span key={sig} className="mono-code" style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', background: '#f8fafc', color: '#475569', borderRadius: '4px', border: '1px solid #ede9f6' }}>
                               {sig}
                             </span>
                           ))}
@@ -592,7 +616,7 @@ export default function AnalysisResultsPage() {
 
                       <div>
                         <span className="spec-label">Executed By / Timestamp:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#94a3b8' }}>
+                        <span className="mono-code" style={{ display: 'block', color: '#64748b' }}>
                           {selectedRun.createdByName} • {new Date(selectedRun.createdAt).toLocaleString()}
                         </span>
                       </div>
@@ -600,10 +624,10 @@ export default function AnalysisResultsPage() {
                       <div>
                         <span className="spec-label">Operating Regime Context:</span>
                         <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#0284c7', color: '#fff', borderRadius: '4px', fontWeight: 600 }}>
+                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#eff6ff', color: '#1d4ed8', borderRadius: '4px', fontWeight: 600, border: '1px solid #bfdbfe' }}>
                             {selectedRun.regimeSummary?.regimeMethod === 'regime_conditioned' ? 'Regime-Conditioned Baseline' : 'Global Baseline'}
                           </span>
-                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#1e293b', color: '#94a3b8', borderRadius: '4px', border: '1px solid #334155' }}>
+                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#f8fafc', color: '#64748b', borderRadius: '4px', border: '1px solid #ede9f6' }}>
                             {selectedRun.regimeSummary?.regimeStability || 'steady_state'}
                           </span>
                         </div>
@@ -612,21 +636,21 @@ export default function AnalysisResultsPage() {
                       <div>
                         <span className="spec-label">Active Signal Paths:</span>
                         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                          <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.vibrationPathActive ? 'rgba(56,189,248,0.2)' : '#1e293b', color: selectedRun.signalPathsSummary?.vibrationPathActive ? '#38bdf8' : '#64748b', border: '1px solid #334155' }}>
-                            {selectedRun.signalPathsSummary?.vibrationPathActive ? '✓ Vibration Path' : '✕ Vibration Path'}
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.vibrationPathActive ? '#eff6ff' : '#f8fafc', color: selectedRun.signalPathsSummary?.vibrationPathActive ? '#1d4ed8' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Icon name={selectedRun.signalPathsSummary?.vibrationPathActive ? 'check' : 'close'} size={11} /> Vibration Path
                           </span>
-                          <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.thermalPathActive ? 'rgba(251,146,60,0.2)' : '#1e293b', color: selectedRun.signalPathsSummary?.thermalPathActive ? '#fb923c' : '#64748b', border: '1px solid #334155' }}>
-                            {selectedRun.signalPathsSummary?.thermalPathActive ? '✓ Thermal Path' : '✕ Thermal Path'}
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.thermalPathActive ? '#fff7ed' : '#f8fafc', color: selectedRun.signalPathsSummary?.thermalPathActive ? '#c2410c' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Icon name={selectedRun.signalPathsSummary?.thermalPathActive ? 'check' : 'close'} size={11} /> Thermal Path
                           </span>
-                          <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'rgba(168,85,247,0.2)' : '#1e293b', color: selectedRun.signalPathsSummary?.operatingContextPathActive ? '#d8b4fe' : '#64748b', border: '1px solid #334155' }}>
-                            {selectedRun.signalPathsSummary?.operatingContextPathActive ? '✓ Speed/Load Context' : '✕ Context'}
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.operatingContextPathActive ? '#f5f3ff' : '#f8fafc', color: selectedRun.signalPathsSummary?.operatingContextPathActive ? '#6d28d9' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Icon name={selectedRun.signalPathsSummary?.operatingContextPathActive ? 'check' : 'close'} size={11} /> Context
                           </span>
                         </div>
                       </div>
 
                       <div>
                         <span className="spec-label">Sensor Coverage & Uncertainty:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#34d399', fontSize: '0.8rem' }}>
+                        <span className="mono-code" style={{ display: 'block', color: '#16a34a', fontSize: '0.8rem', fontWeight: 600 }}>
                           {((selectedRun.sensorCoverage?.coverageScore ?? selectedRun.sensorCoverage?.coverage_score ?? 1.0) * 100).toFixed(0)}% Coverage • {(selectedRun.sensorCoverage?.uncertaintyLevel || selectedRun.sensorCoverage?.uncertainty_level || 'low').toUpperCase()} Uncertainty
                         </span>
                       </div>
@@ -747,18 +771,19 @@ export default function AnalysisResultsPage() {
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
                                 {(interval.fusion_rationale || interval.fusionRationale) && (
-                                  <div style={{ padding: '0.6rem 0.8rem', borderRadius: '6px', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', fontSize: '0.8rem', color: '#e9d5ff' }}>
+                                  <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: '#f5f3ff', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.85rem', color: '#5b21b6' }}>
                                     <strong>Calibrated Fusion Rationale:</strong> {interval.fusion_rationale || interval.fusionRationale}
                                   </div>
                                 )}
                                 {/* 2-Col: Signals vs SHAP */}
                                 <div className="grid-two-col">
                                   {/* Physical Transducer Contributing Signals */}
-                                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#38bdf8', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <span>📡 Contributing Transducer Signals</span>
+                                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0284c7', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                      <Icon name="activity" size={15} color="#0284c7" />
+                                      <span>Contributing Transducer Signals</span>
                                     </div>
-                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
+                                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>
                                       Physical engineering sensors exhibiting statistical deviation above nominal baseline:
                                     </p>
 
@@ -770,10 +795,10 @@ export default function AnalysisResultsPage() {
                                           <div
                                             key={sIdx}
                                             style={{
-                                              padding: '0.5rem 0.75rem',
+                                              padding: '0.6rem 0.75rem',
                                               borderRadius: '6px',
-                                              background: '#1e293b',
-                                              border: '1px solid #334155',
+                                              background: '#f8fafc',
+                                              border: '1px solid #ede9f6',
                                               display: 'flex',
                                               justifyContent: 'space-between',
                                               alignItems: 'center',
@@ -781,16 +806,16 @@ export default function AnalysisResultsPage() {
                                             }}
                                           >
                                             <div>
-                                              <strong style={{ color: '#f8fafc' }}>{sig.signal}</strong>
-                                              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                              <strong style={{ color: '#1e1b4b' }}>{sig.signal}</strong>
+                                              <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                                                 Baseline: {sig.baseline_mean || sig.baseline} {sig.unit || 'g'}
                                               </div>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
-                                              <div style={{ color: '#f87171', fontWeight: 700 }}>
+                                              <div style={{ color: '#dc2626', fontWeight: 700 }}>
                                                 {sig.peak_value || sig.value} {sig.unit || 'g'}
                                               </div>
-                                              <span style={{ fontSize: '0.7rem', color: '#fb923c', fontWeight: 600 }}>
+                                              <span style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 600 }}>
                                                 Δ {sig.delta_pct || sig.delta || '+35%'}
                                               </span>
                                             </div>
@@ -801,11 +826,12 @@ export default function AnalysisResultsPage() {
                                   </div>
 
                                   {/* Verified SHAP Feature Attributions */}
-                                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
-                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#a78bfa', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <span>🔬 Verified {explainerType} Attributions</span>
+                                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#7c3aed', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                      <Icon name="research" size={15} color="#7c3aed" />
+                                      <span>Verified {explainerType} Attributions</span>
                                     </div>
-                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
+                                    <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>
                                       Cooperative game-theoretic feature contribution towards anomalous interval:
                                     </p>
 
@@ -820,10 +846,10 @@ export default function AnalysisResultsPage() {
                                             <div
                                               key={fIdx}
                                               style={{
-                                                padding: '0.5rem 0.75rem',
+                                                padding: '0.6rem 0.75rem',
                                                 borderRadius: '6px',
-                                                background: '#1e293b',
-                                                border: '1px solid #334155',
+                                                background: '#f8fafc',
+                                                border: '1px solid #ede9f6',
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
                                                 alignItems: 'center',
@@ -831,7 +857,7 @@ export default function AnalysisResultsPage() {
                                               }}
                                             >
                                               <div style={{ maxWidth: '65%' }}>
-                                                <div className="mono-code" style={{ color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                <div className="mono-code" style={{ color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
                                                   {feat.feature}
                                                 </div>
                                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
@@ -839,10 +865,10 @@ export default function AnalysisResultsPage() {
                                                 </div>
                                               </div>
                                               <div style={{ textAlign: 'right' }}>
-                                                <span style={{ color: isPositive ? '#f87171' : '#34d399', fontWeight: 700 }}>
+                                                <span style={{ color: isPositive ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
                                                   {isPositive ? '+' : ''}{attVal.toFixed(4)}
                                                 </span>
-                                                <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+                                                <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
                                                   {isPositive ? 'anomalous push' : 'normal suppress'}
                                                 </div>
                                               </div>
@@ -858,29 +884,31 @@ export default function AnalysisResultsPage() {
                                 {interval.detector_breakdown && (
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
                                     {/* Vibration Detector */}
-                                    <div style={{ background: '#0f172a', padding: '0.75rem', borderRadius: '6px', border: '1px solid #1e293b' }}>
-                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8', marginBottom: '0.35rem' }}>
-                                        ⚙️ Vibration Path Detector
+                                    <div style={{ background: '#ffffff', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0284c7', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        <Icon name="activity" size={14} color="#0284c7" />
+                                        <span>Vibration Path Detector</span>
                                       </div>
-                                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
-                                        Status: <strong style={{ color: interval.detector_breakdown.vibration?.is_anomalous ? '#f87171' : '#34d399' }}>
+                                      <div style={{ fontSize: '0.75rem', color: '#334155' }}>
+                                        Status: <strong style={{ color: interval.detector_breakdown.vibration?.is_anomalous ? '#dc2626' : '#16a34a' }}>
                                           {interval.detector_breakdown.vibration?.is_anomalous ? 'ANOMALY DETECTED' : 'NOMINAL'}
                                         </strong>
                                       </div>
-                                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                                         Score: {Number(interval.detector_breakdown.vibration?.score || 0).toFixed(4)} (Threshold: {Number(interval.detector_breakdown.vibration?.threshold || 0).toFixed(4)})
                                       </div>
                                       {interval.detector_breakdown.vibration?.limitations && (
-                                        <div style={{ fontSize: '0.7rem', color: '#fbbf24', marginTop: '0.25rem' }}>
+                                        <div style={{ fontSize: '0.7rem', color: '#b45309', marginTop: '0.25rem' }}>
                                           Note: {interval.detector_breakdown.vibration.limitations}
                                         </div>
                                       )}
                                     </div>
 
                                     {/* Thermal Detector */}
-                                    <div style={{ background: '#0f172a', padding: '0.75rem', borderRadius: '6px', border: '1px solid #1e293b' }}>
-                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fb923c', marginBottom: '0.35rem' }}>
-                                        🌡️ Thermal Path Detector
+                                    <div style={{ background: '#ffffff', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ea580c', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        <Icon name="thermometer" size={14} color="#ea580c" />
+                                        <span>Thermal Path Detector</span>
                                       </div>
                                       <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
                                         Status: <strong style={{ color: interval.detector_breakdown.thermal?.is_anomalous ? '#f87171' : '#34d399' }}>
@@ -913,7 +941,7 @@ export default function AnalysisResultsPage() {
                                     lineHeight: 1.4
                                   }}
                                 >
-                                  <strong>⚠️ Scientific Disclaimers & Physical Inspection Requirement:</strong>
+                                  <strong>Scientific Disclaimers & Physical Inspection Requirement:</strong>
                                   <ul style={{ margin: '0.35rem 0 0 1.25rem', padding: 0 }}>
                                     <li>This statistical anomaly interval reflects signal deviation beyond the calibrated 5% false-alarm threshold.</li>
                                     <li>It does <strong>not</strong> assert physical gear tooth breakage or fatigue failure without visual borescope or secondary acoustic inspection.</li>
@@ -952,7 +980,7 @@ export default function AnalysisResultsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Model Selector Bar */}
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-muted)' }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#64748b' }}>
                   Select Specimen Model:
                 </span>
                 {models.map((m) => {
@@ -963,11 +991,12 @@ export default function AnalysisResultsPage() {
                       key={m._id || m.id}
                       onClick={() => setSelectedModelId(m._id || m.id)}
                       style={{
-                        padding: '0.5rem 0.875rem',
+                        padding: '0.55rem 0.875rem',
                         borderRadius: '6px',
-                        border: isSelected ? '2px solid #3b82f6' : '1px solid #334155',
-                        background: isSelected ? '#1e293b' : '#0f172a',
-                        color: isSelected ? '#ffffff' : '#94a3b8',
+                        border: isSelected ? '2px solid #7c3aed' : '1px solid #ede9f6',
+                        background: '#ffffff',
+                        boxShadow: isSelected ? '0 2px 8px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
+                        color: isSelected ? '#1e1b4b' : '#64748b',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -981,7 +1010,7 @@ export default function AnalysisResultsPage() {
                           width: '8px',
                           height: '8px',
                           borderRadius: '50%',
-                          background: m.status === 'ready' ? '#10b981' : m.status === 'failed' ? '#ef4444' : '#f59e0b'
+                          background: m.status === 'ready' ? '#16a34a' : m.status === 'failed' ? '#dc2626' : '#d97706'
                         }}
                       />
                       <strong>{m.name}</strong>
@@ -1107,9 +1136,9 @@ export default function AnalysisResultsPage() {
                           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.85rem' }}>
                             <thead>
                               <tr>
-                                <th style={{ padding: '0.5rem', borderBottom: '1px solid #334155', color: '#94a3b8' }}>Actual \ Pred</th>
+                                <th style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: '#64748b' }}>Actual \ Pred</th>
                                 {selectedModel.metrics.classes.map((cls) => (
-                                  <th key={cls} style={{ padding: '0.5rem', borderBottom: '1px solid #334155', color: '#38bdf8' }}>
+                                  <th key={cls} style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: '#7c3aed' }}>
                                     {cls.replace('_', ' ')}
                                   </th>
                                 ))}
@@ -1120,7 +1149,7 @@ export default function AnalysisResultsPage() {
                                 const actualLabel = selectedModel.metrics.classes[rIdx];
                                 return (
                                   <tr key={rIdx}>
-                                    <td style={{ padding: '0.5rem', fontWeight: 600, borderBottom: '1px solid #1e293b', color: '#cbd5e1', textAlign: 'left' }}>
+                                    <td style={{ padding: '0.6rem', fontWeight: 600, borderBottom: '1px solid #ede9f6', color: '#1e1b4b', textAlign: 'left' }}>
                                       {actualLabel.replace('_', ' ')}
                                     </td>
                                     {row.map((val, cIdx) => {
@@ -1129,10 +1158,10 @@ export default function AnalysisResultsPage() {
                                         <td
                                           key={cIdx}
                                           style={{
-                                            padding: '0.5rem',
-                                            borderBottom: '1px solid #1e293b',
-                                            backgroundColor: isDiagonal ? 'rgba(16, 185, 129, 0.15)' : val > 0 ? 'rgba(239, 68, 68, 0.15)' : 'transparent',
-                                            color: isDiagonal ? '#34d399' : val > 0 ? '#f87171' : '#64748b',
+                                            padding: '0.6rem',
+                                            borderBottom: '1px solid #ede9f6',
+                                            backgroundColor: isDiagonal ? '#ecfdf5' : val > 0 ? '#fef2f2' : 'transparent',
+                                            color: isDiagonal ? '#047857' : val > 0 ? '#dc2626' : '#64748b',
                                             fontWeight: isDiagonal ? 700 : 400
                                           }}
                                         >
@@ -1154,20 +1183,20 @@ export default function AnalysisResultsPage() {
                             <div
                               key={className}
                               style={{
-                                padding: '0.75rem',
+                                padding: '0.75rem 1rem',
                                 borderRadius: '6px',
-                                background: '#0f172a',
-                                border: '1px solid #334155'
+                                background: '#f8fafc',
+                                border: '1px solid #ede9f6'
                               }}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                                <strong style={{ color: '#f8fafc' }}>{className.replace('_', ' ').toUpperCase()}</strong>
-                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Support: {m.support} windows</span>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                                <strong style={{ color: '#1e1b4b' }}>{className.replace('_', ' ').toUpperCase()}</strong>
+                                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Support: {m.support} windows</span>
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
-                                <div>Precision: <strong style={{ color: '#38bdf8' }}>{(m.precision * 100).toFixed(1)}%</strong></div>
-                                <div>Recall: <strong style={{ color: '#34d399' }}>{(m.recall * 100).toFixed(1)}%</strong></div>
-                                <div>F1-Score: <strong style={{ color: '#a78bfa' }}>{(m.f1_score * 100).toFixed(1)}%</strong></div>
+                                <div>Precision: <strong style={{ color: '#0284c7' }}>{(m.precision * 100).toFixed(1)}%</strong></div>
+                                <div>Recall: <strong style={{ color: '#16a34a' }}>{(m.recall * 100).toFixed(1)}%</strong></div>
+                                <div>F1-Score: <strong style={{ color: '#7c3aed' }}>{(m.f1_score * 100).toFixed(1)}%</strong></div>
                               </div>
                             </div>
                           ))}
@@ -1183,7 +1212,7 @@ export default function AnalysisResultsPage() {
                       title={`Verified TreeSHAP & Attribution: ${selectedModel.shapSummary?.explainerType || 'Exact TreeExplainer'}`}
                       description={
                         selectedModel.shapSummary?.additivityVerified
-                          ? `✓ Mathematically Verified Additive: Sum of feature contributions (Σ φi) plus baseline base value (φ0) equals model output within 10^-4 tolerance (Max Discrepancy: ${selectedModel.shapSummary?.maxAdditivityDiscrepancy || 0}). No heuristics or substituted feature rankings.`
+                          ? `Mathematically Verified Additive: Sum of feature contributions (Σ φi) plus baseline base value (φ0) equals model output within 10^-4 tolerance (Max Discrepancy: ${selectedModel.shapSummary?.maxAdditivityDiscrepancy || 0}). No heuristics or substituted feature rankings.`
                           : 'Evaluating exact Shapley cooperative game-theoretic feature allocations.'
                       }
                     />
@@ -1206,14 +1235,14 @@ export default function AnalysisResultsPage() {
                                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
                                     <span className="mono-code">{f.feature}</span>
-                                    <span style={{ fontWeight: 600, color: '#38bdf8' }}>{val.toFixed(4)}</span>
+                                    <span style={{ fontWeight: 600, color: '#7c3aed' }}>{val.toFixed(4)}</span>
                                   </div>
-                                  <div style={{ height: '8px', background: '#1e293b', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ height: '8px', background: '#ede9f6', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div
                                       style={{
                                         height: '100%',
                                         width: `${pct}%`,
-                                        background: idx === 0 ? '#38bdf8' : idx === 1 ? '#60a5fa' : '#818cf8',
+                                        background: idx === 0 ? '#7c3aed' : idx === 1 ? '#8b5cf6' : '#a78bfa',
                                         borderRadius: '4px'
                                       }}
                                     />
@@ -1229,7 +1258,7 @@ export default function AnalysisResultsPage() {
                         subtitle="Exact feature contributions for anomalous condition sample"
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-                          <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '0.5rem', background: '#0f172a', borderRadius: '6px' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#475569', padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #ede9f6' }}>
                             Baseline Expected Value (φ₀): <strong>{JSON.stringify(selectedModel.shapSummary?.baselineExpectedValue)}</strong>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1240,26 +1269,27 @@ export default function AnalysisResultsPage() {
                                   display: 'flex',
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
-                                  padding: '0.5rem 0.75rem',
-                                  background: '#1e293b',
+                                  padding: '0.6rem 0.85rem',
+                                  background: '#f8fafc',
+                                  border: '1px solid #ede9f6',
                                   borderRadius: '6px',
                                   fontSize: '0.82rem'
                                 }}
                               >
                                 <div>
-                                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{c.feature}</div>
+                                  <div style={{ fontWeight: 600, color: '#1e1b4b' }}>{c.feature}</div>
                                   <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Transducer Value: {c.value}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
                                   <span
                                     style={{
-                                      color: (c.attribution || c.importance) > 0 ? '#f87171' : '#34d399',
+                                      color: (c.attribution || c.importance) > 0 ? '#dc2626' : '#16a34a',
                                       fontWeight: 700
                                     }}
                                   >
                                     {(c.attribution || c.importance) > 0 ? '+' : ''}{(c.attribution || c.importance).toFixed(4)}
                                   </span>
-                                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>SHAP contribution</div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748b' }}>SHAP contribution</div>
                                 </div>
                               </div>
                             ))}
@@ -1302,15 +1332,15 @@ export default function AnalysisResultsPage() {
                 title="Benchmark Dataset Provenance & Component Classification Audit"
                 subtitle="Formal verification of component types, test rig instrumentation, operating conditions, and research citations."
                 badge={
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'rgba(52,211,153,0.15)', color: '#34d399', borderRadius: '4px', border: '1px solid #34d399' }}>
-                    ✓ 5 BENCHMARKS AUDITED
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#ecfdf5', color: '#047857', borderRadius: '4px', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Icon name="check" size={12} color="#16a34a" /> 5 BENCHMARKS AUDITED
                   </span>
                 }
               >
                 <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>
+                      <tr style={{ borderBottom: '1px solid #ede9f6', color: '#64748b' }}>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Benchmark Title</th>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Component Type</th>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Category</th>
@@ -1320,10 +1350,10 @@ export default function AnalysisResultsPage() {
                     </thead>
                     <tbody>
                       {Object.entries(researchData.provenance_registry || {}).map(([key, bm]) => (
-                        <tr key={key} style={{ borderBottom: '1px solid #1e293b' }}>
+                        <tr key={key} style={{ borderBottom: '1px solid #ede9f6' }}>
                           <td style={{ padding: '0.75rem' }}>
-                            <strong style={{ color: '#f8fafc', display: 'block' }}>{bm.title}</strong>
-                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Citation: {bm.citation}</span>
+                            <strong style={{ color: '#1e1b4b', display: 'block' }}>{bm.title}</strong>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Citation: {bm.citation}</span>
                           </td>
                           <td style={{ padding: '0.75rem' }}>
                             <span
@@ -1332,21 +1362,24 @@ export default function AnalysisResultsPage() {
                                 borderRadius: '4px',
                                 fontSize: '0.75rem',
                                 fontWeight: 700,
-                                background: bm.component_type === 'gearbox' ? 'rgba(56,189,248,0.2)' : 'rgba(251,146,60,0.2)',
-                                color: bm.component_type === 'gearbox' ? '#38bdf8' : '#fb923c'
+                                background: bm.component_type === 'gearbox' ? '#eff6ff' : '#fff7ed',
+                                color: bm.component_type === 'gearbox' ? '#1d4ed8' : '#c2410c',
+                                border: bm.component_type === 'gearbox' ? '1px solid #bfdbfe' : '1px solid #fed7aa'
                               }}
                             >
                               {bm.component_type.toUpperCase()}
                             </span>
                           </td>
-                          <td style={{ padding: '0.75rem', color: '#cbd5e1' }}>
+                          <td style={{ padding: '0.75rem', color: '#334155' }}>
                             {bm.benchmark_category.replace('_', ' ')}
                           </td>
-                          <td style={{ padding: '0.75rem', color: '#94a3b8', fontSize: '0.75rem', maxWidth: '280px' }}>
+                          <td style={{ padding: '0.75rem', color: '#64748b', fontSize: '0.75rem', maxWidth: '280px' }}>
                             {bm.operating_conditions}
                           </td>
                           <td style={{ padding: '0.75rem' }}>
-                            <span style={{ color: '#34d399', fontWeight: 600 }}>✓ Audited</span>
+                            <span style={{ color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Icon name="check" size={13} color="#16a34a" /> Audited
+                            </span>
                             <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{bm.notes}</div>
                           </td>
                         </tr>
@@ -1362,43 +1395,43 @@ export default function AnalysisResultsPage() {
                 subtitle="Demonstrating avoidance of false positive anomaly alerts on healthy operational speed and load transitions."
               >
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '0.5rem', marginBottom: '1.25rem' }}>
-                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Global Baseline FPR (Transitions)</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f87171' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Global Baseline FPR (Transitions)</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#dc2626' }}>
                       {((researchData.regime_comparison?.global_baseline?.false_positive_rate_healthy ?? 0.4286) * 100).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#b91c1c' }}>
                       {researchData.regime_comparison?.global_baseline?.false_positives_count ?? 60} false alarms on normal speed ramp
                     </div>
                   </div>
 
-                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #0284c7' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Regime-Conditioned Baseline FPR</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#34d399' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #a7f3d0', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Regime-Conditioned Baseline FPR</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#16a34a' }}>
                       {((researchData.regime_comparison?.regime_conditioned_baseline?.false_positive_rate_healthy ?? 0) * 100).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#34d399' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#16a34a' }}>
                       0 false alarms • {researchData.regime_comparison?.regime_conditioned_baseline?.fpr_reduction_pct ?? 100}% reduction
                     </div>
                   </div>
 
-                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Defect Recall (Fault Sensitivity)</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#38bdf8' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Defect Recall (Fault Sensitivity)</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7c3aed' }}>
                       {((researchData.regime_comparison?.regime_conditioned_baseline?.defect_recall ?? 1.0) * 100).toFixed(1)}%
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                       100% true defect recall preserved
                     </div>
                   </div>
                 </div>
 
                 {/* Per-regime breakdown table */}
-                <h4 style={{ fontSize: '0.9rem', color: '#f8fafc', marginBottom: '0.5rem' }}>Per-Regime False Alarm Prevention Breakdown:</h4>
+                <h4 style={{ fontSize: '0.9rem', color: '#1e1b4b', marginBottom: '0.5rem', fontWeight: 700 }}>Per-Regime False Alarm Prevention Breakdown:</h4>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>
+                      <tr style={{ borderBottom: '1px solid #ede9f6', color: '#64748b' }}>
                         <th style={{ padding: '0.5rem' }}>Operating Regime</th>
                         <th style={{ padding: '0.5rem' }}>Samples Evaluated</th>
                         <th style={{ padding: '0.5rem' }}>Global FPR</th>
@@ -1408,17 +1441,17 @@ export default function AnalysisResultsPage() {
                     </thead>
                     <tbody>
                       {Object.entries(researchData.regime_comparison?.per_regime_breakdown || {}).map(([regName, rData]) => (
-                        <tr key={regName} style={{ borderBottom: '1px solid #1e293b' }}>
-                          <td style={{ padding: '0.5rem', fontWeight: 600, color: '#f8fafc' }}>{regName}</td>
-                          <td style={{ padding: '0.5rem', color: '#cbd5e1' }}>{rData.samples_count}</td>
-                          <td style={{ padding: '0.5rem', color: rData.fpr_global > 0 ? '#f87171' : '#94a3b8' }}>
+                        <tr key={regName} style={{ borderBottom: '1px solid #ede9f6' }}>
+                          <td style={{ padding: '0.5rem', fontWeight: 600, color: '#1e1b4b' }}>{regName}</td>
+                          <td style={{ padding: '0.5rem', color: '#334155' }}>{rData.samples_count}</td>
+                          <td style={{ padding: '0.5rem', color: rData.fpr_global > 0 ? '#dc2626' : '#64748b' }}>
                             {rData.fpr_global !== null ? `${(rData.fpr_global * 100).toFixed(0)}%` : 'N/A (Defect Only)'}
                           </td>
-                          <td style={{ padding: '0.5rem', color: '#34d399', fontWeight: 600 }}>
+                          <td style={{ padding: '0.5rem', color: '#16a34a', fontWeight: 600 }}>
                             {rData.fpr_regime_aware !== null ? `${(rData.fpr_regime_aware * 100).toFixed(0)}%` : 'N/A'}
                           </td>
                           <td style={{ padding: '0.5rem' }}>
-                            <span style={{ color: rData.false_alarms_prevented > 0 ? '#34d399' : '#64748b', fontWeight: 700 }}>
+                            <span style={{ color: rData.false_alarms_prevented > 0 ? '#16a34a' : '#64748b', fontWeight: 700 }}>
                               +{rData.false_alarms_prevented} alarms avoided
                             </span>
                           </td>
@@ -1436,56 +1469,83 @@ export default function AnalysisResultsPage() {
               >
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
                   {/* Vibration Path Only */}
-                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>⚙️ Mechanical Vibration Only</strong>
-                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'rgba(56,189,248,0.2)', color: '#38bdf8' }}>
+                      <strong style={{ color: '#0284c7', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Icon name="activity" size={16} color="#0284c7" /> Mechanical Vibration Only
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
                         F1: {(researchData.signal_paths_comparison?.vibration_path_only?.overall_metrics?.f1_score * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-                      <div>Mechanical Recall: <strong style={{ color: '#34d399' }}>{((researchData.signal_paths_comparison?.vibration_path_only?.mechanical_fault_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
-                      <div>Thermal Recall: <strong style={{ color: '#f87171' }}>{((researchData.signal_paths_comparison?.vibration_path_only?.thermal_anomaly_recall ?? 0.4) * 100).toFixed(0)}%</strong></div>
+                      <div>Mechanical Recall: <strong style={{ color: '#16a34a' }}>{((researchData.signal_paths_comparison?.vibration_path_only?.mechanical_fault_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
+                      <div>Thermal Recall: <strong style={{ color: '#dc2626' }}>{((researchData.signal_paths_comparison?.vibration_path_only?.thermal_anomaly_recall ?? 0.4) * 100).toFixed(0)}%</strong></div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#34d399' }}>Strength:</strong> {researchData.signal_paths_comparison?.vibration_path_only?.strength}</p>
-                      <p style={{ margin: 0 }}><strong style={{ color: '#fbbf24' }}>Limitation:</strong> {researchData.signal_paths_comparison?.vibration_path_only?.limitation}</p>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#16a34a' }}>Strength:</strong> {researchData.signal_paths_comparison?.vibration_path_only?.strength}</p>
+                      <p style={{ margin: 0 }}><strong style={{ color: '#d97706' }}>Limitation:</strong> {researchData.signal_paths_comparison?.vibration_path_only?.limitation}</p>
                     </div>
                   </div>
 
                   {/* Thermal Path Only */}
-                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #1e293b' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ color: '#fb923c', fontSize: '0.95rem' }}>🌡️ Thermal Path Only</strong>
-                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'rgba(251,146,60,0.2)', color: '#fb923c' }}>
+                      <strong style={{ color: '#ea580c', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Icon name="thermometer" size={16} color="#ea580c" /> Thermal Path Only
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa' }}>
                         F1: {(researchData.signal_paths_comparison?.thermal_path_only?.overall_metrics?.f1_score * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-                      <div>Mechanical Recall: <strong style={{ color: '#f87171' }}>{((researchData.signal_paths_comparison?.thermal_path_only?.mechanical_fault_recall ?? 0.44) * 100).toFixed(0)}%</strong></div>
-                      <div>Thermal Recall: <strong style={{ color: '#34d399' }}>{((researchData.signal_paths_comparison?.thermal_path_only?.thermal_anomaly_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
+                      <div>Mechanical Recall: <strong style={{ color: '#dc2626' }}>{((researchData.signal_paths_comparison?.thermal_path_only?.mechanical_fault_recall ?? 0.44) * 100).toFixed(0)}%</strong></div>
+                      <div>Thermal Recall: <strong style={{ color: '#16a34a' }}>{((researchData.signal_paths_comparison?.thermal_path_only?.thermal_anomaly_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#34d399' }}>Strength:</strong> {researchData.signal_paths_comparison?.thermal_path_only?.strength}</p>
-                      <p style={{ margin: 0 }}><strong style={{ color: '#fbbf24' }}>Limitation:</strong> {researchData.signal_paths_comparison?.thermal_path_only?.limitation}</p>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#16a34a' }}>Strength:</strong> {researchData.signal_paths_comparison?.thermal_path_only?.strength}</p>
+                      <p style={{ margin: 0 }}><strong style={{ color: '#d97706' }}>Limitation:</strong> {researchData.signal_paths_comparison?.thermal_path_only?.limitation}</p>
                     </div>
                   </div>
 
                   {/* Multi-Signal Fused Path */}
-                  <div style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #a855f7' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ddd6fe', boxShadow: '0 1px 2px rgba(124, 58, 237, 0.05)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ color: '#d8b4fe', fontSize: '0.95rem' }}>⚡ Multi-Signal Fused</strong>
-                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'rgba(168,85,247,0.3)', color: '#e9d5ff', fontWeight: 700 }}>
+                      <strong style={{ color: '#7c3aed', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Icon name="layer" size={16} color="#7c3aed" /> Multi-Signal Fused
+                      </strong>
+                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#f5f3ff', color: '#6d28d9', fontWeight: 700, border: '1px solid #ddd6fe' }}>
                         F1: {(researchData.signal_paths_comparison?.multi_signal_fused?.overall_metrics?.f1_score * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-                      <div>Mechanical Recall: <strong style={{ color: '#34d399' }}>{((researchData.signal_paths_comparison?.multi_signal_fused?.mechanical_fault_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
-                      <div>Thermal Recall: <strong style={{ color: '#34d399' }}>{((researchData.signal_paths_comparison?.multi_signal_fused?.thermal_anomaly_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
+                      <div>Mechanical Recall: <strong style={{ color: '#16a34a' }}>{((researchData.signal_paths_comparison?.multi_signal_fused?.mechanical_fault_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
+                      <div>Thermal Recall: <strong style={{ color: '#16a34a' }}>{((researchData.signal_paths_comparison?.multi_signal_fused?.thermal_anomaly_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#34d399' }}>Strength:</strong> {researchData.signal_paths_comparison?.multi_signal_fused?.strength}</p>
-                      <p style={{ margin: 0 }}><strong style={{ color: '#a855f7' }}>Cross-Confirmation:</strong> Promotes alerts to CRITICAL only when both mechanical and thermal channels confirm abnormal deviation.</p>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#16a34a' }}>Strength:</strong> {researchData.signal_paths_comparison?.multi_signal_fused?.strength}</p>
+                      <p style={{ margin: 0 }}><strong style={{ color: '#7c3aed' }}>Cross-Confirmation:</strong> Promotes alerts to CRITICAL only when both mechanical and thermal channels confirm abnormal deviation.</p>
+                    </div>
+                  </div>
+
+                  {/* Multi-Signal Fused Path */}
+                  <div style={{ background: 'var(--bg-surface-subtle)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--primary-light)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Icon name="activity" size={16} color="var(--primary)" />
+                        <strong style={{ color: 'var(--primary)', fontSize: '0.95rem' }}>Multi-Signal Fused</strong>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'var(--primary-glow)', color: 'var(--primary)', fontWeight: 700 }}>
+                        F1: {(researchData.signal_paths_comparison?.multi_signal_fused?.overall_metrics?.f1_score * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                      <div>Mechanical Recall: <strong style={{ color: '#16a34a' }}>{((researchData.signal_paths_comparison?.multi_signal_fused?.mechanical_fault_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
+                      <div>Thermal Recall: <strong style={{ color: '#16a34a' }}>{((researchData.signal_paths_comparison?.multi_signal_fused?.thermal_anomaly_recall ?? 1.0) * 100).toFixed(0)}%</strong></div>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#16a34a' }}>Strength:</strong> {researchData.signal_paths_comparison?.multi_signal_fused?.strength}</p>
+                      <p style={{ margin: 0 }}><strong style={{ color: 'var(--primary)' }}>Cross-Confirmation:</strong> Promotes alerts to CRITICAL only when both mechanical and thermal channels confirm abnormal deviation.</p>
                     </div>
                   </div>
                 </div>
@@ -1501,7 +1561,8 @@ export default function AnalysisResultsPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.75)',
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1511,21 +1572,31 @@ export default function AnalysisResultsPage() {
         >
           <div
             style={{
-              background: '#0f172a',
-              border: '1px solid #334155',
-              borderRadius: '8px',
+              background: '#ffffff',
+              border: '1px solid #ede9f6',
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               maxWidth: '560px',
               width: '100%',
-              padding: '1.5rem',
+              padding: '1.75rem',
               maxHeight: '90vh',
               overflowY: 'auto'
             }}
           >
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>
-              Launch Verified Condition Analysis Run
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
-              Execute reproducible signal feature extraction, model inference, and exact SHAP attribution against an operational machine dataset.
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e1b4b', margin: 0 }}>
+                Launch Verified Condition Analysis Run
+              </h2>
+              <button
+                onClick={() => setIsRunModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4 }}
+                aria-label="Close"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
+              Execute reproducible signal feature extraction, model inference, and exact TreeSHAP attribution against an operational machine dataset.
             </p>
 
             {runSubmitError && (
@@ -1536,21 +1607,14 @@ export default function AnalysisResultsPage() {
 
             <form onSubmit={handleRunSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                   Target Industrial Machine:
                 </label>
                 <select
                   required
                   value={runForm.machineId}
                   onChange={(e) => setRunForm({ ...runForm, machineId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    color: '#f8fafc'
-                  }}
+                  className="form-select"
                 >
                   {availableMachines.map((m) => (
                     <option key={m._id || m.id} value={m._id || m.id}>
@@ -1561,21 +1625,14 @@ export default function AnalysisResultsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                   Telemetry Dataset:
                 </label>
                 <select
                   required
                   value={runForm.datasetId}
                   onChange={(e) => setRunForm({ ...runForm, datasetId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    color: '#f8fafc'
-                  }}
+                  className="form-select"
                 >
                   {availableDatasets.map((d) => (
                     <option key={d._id || d.id} value={d._id || d.id}>
@@ -1586,21 +1643,14 @@ export default function AnalysisResultsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                   Trained Model Artifact:
                 </label>
                 <select
                   required
                   value={runForm.modelArtifactId}
                   onChange={(e) => setRunForm({ ...runForm, modelArtifactId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    color: '#f8fafc'
-                  }}
+                  className="form-select"
                 >
                   {models.filter((m) => m.status === 'ready').map((m) => (
                     <option key={m._id || m.id} value={m._id || m.id}>
@@ -1615,10 +1665,10 @@ export default function AnalysisResultsPage() {
                 style={{
                   padding: '0.75rem',
                   borderRadius: '6px',
-                  background: preflightCheck.valid ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  border: `1px solid ${preflightCheck.valid ? '#10b981' : '#ef4444'}`,
+                  background: preflightCheck.valid ? '#ecfdf5' : '#fef2f2',
+                  border: `1px solid ${preflightCheck.valid ? '#a7f3d0' : '#fecaca'}`,
                   fontSize: '0.8rem',
-                  color: preflightCheck.valid ? '#34d399' : '#f87171'
+                  color: preflightCheck.valid ? '#047857' : '#b91c1c'
                 }}
               >
                 <strong>Pre-flight Verification:</strong>
@@ -1627,28 +1677,21 @@ export default function AnalysisResultsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                     Window Size:
                   </label>
                   <input
                     type="number"
                     min="16"
                     step="16"
+                    className="form-input"
                     value={runForm.windowSize}
                     onChange={(e) => setRunForm({ ...runForm, windowSize: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '6px',
-                      color: '#f8fafc'
-                    }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                     Overlap Ratio:
                   </label>
                   <input
@@ -1656,16 +1699,9 @@ export default function AnalysisResultsPage() {
                     min="0"
                     max="0.9"
                     step="0.1"
+                    className="form-input"
                     value={runForm.overlapRatio}
                     onChange={(e) => setRunForm({ ...runForm, overlapRatio: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '6px',
-                      color: '#f8fafc'
-                    }}
                   />
                 </div>
               </div>
@@ -1698,7 +1734,8 @@ export default function AnalysisResultsPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.7)',
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1708,20 +1745,30 @@ export default function AnalysisResultsPage() {
         >
           <div
             style={{
-              background: '#0f172a',
-              border: '1px solid #334155',
-              borderRadius: '8px',
+              background: '#ffffff',
+              border: '1px solid #ede9f6',
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               maxWidth: '540px',
               width: '100%',
-              padding: '1.5rem',
+              padding: '1.75rem',
               maxHeight: '90vh',
               overflowY: 'auto'
             }}
           >
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem' }}>
-              Train Machine Learning Model
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e1b4b', margin: 0 }}>
+                Train Machine Learning Model
+              </h2>
+              <button
+                onClick={() => setIsTrainModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4 }}
+                aria-label="Close"
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.25rem' }}>
               Extract physical engineering indicators and train scientific Random Forest or Isolation Forest models with exact TreeSHAP attributions.
             </p>
 
@@ -1733,42 +1780,28 @@ export default function AnalysisResultsPage() {
 
             <form onSubmit={handleTrainSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                   Model Name:
                 </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. GB-104 Pinion Fault Classifier"
+                  className="form-input"
                   value={trainForm.name}
                   onChange={(e) => setTrainForm({ ...trainForm, name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    color: '#f8fafc'
-                  }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                     Algorithm Architecture:
                   </label>
                   <select
                     value={trainForm.modelType}
                     onChange={(e) => setTrainForm({ ...trainForm, modelType: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '6px',
-                      color: '#f8fafc'
-                    }}
+                    className="form-select"
                   >
                     <option value={MODEL_TYPES.RANDOM_FOREST}>Random Forest (Supervised)</option>
                     <option value={MODEL_TYPES.ISOLATION_FOREST}>Isolation Forest (Unsupervised)</option>
@@ -1776,20 +1809,13 @@ export default function AnalysisResultsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                     Fault Domain Taxonomy:
                   </label>
                   <select
                     value={trainForm.targetDomain}
                     onChange={(e) => setTrainForm({ ...trainForm, targetDomain: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '6px',
-                      color: '#f8fafc'
-                    }}
+                    className="form-select"
                   >
                     <option value={FAULT_DOMAINS.GEAR_FAULTS}>Gear Faults (Teeth, Mesh)</option>
                     <option value={FAULT_DOMAINS.BEARING_FAULTS}>Bearing Faults (Races, Balls)</option>
@@ -1799,21 +1825,14 @@ export default function AnalysisResultsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                   Select Training Dataset:
                 </label>
                 <select
                   required
                   value={trainForm.datasetId}
                   onChange={(e) => setTrainForm({ ...trainForm, datasetId: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#1e293b',
-                    border: '1px solid #475569',
-                    borderRadius: '6px',
-                    color: '#f8fafc'
-                  }}
+                  className="form-select"
                 >
                   {availableDatasets.map((ds) => (
                     <option key={ds._id || ds.id} value={ds._id || ds.id}>
@@ -1825,28 +1844,21 @@ export default function AnalysisResultsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                     Window Size (Samples):
                   </label>
                   <input
                     type="number"
                     min="16"
                     step="16"
+                    className="form-input"
                     value={trainForm.window_size}
                     onChange={(e) => setTrainForm({ ...trainForm, window_size: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '6px',
-                      color: '#f8fafc'
-                    }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
                     Overlap Ratio (0.0 - 0.9):
                   </label>
                   <input
@@ -1854,16 +1866,9 @@ export default function AnalysisResultsPage() {
                     min="0"
                     max="0.9"
                     step="0.1"
+                    className="form-input"
                     value={trainForm.overlap_ratio}
                     onChange={(e) => setTrainForm({ ...trainForm, overlap_ratio: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      background: '#1e293b',
-                      border: '1px solid #475569',
-                      borderRadius: '6px',
-                      color: '#f8fafc'
-                    }}
                   />
                 </div>
               </div>

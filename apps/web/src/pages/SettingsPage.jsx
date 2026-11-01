@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Button from '../components/common/Button.jsx';
+import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { USER_ROLES } from '@predictive-maintenance/shared';
 
@@ -139,9 +140,10 @@ export default function SettingsPage({ apiStatus, onRefreshApi }) {
         }
       >
         {user?.role !== USER_ROLES.FACTORY_MANAGER ? (
-          <div className="login-error-alert" role="status">
+          <div className="login-error-alert" role="status" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Icon name="shield" size={16} color="#dc2626" />
             <span>
-              🔒 Access Restricted: The user management directory is restricted to Factory Managers. Non-manager roles receive a 403 Forbidden from the API.
+              Access Restricted: The user management directory is restricted to Factory Managers. Non-manager roles receive a 403 Forbidden from the API.
             </span>
           </div>
         ) : loadingUsers ? (

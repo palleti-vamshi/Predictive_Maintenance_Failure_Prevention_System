@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { MaintenanceWorkOrder } from '../models/MaintenanceWorkOrder.js';
 import { Machine } from '../models/Machine.js';
+import { User } from '../models/User.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireManager } from '../middleware/authorize.js';
 import { WORK_ORDER_STATUS, USER_ROLES } from '@predictive-maintenance/shared';
@@ -9,6 +10,65 @@ const router = Router();
 
 // All work order routes require authentication
 router.use(authenticate);
+
+/**
+ * GET /api/work-orders/eligible-technicians
+ * Returns technicians belonging to this factory with their skills, availability, and active workload count.
+ */
+router.get('/eligible-technicians', async (req, res) => {
+  try {
+    const factoryId = req.user.factoryId?._id || req.user.factoryId;
+    const technicians = await User.find({
+      factoryId,
+      role: USER_ROLES.TECHNICIAN,
+      isActive: true
+    })
+      .populate('assignedMachines', 'code name status')
+      .sort({ fullName: 1 });
+
+    // Calculate active workload (non-completed work orders) for each technician
+    const activeTasksByTech = await MaintenanceWorkOrder.aggregate([
+      {
+        $match: {
+          factoryId,
+          status: { $nin: [WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED] }
+        }
+      },
+      {
+        $group: {
+          _id: '$assignedTechnicianId',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const workloadMap = {};
+    activeTasksByTech.forEach((t) => {
+      workloadMap[t._id.toString()] = t.count;
+    });
+
+    const result = technicians.map((tech) => {
+      const json = tech.toJSON();
+      const openCount = workloadMap[tech._id.toString()] || 0;
+      return {
+        ...json,
+        activeWorkload: openCount,
+        availabilityStatus: openCount === 0 ? 'available' : openCount < 3 ? 'assigned' : 'high_workload'
+      };
+    });
+
+    return res.status(200).json({
+      count: result.length,
+      technicians: result
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:EligibleTechnicians] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to retrieve eligible technicians.'
+    });
+  }
+});
 
 /**
  * GET /api/work-orders/my-tasks
@@ -257,6 +317,257 @@ router.patch('/:orderId/status', async (req, res) => {
       error: 'InternalServerError',
       message: 'Failed to update work order status.'
     });
+  }
+});
+
+/**
+ * POST /api/work-orders/:orderId/request-parts
+ * Technician requests spare parts, transitioning status to WAITING_FOR_PARTS.
+ */
+router.post('/:orderId/request-parts', async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+    const workOrder = await MaintenanceWorkOrder.findById(req.params.orderId);
+
+    if (!workOrder || workOrder.factoryId.toString() !== factoryId) {
+      return res.status(404).json({ error: 'NotFound', message: 'Work order not found.' });
+    }
+
+    if (req.user.role === USER_ROLES.TECHNICIAN && workOrder.assignedTechnicianId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden', message: 'Only the assigned technician can request parts.' });
+    }
+
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Reason for parts request is required.' });
+    }
+
+    workOrder.status = WORK_ORDER_STATUS.WAITING_FOR_PARTS;
+    workOrder.approvalRequest = {
+      requestType: 'parts',
+      reason: reason.trim(),
+      requestedAt: new Date(),
+      requestedById: req.user._id,
+      requestedByName: req.user.fullName,
+      status: 'pending'
+    };
+
+    workOrder.statusHistory.push({
+      status: WORK_ORDER_STATUS.WAITING_FOR_PARTS,
+      changedById: req.user._id,
+      changedByName: req.user.fullName,
+      changedByRole: req.user.role,
+      timestamp: new Date(),
+      note: `Requested parts: ${reason.trim()}`
+    });
+
+    await workOrder.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Parts request submitted. Status updated to Waiting for parts.',
+      workOrder
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:RequestParts] Error:', err);
+    return res.status(500).json({ error: 'InternalServerError', message: 'Failed to submit parts request.' });
+  }
+});
+
+/**
+ * POST /api/work-orders/:orderId/request-approval
+ * Technician requests permission to proceed, transitioning status to WAITING_FOR_APPROVAL.
+ */
+router.post('/:orderId/request-approval', async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+    const workOrder = await MaintenanceWorkOrder.findById(req.params.orderId);
+
+    if (!workOrder || workOrder.factoryId.toString() !== factoryId) {
+      return res.status(404).json({ error: 'NotFound', message: 'Work order not found.' });
+    }
+
+    if (req.user.role === USER_ROLES.TECHNICIAN && workOrder.assignedTechnicianId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden', message: 'Only the assigned technician can request permission.' });
+    }
+
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Reason for permission request is required.' });
+    }
+
+    workOrder.status = WORK_ORDER_STATUS.WAITING_FOR_APPROVAL;
+    workOrder.approvalRequest = {
+      requestType: 'permission',
+      reason: reason.trim(),
+      requestedAt: new Date(),
+      requestedById: req.user._id,
+      requestedByName: req.user.fullName,
+      status: 'pending'
+    };
+
+    workOrder.statusHistory.push({
+      status: WORK_ORDER_STATUS.WAITING_FOR_APPROVAL,
+      changedById: req.user._id,
+      changedByName: req.user.fullName,
+      changedByRole: req.user.role,
+      timestamp: new Date(),
+      note: `Requested permission: ${reason.trim()}`
+    });
+
+    await workOrder.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Permission request submitted. Status updated to Waiting for approval.',
+      workOrder
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:RequestApproval] Error:', err);
+    return res.status(500).json({ error: 'InternalServerError', message: 'Failed to submit permission request.' });
+  }
+});
+
+/**
+ * POST /api/work-orders/:orderId/decision
+ * Manager approves or rejects a parts/permission request.
+ */
+router.post('/:orderId/decision', requireManager, async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+    const workOrder = await MaintenanceWorkOrder.findById(req.params.orderId);
+
+    if (!workOrder || workOrder.factoryId.toString() !== factoryId) {
+      return res.status(404).json({ error: 'NotFound', message: 'Work order not found.' });
+    }
+
+    const { decision, decisionNote } = req.body;
+    if (!['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Decision must be "approved" or "rejected".' });
+    }
+
+    if (workOrder.approvalRequest) {
+      workOrder.approvalRequest.status = decision;
+      workOrder.approvalRequest.decisionNote = decisionNote?.trim() || '';
+      workOrder.approvalRequest.decidedAt = new Date();
+      workOrder.approvalRequest.decidedById = req.user._id;
+      workOrder.approvalRequest.decidedByName = req.user.fullName;
+    }
+
+    // Both approval and rejection resume task to IN_PROGRESS with documented decision note
+    workOrder.status = WORK_ORDER_STATUS.IN_PROGRESS;
+
+    workOrder.statusHistory.push({
+      status: WORK_ORDER_STATUS.IN_PROGRESS,
+      changedById: req.user._id,
+      changedByName: req.user.fullName,
+      changedByRole: req.user.role,
+      timestamp: new Date(),
+      note: `Request ${decision.toUpperCase()} by Manager: ${decisionNote?.trim() || 'No note provided'}`
+    });
+
+    await workOrder.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Request was ${decision}. Task resumed to In Progress.`,
+      workOrder
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:Decision] Error:', err);
+    return res.status(500).json({ error: 'InternalServerError', message: 'Failed to record decision.' });
+  }
+});
+
+/**
+ * POST /api/work-orders/:orderId/submit-work
+ * Technician submits completed work report for manager review.
+ */
+router.post('/:orderId/submit-work', async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+    const workOrder = await MaintenanceWorkOrder.findById(req.params.orderId);
+
+    if (!workOrder || workOrder.factoryId.toString() !== factoryId) {
+      return res.status(404).json({ error: 'NotFound', message: 'Work order not found.' });
+    }
+
+    if (req.user.role === USER_ROLES.TECHNICIAN && workOrder.assignedTechnicianId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Forbidden', message: 'Only the assigned technician can submit work.' });
+    }
+
+    const { findings, workPerformed, followUpNeeded } = req.body;
+
+    workOrder.technicianFeedback = {
+      findings: findings?.trim() || '',
+      workPerformed: workPerformed?.trim() || '',
+      followUpNeeded: followUpNeeded?.trim() || '',
+      submittedAt: new Date()
+    };
+
+    workOrder.status = WORK_ORDER_STATUS.WORK_SUBMITTED;
+
+    workOrder.statusHistory.push({
+      status: WORK_ORDER_STATUS.WORK_SUBMITTED,
+      changedById: req.user._id,
+      changedByName: req.user.fullName,
+      changedByRole: req.user.role,
+      timestamp: new Date(),
+      note: `Work report submitted for manager review: ${workPerformed?.trim() || 'Work completed'}`
+    });
+
+    await workOrder.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Work report submitted for manager review.',
+      workOrder
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:SubmitWork] Error:', err);
+    return res.status(500).json({ error: 'InternalServerError', message: 'Failed to submit work report.' });
+  }
+});
+
+/**
+ * POST /api/work-orders/:orderId/return-clarification
+ * Manager returns submitted work to technician for clarification.
+ */
+router.post('/:orderId/return-clarification', requireManager, async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+    const workOrder = await MaintenanceWorkOrder.findById(req.params.orderId);
+
+    if (!workOrder || workOrder.factoryId.toString() !== factoryId) {
+      return res.status(404).json({ error: 'NotFound', message: 'Work order not found.' });
+    }
+
+    const { clarificationNote } = req.body;
+    if (!clarificationNote || !clarificationNote.trim()) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Clarification note is required.' });
+    }
+
+    workOrder.status = WORK_ORDER_STATUS.IN_PROGRESS;
+
+    workOrder.statusHistory.push({
+      status: WORK_ORDER_STATUS.IN_PROGRESS,
+      changedById: req.user._id,
+      changedByName: req.user.fullName,
+      changedByRole: req.user.role,
+      timestamp: new Date(),
+      note: `Returned for clarification by Manager: ${clarificationNote.trim()}`
+    });
+
+    await workOrder.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Work order returned to technician for clarification.',
+      workOrder
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:ReturnClarification] Error:', err);
+    return res.status(500).json({ error: 'InternalServerError', message: 'Failed to return work order.' });
   }
 });
 

@@ -6,11 +6,13 @@ import Shell from './components/layout/Shell.jsx';
 import FactoryOverviewPage from './pages/FactoryOverviewPage.jsx';
 import MachinesPage from './pages/MachinesPage.jsx';
 import MachineDetailPage from './pages/MachineDetailPage.jsx';
+import MaintenancePage from './pages/MaintenancePage.jsx';
 import DatasetUploadPage from './pages/DatasetUploadPage.jsx';
 import AnalysisResultsPage from './pages/AnalysisResultsPage.jsx';
 import AlertsPage from './pages/AlertsPage.jsx';
 import ResearchBenchmarkPage from './pages/ResearchBenchmarkPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import Icon from './components/common/Icon.jsx';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -24,6 +26,8 @@ function RouteSwitch({ apiStatus, onRefreshApi }) {
       return <MachinesPage />;
     case 'machine_detail':
       return <MachineDetailPage />;
+    case 'maintenance':
+      return <MaintenancePage />;
     case 'datasets':
       return <DatasetUploadPage />;
     case 'analysis':
@@ -46,7 +50,9 @@ function AuthenticatedApp({ apiStatus, onRefreshApi }) {
     return (
       <div className="session-loading-screen">
         <div className="session-loading-box">
-          <span className="brand-logo-icon" aria-hidden="true" style={{ fontSize: '2.5rem' }}>⚙️</span>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+            <Icon name="brandMark" size={44} color="#7c3aed" />
+          </div>
           <div className="session-loading-title">Verifying Factory Authentication...</div>
           <p className="session-loading-sub">Querying secure server session credentials</p>
         </div>

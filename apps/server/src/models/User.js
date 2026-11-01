@@ -59,6 +59,27 @@ const userSchema = new mongoose.Schema(
         ref: 'Machine'
       }
     ],
+    skills: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
+    availability: {
+      type: String,
+      enum: ['available', 'assigned', 'busy', 'high_workload', 'on_call', 'off_duty'],
+      default: 'available'
+    },
+    isDemoAccount: {
+      type: Boolean,
+      default: false
+    },
+    authorizedFactories: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Factory'
+      }
+    ],
     isActive: {
       type: Boolean,
       default: true

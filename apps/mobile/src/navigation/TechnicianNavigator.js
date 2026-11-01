@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, SafeAreaView, Platform } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import AssignedMachinesScreen from '../screens/AssignedMachinesScreen.js';
 import MachineDetailScreen from '../screens/MachineDetailScreen.js';
 import UploadDatasetScreen from '../screens/UploadDatasetScreen.js';
@@ -35,12 +36,11 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
     setSelectedAlert(null);
   };
 
-  const factoryName = user?.factory?.name || DEMO_FACTORY.name;
+  const factoryName = user?.factory?.name || user?.factoryId?.name || DEMO_FACTORY.name;
   const userRole = user?.role || 'technician';
   const userName = user?.fullName || 'Technician';
 
   const renderContent = () => {
-    // If drilled into machine detail
     if (activeTab === 'machines' && selectedMachine) {
       return (
         <MachineDetailScreen
@@ -58,7 +58,6 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
       );
     }
 
-    // If drilled into alert detail
     if (activeTab === 'alerts' && selectedAlert) {
       return (
         <AlertDetailScreen
@@ -88,21 +87,14 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
   };
 
   const tabs = [
-    { key: 'machines', label: 'Machines', icon: '⚙️' },
-    { key: 'upload', label: 'Check-In', icon: '📁' },
-    { key: 'alerts', label: 'Warnings', icon: '🚨', badge: DEMO_ALERTS.length },
-    { key: 'notes', label: 'Field Notes', icon: '📝' }
+    { key: 'machines', label: 'Machines', iconName: 'cpu' },
+    { key: 'upload', label: 'Check-In', iconName: 'upload-cloud' },
+    { key: 'alerts', label: 'Warnings', iconName: 'alert-triangle', badge: DEMO_ALERTS.length },
+    { key: 'notes', label: 'Field Tasks', iconName: 'clipboard' }
   ];
 
   return (
     <SafeAreaView style={styles.root}>
-      {/* Universal Demo Banner */}
-      <View style={styles.demoBanner}>
-        <Text style={styles.demoBannerText}>
-          DEMO SHELL • Simulated Gearbox Telemetry • No Real Hardware
-        </Text>
-      </View>
-
       {/* Top Mobile Bar with User Profile & Scope */}
       <View style={styles.topBar}>
         <View style={styles.userScopeContainer}>
@@ -113,6 +105,7 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
             </View>
           </View>
           <View style={styles.scopeRow}>
+            <Feather name="map-pin" size={11} color="#64748b" style={{ marginRight: 4 }} />
             <Text style={styles.scopeText} numberOfLines={1}>
               {factoryName}
             </Text>
@@ -142,6 +135,7 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
             accessibilityRole="button"
             accessibilityLabel="Sign Out of Terminal"
           >
+            <Feather name="log-out" size={13} color="#64748b" style={{ marginRight: 4 }} />
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
@@ -160,7 +154,6 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
             <TouchableOpacity
               key={tab.key}
               onPress={() => {
-                // Clear drilldowns on explicit tab switch
                 setSelectedMachine(null);
                 setSelectedAlert(null);
                 setActiveTab(tab.key);
@@ -170,7 +163,11 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
               accessibilityState={{ selected: isActive }}
             >
               <View style={styles.tabIconBox}>
-                <Text style={styles.tabIcon}>{tab.icon}</Text>
+                <Feather
+                  name={tab.iconName}
+                  size={20}
+                  color={isActive ? '#7c3aed' : '#64748b'}
+                />
                 {tab.badge && tab.badge > 0 && (
                   <View style={styles.badgeCount}>
                     <Text style={styles.badgeCountText}>{tab.badge}</Text>
@@ -191,105 +188,97 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#070b14',
-  },
-  demoBanner: {
-    backgroundColor: '#1e1338',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(168, 85, 247, 0.4)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  demoBannerText: {
-    color: '#d8b4fe',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    backgroundColor: '#f6f5fb',
   },
   topBar: {
-    backgroundColor: '#0f172a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ede9f6',
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 2,
   },
   userScopeContainer: {
     flex: 1,
-    marginRight: 8,
+    gap: 3,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   brandTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#f8fafc',
-    letterSpacing: -0.2,
-    maxWidth: 160,
+    color: '#1e1b4b',
+    letterSpacing: -0.3,
   },
   roleTag: {
-    backgroundColor: 'rgba(2, 132, 199, 0.25)',
+    backgroundColor: '#f5f3ff',
+    borderColor: '#ddd6fe',
+    borderWidth: 1,
+    borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.4)',
   },
   roleTagText: {
-    color: '#38bdf8',
     fontSize: 9,
+    color: '#7c3aed',
     fontWeight: '800',
-    letterSpacing: 0.3,
   },
   scopeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
+    gap: 4,
   },
   scopeText: {
-    fontSize: 11,
-    color: '#94a3b8',
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '500',
     maxWidth: 160,
   },
   demoTag: {
-    backgroundColor: 'rgba(168, 85, 247, 0.25)',
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+    borderWidth: 1,
+    borderRadius: 4,
     paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 2,
   },
   demoTagText: {
-    color: '#c084fc',
     fontSize: 8,
-    fontWeight: '800',
+    color: '#475569',
+    fontWeight: '700',
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   apiPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 9999,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
     borderWidth: 1,
+    gap: 5,
+    minHeight: 32,
   },
   apiOnline: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
+    backgroundColor: '#f0fdf4',
+    borderColor: '#bbf7d0',
   },
   apiDegraded: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
   },
   apiDot: {
     width: 6,
@@ -297,77 +286,81 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   dotOnline: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#16a34a',
   },
   dotDegraded: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#d97706',
   },
   apiLabel: {
-    fontSize: 10,
-    fontFamily: 'monospace',
-    fontWeight: '700',
-    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
   },
   signOutBtn: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    minHeight: 32,
   },
   signOutText: {
-    color: '#fca5a5',
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '600',
   },
   body: {
     flex: 1,
-    backgroundColor: '#070b14',
   },
   tabBar: {
-    backgroundColor: '#0f172a',
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
     flexDirection: 'row',
-    minHeight: 56,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 4,
-    paddingTop: 4,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#ede9f6',
+    paddingBottom: Platform.OS === 'ios' ? 14 : 6,
+    paddingTop: 6,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 4,
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
     minHeight: 48,
+    paddingVertical: 4,
+    gap: 3,
   },
   tabBtnActive: {
-    backgroundColor: 'rgba(2, 132, 199, 0.08)',
     borderTopWidth: 2,
-    borderTopColor: '#38bdf8',
+    borderTopColor: '#7c3aed',
   },
   tabIconBox: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tabIcon: {
-    fontSize: 18,
+    width: 26,
+    height: 24,
   },
   badgeCount: {
     position: 'absolute',
     top: -4,
     right: -10,
-    backgroundColor: '#f59e0b',
+    backgroundColor: '#dc2626',
     borderRadius: 8,
-    minWidth: 15,
-    height: 15,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
   badgeCountText: {
-    color: '#070b14',
+    color: '#ffffff',
     fontSize: 9,
     fontWeight: '800',
   },
@@ -375,10 +368,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#64748b',
     fontWeight: '600',
-    marginTop: 2,
   },
   tabLabelActive: {
-    color: '#38bdf8',
+    color: '#7c3aed',
     fontWeight: '700',
   },
 });

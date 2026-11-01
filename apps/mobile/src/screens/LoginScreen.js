@@ -5,35 +5,33 @@ import {
   Text,
   TextInput,
   ScrollView,
+  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  TouchableOpacity,
-  SafeAreaView
+  TouchableOpacity
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Button from '../components/Button.js';
 import { useAuth } from '../context/AuthContext.js';
+import { USER_ROLES } from '@predictive-maintenance/shared';
 
 export default function LoginScreen() {
-  const { login, isLoading, authError, clearError } = useAuth();
+  const { login, quickDemoLogin, isLoading, authError, clearError } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSignIn = async () => {
-    if (!email.trim() || !password) {
-      return;
-    }
+    if (!email.trim() || !password) return;
     await login(email.trim(), password);
   };
 
-  const handleQuickFillAndLogin = async (fillEmail, fillPassword) => {
-    setEmail(fillEmail);
-    setPassword(fillPassword);
-    clearError();
-    await login(fillEmail, fillPassword);
+  const handleQuickDemo = async (role) => {
+    await quickDemoLogin(role);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.root}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -42,20 +40,15 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Universal Demo Banner */}
-          <View style={styles.demoBanner}>
-            <Text style={styles.demoBannerText}>
-              DEMO ENVIRONMENT • Simulated Gearbox Telemetry • No Real Hardware
-            </Text>
-          </View>
-
-          {/* Header & Branding */}
-          <View style={styles.headerBox}>
+          {/* Header Branding */}
+          <View style={styles.header}>
             <View style={styles.logoBadge}>
-              <Text style={styles.logoBadgeText}>PM-FS</Text>
+              <Feather name="activity" size={24} color="#ffffff" />
             </View>
-            <Text style={styles.appTitle}>Predictive Maintenance</Text>
-            <Text style={styles.appSubtitle}>Industrial Gearbox Condition Monitoring</Text>
+            <Text style={styles.appTitle}>Presight</Text>
+            <Text style={styles.appSubtitle}>
+              AI-Based Predictive Maintenance System
+            </Text>
             <View style={styles.terminalBadge}>
               <Text style={styles.terminalBadgeText}>TECHNICIAN FIELD TERMINAL</Text>
             </View>
@@ -70,7 +63,7 @@ export default function LoginScreen() {
 
             {authError && (
               <View style={styles.errorBanner} accessibilityRole="alert">
-                <Text style={styles.errorIcon}>⚠️</Text>
+                <Feather name="alert-circle" size={16} color="#dc2626" />
                 <View style={styles.errorTextContainer}>
                   <Text style={styles.errorTitle}>Authentication Error</Text>
                   <Text style={styles.errorMessage}>{authError}</Text>
@@ -87,8 +80,8 @@ export default function LoginScreen() {
                   setEmail(t);
                   if (authError) clearError();
                 }}
-                placeholder="technician@factory.com"
-                placeholderTextColor="#64748b"
+                placeholder="tech@detroit.factory"
+                placeholderTextColor="#94a3b8"
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoCorrect={false}
@@ -106,7 +99,7 @@ export default function LoginScreen() {
                   if (authError) clearError();
                 }}
                 placeholder="••••••••••••"
-                placeholderTextColor="#64748b"
+                placeholderTextColor="#94a3b8"
                 secureTextEntry
                 autoCapitalize="none"
                 accessibilityLabel="Security Password"
@@ -123,70 +116,74 @@ export default function LoginScreen() {
             />
 
             <View style={styles.securityNote}>
+              <Feather name="shield" size={12} color="#64748b" style={{ marginRight: 4 }} />
               <Text style={styles.securityNoteText}>
-                🔒 Scoped to assigned factory & equipment. Access verified server-side.
+                Scoped to assigned factory & equipment. Access verified server-side.
               </Text>
             </View>
           </View>
 
-          {/* Development Quick-Login Accounts Card (Rendered strictly in development mode) */}
+          {/* Development Quick-Login Accounts Card */}
           {__DEV__ && (
             <View style={styles.devCard}>
               <View style={styles.devHeaderRow}>
-                <Text style={styles.devTag}>DEV / DEMO</Text>
+                <Text style={styles.devTag}>DEMO ACCOUNTS</Text>
                 <Text style={styles.devTitle}>Pre-Seeded Factory Accounts</Text>
               </View>
               <Text style={styles.devDescription}>
-                Tap any role to immediately test scoped authentication against Detroit Plant #2:
+                Tap any demo account to immediately test scoped authentication against Pune Precision Powertrains Plant #2 [Demo account]:
               </Text>
 
-              <View style={styles.quickButtons}>
+              <View style={styles.quickGrid}>
+                {/* Technician Quick Button */}
                 <TouchableOpacity
-                  style={styles.quickBtn}
-                  onPress={() => handleQuickFillAndLogin('tech@detroit.factory', 'Tech123!')}
+                  style={[styles.quickBtn, styles.quickBtnTech]}
+                  onPress={() => handleQuickDemo(USER_ROLES.TECHNICIAN)}
                   disabled={isLoading}
                   accessibilityRole="button"
                 >
-                  <View style={styles.quickRoleBadgeTech}>
-                    <Text style={styles.quickRoleText}>TECHNICIAN</Text>
+                  <View style={styles.quickBtnHeader}>
+                    <Text style={styles.quickRoleText}>Rajesh Kumar (Technician)</Text>
+                    <View style={styles.pillTech}>
+                      <Text style={styles.pillTextTech}>DEMO ACCOUNT</Text>
+                    </View>
                   </View>
-                  <View style={styles.quickInfo}>
-                    <Text style={styles.quickName}>Alex Mercer</Text>
-                    <Text style={styles.quickScope}>Detroit #2 • Assigned to GB-104</Text>
-                  </View>
-                  <Text style={styles.quickArrow}>→</Text>
+                  <Text style={styles.quickEmailText}>tech@detroit.factory</Text>
+                  <Text style={styles.quickScopeText}>Assigned: GB-104 (Dynamic Workload: 3)</Text>
                 </TouchableOpacity>
 
+                {/* Manager Quick Button */}
                 <TouchableOpacity
                   style={styles.quickBtn}
-                  onPress={() => handleQuickFillAndLogin('manager@detroit.factory', 'Manager123!')}
+                  onPress={() => handleQuickDemo(USER_ROLES.FACTORY_MANAGER)}
                   disabled={isLoading}
                   accessibilityRole="button"
                 >
-                  <View style={styles.quickRoleBadgeManager}>
-                    <Text style={styles.quickRoleText}>MANAGER</Text>
+                  <View style={styles.quickBtnHeader}>
+                    <Text style={styles.quickRoleText}>Sunita Rao (Manager)</Text>
+                    <View style={styles.pillManager}>
+                      <Text style={styles.pillTextManager}>FULL ACCESS</Text>
+                    </View>
                   </View>
-                  <View style={styles.quickInfo}>
-                    <Text style={styles.quickName}>Sarah Vance</Text>
-                    <Text style={styles.quickScope}>Detroit #2 • Full Plant Scope</Text>
-                  </View>
-                  <Text style={styles.quickArrow}>→</Text>
+                  <Text style={styles.quickEmailText}>manager@detroit.factory</Text>
+                  <Text style={styles.quickScopeText}>Pune Plant Fleet: GB-104, GB-201, PUMP-301, MTR-102</Text>
                 </TouchableOpacity>
 
+                {/* Viewer Quick Button */}
                 <TouchableOpacity
                   style={styles.quickBtn}
-                  onPress={() => handleQuickFillAndLogin('viewer@detroit.factory', 'Viewer123!')}
+                  onPress={() => handleQuickDemo(USER_ROLES.VIEWER)}
                   disabled={isLoading}
                   accessibilityRole="button"
                 >
-                  <View style={styles.quickRoleBadgeViewer}>
-                    <Text style={styles.quickRoleText}>VIEWER</Text>
+                  <View style={styles.quickBtnHeader}>
+                    <Text style={styles.quickRoleText}>Amit Desai (Viewer)</Text>
+                    <View style={styles.pillViewer}>
+                      <Text style={styles.pillTextViewer}>READ ONLY</Text>
+                    </View>
                   </View>
-                  <View style={styles.quickInfo}>
-                    <Text style={styles.quickName}>David Sterling</Text>
-                    <Text style={styles.quickScope}>Detroit #2 • Read-Only Scope</Text>
-                  </View>
-                  <Text style={styles.quickArrow}>→</Text>
+                  <Text style={styles.quickEmailText}>viewer@detroit.factory</Text>
+                  <Text style={styles.quickScopeText}>Read-only assigned telemetry, write blocked</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -198,67 +195,52 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
-    backgroundColor: '#070b14',
+    backgroundColor: '#f6f5fb',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingVertical: 28,
     gap: 16,
   },
-  demoBanner: {
-    backgroundColor: '#1e1338',
-    borderColor: 'rgba(168, 85, 247, 0.4)',
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  demoBannerText: {
-    color: '#d8b4fe',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-  },
-  headerBox: {
+  header: {
     alignItems: 'center',
     paddingVertical: 12,
     gap: 6,
   },
   logoBadge: {
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: '#7c3aed',
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 4,
-  },
-  logoBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
+    shadowColor: '#7c3aed',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   appTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#f8fafc',
+    color: '#1e1b4b',
     textAlign: 'center',
     letterSpacing: -0.5,
   },
   appSubtitle: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: '#64748b',
     textAlign: 'center',
   },
   terminalBadge: {
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
-    borderColor: 'rgba(56, 189, 248, 0.3)',
+    backgroundColor: '#f5f3ff',
+    borderColor: '#ddd6fe',
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -266,41 +248,43 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   terminalBadgeText: {
-    color: '#38bdf8',
+    color: '#7c3aed',
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   formCard: {
-    backgroundColor: '#0f172a',
-    borderColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    borderColor: '#ede9f6',
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 18,
+    borderRadius: 12,
+    padding: 20,
     gap: 14,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   formTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   formHelp: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     marginTop: -8,
   },
   errorBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fecaca',
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     padding: 10,
     flexDirection: 'row',
     gap: 10,
     alignItems: 'flex-start',
-  },
-  errorIcon: {
-    fontSize: 16,
   },
   errorTextContainer: {
     flex: 1,
@@ -308,11 +292,11 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#fca5a5',
+    color: '#b91c1c',
   },
   errorMessage: {
     fontSize: 11,
-    color: '#f8fafc',
+    color: '#7f1d1d',
     marginTop: 2,
   },
   inputGroup: {
@@ -321,24 +305,26 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#cbd5e1',
+    color: '#334155',
   },
   input: {
-    backgroundColor: '#070b14',
-    borderColor: '#334155',
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#f8fafc',
-    minHeight: 44,
+    color: '#1e1b4b',
+    minHeight: 48,
   },
   signInButton: {
     marginTop: 4,
   },
   securityNote: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingTop: 4,
   },
   securityNoteText: {
@@ -347,12 +333,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   devCard: {
-    backgroundColor: '#131d33',
-    borderColor: 'rgba(56, 189, 248, 0.25)',
+    backgroundColor: '#ffffff',
+    borderColor: '#ede9f6',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 16,
     gap: 10,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   devHeaderRow: {
     flexDirection: 'row',
@@ -360,84 +351,92 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   devTag: {
-    backgroundColor: '#0284c7',
-    color: '#ffffff',
-    fontSize: 9,
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    color: '#7c3aed',
+    fontSize: 10,
     fontWeight: '800',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   devTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
   devDescription: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
     lineHeight: 16,
   },
-  quickButtons: {
+  quickGrid: {
     gap: 8,
     marginTop: 4,
   },
   quickBtn: {
-    backgroundColor: '#0f172a',
-    borderColor: '#1e293b',
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    padding: 12,
+    gap: 3,
     minHeight: 48,
+    justifyContent: 'center',
   },
-  quickRoleBadgeTech: {
-    backgroundColor: 'rgba(2, 132, 199, 0.2)',
-    borderColor: '#0284c7',
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  quickBtnTech: {
+    borderColor: '#ddd6fe',
+    backgroundColor: '#f5f3ff',
   },
-  quickRoleBadgeManager: {
-    backgroundColor: 'rgba(168, 85, 247, 0.2)',
-    borderColor: '#a855f7',
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  quickRoleBadgeViewer: {
-    backgroundColor: 'rgba(100, 116, 139, 0.2)',
-    borderColor: '#64748b',
-    borderWidth: 1,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+  quickBtnHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   quickRoleText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#f8fafc',
-  },
-  quickInfo: {
-    flex: 1,
-  },
-  quickName: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
   },
-  quickScope: {
+  quickEmailText: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
   },
-  quickArrow: {
-    fontSize: 16,
-    color: '#38bdf8',
-    fontWeight: '700',
+  quickScopeText: {
+    fontSize: 10,
+    color: '#475569',
+    marginTop: 2,
+  },
+  pillTech: {
+    backgroundColor: '#ede9fe',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  pillTextTech: {
+    fontSize: 8,
+    color: '#7c3aed',
+    fontWeight: '800',
+  },
+  pillManager: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  pillTextManager: {
+    fontSize: 8,
+    color: '#0284c7',
+    fontWeight: '800',
+  },
+  pillViewer: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  pillTextViewer: {
+    fontSize: 8,
+    color: '#475569',
+    fontWeight: '800',
   },
 });
-

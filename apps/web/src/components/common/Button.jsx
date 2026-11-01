@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon.jsx';
 
 /**
  * Reusable Industrial Button Component.
@@ -19,6 +20,14 @@ export default function Button({
   const variantClass = `btn-${variant}`;
   const sizeClass = size === 'sm' ? 'btn-sm' : size === 'lg' ? 'btn-lg' : '';
 
+  const renderIcon = () => {
+    if (!icon) return null;
+    if (typeof icon === 'string') {
+      return <Icon name={icon} size={size === 'sm' ? 14 : 16} />;
+    }
+    return icon;
+  };
+
   return (
     <button
       type={type}
@@ -32,7 +41,7 @@ export default function Button({
       {loading ? (
         <span className="spinner" aria-hidden="true" />
       ) : icon ? (
-        <span className="btn-icon" aria-hidden="true">{icon}</span>
+        <span className="btn-icon" aria-hidden="true">{renderIcon()}</span>
       ) : null}
       <span>{children}</span>
     </button>

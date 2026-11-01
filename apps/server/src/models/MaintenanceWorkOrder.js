@@ -115,6 +115,37 @@ const maintenanceWorkOrderSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    approvalRequest: {
+      requestType: {
+        type: String,
+        enum: ['parts', 'permission']
+      },
+      reason: {
+        type: String,
+        trim: true
+      },
+      requestedAt: Date,
+      requestedById: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      requestedByName: String,
+      status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      decisionNote: {
+        type: String,
+        trim: true
+      },
+      decidedAt: Date,
+      decidedById: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      decidedByName: String
+    },
     statusHistory: [statusHistorySchema],
     sourceAlertId: {
       type: mongoose.Schema.Types.ObjectId,

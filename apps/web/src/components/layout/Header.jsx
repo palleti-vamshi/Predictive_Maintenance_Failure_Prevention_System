@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Button from '../common/Button.jsx';
+import Icon from '../common/Icon.jsx';
 import { USER_ROLES } from '@predictive-maintenance/shared';
 
 const ROLE_DISPLAY_NAMES = {
@@ -11,9 +12,10 @@ const ROLE_DISPLAY_NAMES = {
 
 /**
  * Header component displaying authenticated user, factory scope, and logout control.
+ * Styled in clean light-lavender & white aesthetic with crisp SVG icons.
  */
 export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) {
-  const { user, logout } = useAuth();
+  const { user, logout, switchFactory } = useAuth();
 
   const factoryName = user?.factoryId?.name || 'Assigned Factory';
   const userFullName = user?.fullName || user?.username || 'User';
@@ -25,6 +27,15 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
     .substring(0, 2)
     .toUpperCase();
 
+  const handleFactoryChange = async (e) => {
+    const newFactoryId = e.target.value;
+    if (!newFactoryId || newFactoryId === (user?.factoryId?._id || user?.factoryId)) return;
+    const res = await switchFactory(newFactoryId);
+    if (res.success) {
+      window.location.reload();
+    }
+  };
+
   return (
     <header className="app-header-bar">
       <div className="header-left">
@@ -35,27 +46,49 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
           aria-label={mobileNavOpen ? 'Close navigation drawer' : 'Open navigation drawer'}
           aria-expanded={mobileNavOpen}
         >
-          <span className="hamburger-icon" aria-hidden="true">
-            {mobileNavOpen ? '✕' : '☰'}
-          </span>
+          <Icon name={mobileNavOpen ? 'close' : 'menu'} size={18} />
         </button>
 
         <div className="brand-lockup">
-          <span className="brand-logo-icon" aria-hidden="true">⚙️</span>
+          <div className="brand-logo-badge">
+            <Icon name="brandMark" size={22} color="#ffffff" />
+          </div>
           <div>
-            <div className="brand-title">Predictive Maintenance System</div>
-            <div className="brand-subtitle">Mechanical Systems Failure Prevention</div>
+            <div className="brand-title">Presight</div>
+            <div className="brand-subtitle">Predictive Maintenance & Failure Prevention</div>
           </div>
         </div>
       </div>
 
       <div className="header-right">
-        {/* Factory Scoping Pill */}
-        <div className="scope-pill" title="Hierarchical factory access scope">
-          <span className="scope-icon" aria-hidden="true">🏢</span>
-          <span className="scope-text">{factoryName}</span>
-          <span className="demo-tag" aria-hidden="true">ACTIVE SCOPE</span>
-        </div>
+        {/* Factory Scoping Pill / Interactive Selector */}
+        {user?.role === USER_ROLES.FACTORY_MANAGER && user?.authorizedFactories?.length > 1 ? (
+          <div className="scope-pill scope-selector" title="Switch active factory demonstration scope">
+            <Icon name="factory" size={14} color="var(--primary)" />
+            <select
+              className="factory-select-dropdown"
+              value={user?.factoryId?._id || user?.factoryId || ''}
+              onChange={handleFactoryChange}
+              aria-label="Active factory selector"
+            >
+              {user.authorizedFactories.map((f) => {
+                const id = f._id || f;
+                const name = f.name || f.code || 'Factory';
+                return (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                );
+              })}
+            </select>
+            <Icon name="chevronDown" size={12} color="var(--text-tertiary)" />
+          </div>
+        ) : (
+          <div className="scope-pill" title="Hierarchical factory access scope">
+            <Icon name="factory" size={14} color="var(--primary)" />
+            <span className="scope-text">{factoryName}</span>
+          </div>
+        )}
 
         {/* User Role Profile Pill */}
         <div className="user-profile-pill" title={`Signed in as ${userFullName} (${user?.role})`}>
@@ -75,7 +108,7 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
         >
           <span className="api-dot" aria-hidden="true" />
           <span className="api-text">
-            {apiStatus?.hasActiveConnection ? 'API Online' : 'API Standalone'}
+            {apiStatus?.hasActiveConnection ? 'Online' : 'Standalone'}
           </span>
         </div>
 

@@ -4,6 +4,7 @@ import StatusBadge from '../components/common/StatusBadge.jsx';
 import AlertCallout from '../components/common/AlertCallout.jsx';
 import MetricSummary from '../components/common/MetricSummary.jsx';
 import Button from '../components/common/Button.jsx';
+import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useRouter } from '../router/Router.jsx';
 import { DATASET_TYPES, AI_TASK_TYPES } from '@predictive-maintenance/shared';
@@ -84,14 +85,16 @@ export default function ResearchBenchmarkPage() {
           <Button
             variant={activeTab === 'catalog' ? 'primary' : 'secondary'}
             onClick={() => setActiveTab('catalog')}
+            icon="book"
           >
-            📚 Reference Datasets Catalog ({catalog.length})
+            Reference Datasets Catalog ({catalog.length})
           </Button>
           <Button
             variant={activeTab === 'algorithms' ? 'primary' : 'secondary'}
             onClick={() => setActiveTab('algorithms')}
+            icon="activity"
           >
-            🔬 Method Comparison Suite
+            Method Comparison Suite
           </Button>
         </div>
       </div>
@@ -346,8 +349,9 @@ export default function ResearchBenchmarkPage() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
-                        {bm.shapSummary?.additivityVerified ? '✓ TreeSHAP Additivity Verified' : 'Attribution Evaluated'}
+                      <span style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        {bm.shapSummary?.additivityVerified && <Icon name="check" size={12} color="#16a34a" />}
+                        {bm.shapSummary?.additivityVerified ? 'TreeSHAP Additivity Verified' : 'Attribution Evaluated'}
                       </span>
                       <Button
                         variant="secondary"

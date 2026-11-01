@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Card from '../components/Card.js';
 import Button from '../components/Button.js';
 import { DEMO_MAINTENANCE_NOTES, DEMO_MACHINES, WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
@@ -209,17 +210,26 @@ export default function MaintenanceNotesScreen() {
                 )}
                 {task.status === WORK_ORDER_STATUS.IN_PROGRESS && (
                   <View style={styles.inProgressNotice}>
-                    <Text style={styles.inProgressText}>⚙️ In Progress — View machine profile to complete</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Feather name="clock" size={13} color="#7c3aed" />
+                      <Text style={styles.inProgressText}>In Progress — View machine profile to complete</Text>
+                    </View>
                   </View>
                 )}
                 {task.status === WORK_ORDER_STATUS.COMPLETED && (
                   <View style={styles.completedNotice}>
-                    <Text style={styles.completedText}>✓ Completed — Pending Manager Review</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Feather name="check" size={13} color="#16a34a" />
+                      <Text style={styles.completedText}>Completed — Pending Manager Review</Text>
+                    </View>
                   </View>
                 )}
                 {task.status === WORK_ORDER_STATUS.REVIEWED && (
                   <View style={styles.reviewedNotice}>
-                    <Text style={styles.reviewedText}>✓ Reviewed & Closed by Manager</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Feather name="check" size={13} color="#15803d" />
+                      <Text style={styles.reviewedText}>Reviewed & Closed by Manager</Text>
+                    </View>
                   </View>
                 )}
               </View>
@@ -275,7 +285,10 @@ export default function MaintenanceNotesScreen() {
         </View>
 
         {successMsg && (
-          <Text style={styles.successText}>✓ Maintenance observation recorded to machine ledger</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 4 }}>
+            <Feather name="check" size={13} color="#16a34a" />
+            <Text style={styles.successText}>Maintenance observation recorded to machine ledger</Text>
+          </View>
         )}
 
         <Button

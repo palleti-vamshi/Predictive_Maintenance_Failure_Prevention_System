@@ -1,9 +1,9 @@
 import React from 'react';
 import { NAV_ITEMS, useRouter } from '../../router/Router.jsx';
-import { MACHINE_TYPES } from '@predictive-maintenance/shared';
+import Icon from '../common/Icon.jsx';
 
 /**
- * Sidebar navigation drawer with accessible route indicators and machine scope info.
+ * Sidebar navigation drawer with accessible route indicators and clean vector icons.
  */
 export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
   const { routeKey, navigate } = useRouter();
@@ -27,15 +27,9 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
       )}
 
       <aside className={`app-sidebar ${mobileNavOpen ? 'sidebar-open' : ''}`}>
-        {/* Machine Archetype Banner */}
-        <div className="sidebar-target-machine">
-          <span className="target-label">Target Architecture</span>
-          <span className="target-value">Industrial {MACHINE_TYPES.GEARBOX.toUpperCase()}</span>
-          <span className="target-stage-note">Planetary & Helical Stages</span>
-        </div>
-
         {/* Navigation Item List */}
         <nav className="sidebar-nav" aria-label="Main Navigation">
+          <div className="sidebar-section-title">Navigation</div>
           <ul className="nav-list">
             {NAV_ITEMS.map((item) => {
               const isActive =
@@ -50,7 +44,9 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
                     className={`nav-link ${isActive ? 'nav-link-active' : ''}`}
                     aria-current={isActive ? 'page' : undefined}
                   >
-                    <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                    <span className="nav-icon" aria-hidden="true">
+                      <Icon name={item.icon} size={18} color={isActive ? 'var(--primary)' : 'var(--text-secondary)'} />
+                    </span>
                     <div className="nav-content">
                       <span className="nav-title">{item.label}</span>
                       <span className="nav-desc">{item.description}</span>
@@ -62,12 +58,15 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
           </ul>
         </nav>
 
-        {/* Operational Disclaimer */}
+        {/* Clean Sidebar Footer */}
         <div className="sidebar-footer">
-          <div className="sim-disclaimer-box">
-            <span className="sim-badge" aria-hidden="true">BENCHMARK ENVIRONMENT</span>
-            <p className="sim-text">
-              Calibrated baseline telemetry & verified benchmark specimens. Seeded data labeled [SIMULATED].
+          <div className="sidebar-info-card">
+            <div className="sidebar-info-title">
+              <Icon name="shield" size={14} color="var(--primary)" />
+              <span>Condition Guard</span>
+            </div>
+            <p className="sidebar-info-text">
+              Multi-signal telemetry & regime-aware anomaly detection.
             </p>
           </div>
         </div>

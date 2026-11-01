@@ -93,6 +93,34 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Switch active factory scope (Factory Managers)
+  const switchFactory = async (factoryId) => {
+    setLoading(true);
+    try {
+      const url = `${API_BASE}/auth/switch-factory`;
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ factoryId })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to switch factory.');
+      }
+      setUser(data.user);
+      return { success: true, user: data.user };
+    } catch (err) {
+      console.error('[AuthContext:switchFactory] Error:', err);
+      return { success: false, message: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Development Quick-Fill / Demo Logins
   const quickDemoLogin = async (roleType) => {
     const creds = {
@@ -115,6 +143,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         quickDemoLogin,
+        switchFactory,
         refreshSession: checkCurrentSession
       }}
     >

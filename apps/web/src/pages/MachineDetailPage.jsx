@@ -3,6 +3,7 @@ import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Button from '../components/common/Button.jsx';
 import AlertCallout from '../components/common/AlertCallout.jsx';
+import Icon from '../components/common/Icon.jsx';
 import {
   DEMO_MACHINES,
   DEMO_ALERTS,
@@ -368,20 +369,18 @@ export default function MachineDetailPage() {
               }}
               disabled={isDecomm}
               title={isDecomm ? 'Cannot assign tasks to decommissioned machine' : 'Assign maintenance task'}
-              icon="📋"
             >
-              + Create Work Order
+              <Icon name="plus" size={14} style={{ marginRight: 6 }} /> Create Work Order
             </Button>
           )}
 
           <Button
             variant="primary"
             onClick={() => navigate(ROUTES.DATASETS_UPLOAD)}
-            icon="⬆️"
             disabled={isDecomm}
             title={isDecomm ? 'Cannot upload data for decommissioned machine' : 'Upload dataset'}
           >
-            Upload Gearbox Run
+            <Icon name="upload" size={14} style={{ marginRight: 6 }} /> Upload Gearbox Run
           </Button>
         </div>
       </div>
@@ -389,22 +388,22 @@ export default function MachineDetailPage() {
       {/* Decommission Banner if applicable */}
       {isDecomm && (
         <div style={{
-          backgroundColor: 'rgba(239, 68, 68, 0.15)',
-          borderColor: '#ef4444',
+          backgroundColor: '#fef2f2',
+          borderColor: '#fecaca',
           borderWidth: 1,
           borderStyle: 'solid',
           borderRadius: 8,
           padding: 16,
           marginBottom: 16
         }}>
-          <h3 style={{ margin: 0, color: '#fca5a5', fontSize: 15, fontWeight: 700 }}>
-            🛑 Gearbox Specimen is Soft-Decommissioned
+          <h3 style={{ margin: 0, color: '#991b1b', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="alert" size={16} color="#dc2626" /> Gearbox Specimen is Soft-Decommissioned
           </h3>
-          <p style={{ margin: '4px 0 0', color: '#cbd5e1', fontSize: 13 }}>
+          <p style={{ margin: '4px 0 0', color: '#7f1d1d', fontSize: 13 }}>
             This gearbox has been taken out of active operational rotation. Historical kinematic records, past maintenance work orders, and field notes are preserved for auditing, but new operational dataset uploads and work orders are disallowed.
           </p>
           {machine.decommissionReason && (
-            <div style={{ marginTop: 8, fontSize: 12, color: '#f8fafc' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: '#991b1b' }}>
               <strong>Decommission Reason:</strong> {machine.decommissionReason}
             </div>
           )}
@@ -425,7 +424,8 @@ export default function MachineDetailPage() {
               size="sm"
               onClick={() => navigate(ROUTES.ALERTS)}
             >
-              Review Warnings Dashboard →
+              <span>Review Warnings Dashboard</span>
+              <Icon name="arrowRight" size={13} style={{ marginLeft: 6 }} />
             </Button>
           }
         />
@@ -577,15 +577,16 @@ export default function MachineDetailPage() {
               {assignedTechs.length > 0 ? (
                 assignedTechs.map((t) => (
                   <div key={t._id || t} style={{
-                    backgroundColor: '#131d33',
-                    border: '1px solid #1e293b',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #ede9f6',
                     borderRadius: 8,
-                    padding: '10px 14px'
+                    padding: '10px 14px',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                   }}>
-                    <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 13 }}>
-                      👤 {t.fullName || t.name || 'Technician'}
+                    <div style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Icon name="user" size={13} color="#7c3aed" /> {t.fullName || t.name || 'Technician'}
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: 11 }}>
+                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
                       {t.email} • {t.role?.toUpperCase()}
                     </div>
                   </div>
@@ -660,9 +661,9 @@ export default function MachineDetailPage() {
                   footer={
                     <div className="card-footer-split">
                       <span className="footer-meta">
-                        Due: {new Date(order.dueDate).toLocaleDateString()}
-                        {order.completedAt && ` • Completed: ${new Date(order.completedAt).toLocaleDateString()}`}
-                        {order.reviewedAt && ` • Reviewed: ${new Date(order.reviewedAt).toLocaleDateString()}`}
+                        Due: {new Date(order.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {order.completedAt && ` • Completed: ${new Date(order.completedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                        {order.reviewedAt && ` • Reviewed: ${new Date(order.reviewedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
                       </span>
 
                       {/* Action Buttons */}
@@ -723,28 +724,28 @@ export default function MachineDetailPage() {
                   {/* Technician Feedback if completed */}
                   {order.technicianFeedback && (order.technicianFeedback.findings || order.technicianFeedback.workPerformed) && (
                     <div style={{
-                      backgroundColor: '#070b14',
-                      border: '1px solid #1e293b',
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #ede9f6',
                       borderRadius: 6,
                       padding: '10px 14px',
                       marginBottom: 10,
                       gap: 6
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: '#38bdf8', marginBottom: 4 }}>
-                        📝 Technician Field Report:
+                      <div style={{ fontWeight: 700, fontSize: 12, color: '#4338ca', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="edit" size={13} color="#4338ca" /> Technician Field Report:
                       </div>
                       {order.technicianFeedback.findings && (
-                        <div style={{ fontSize: 12, color: '#cbd5e1' }}>
+                        <div style={{ fontSize: 12, color: '#334155' }}>
                           <strong>Inspection Findings:</strong> {order.technicianFeedback.findings}
                         </div>
                       )}
                       {order.technicianFeedback.workPerformed && (
-                        <div style={{ fontSize: 12, color: '#cbd5e1' }}>
+                        <div style={{ fontSize: 12, color: '#334155' }}>
                           <strong>Work Performed:</strong> {order.technicianFeedback.workPerformed}
                         </div>
                       )}
                       {order.technicianFeedback.followUpNeeded && (
-                        <div style={{ fontSize: 12, color: '#fcd34d' }}>
+                        <div style={{ fontSize: 12, color: '#b45309' }}>
                           <strong>Follow-up Needed:</strong> {order.technicianFeedback.followUpNeeded}
                         </div>
                       )}
@@ -754,25 +755,25 @@ export default function MachineDetailPage() {
                   {/* Manager Review Notes if reviewed */}
                   {order.reviewNotes && (
                     <div style={{
-                      backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      backgroundColor: '#ecfdf5',
+                      border: '1px solid #a7f3d0',
                       borderRadius: 6,
                       padding: '8px 12px',
                       marginBottom: 10,
                       fontSize: 12,
-                      color: '#a7f3d0'
+                      color: '#047857'
                     }}>
                       <strong>Manager Closure Review ({order.reviewedById?.fullName || 'Manager'}):</strong> {order.reviewNotes}
                     </div>
                   )}
 
                   {/* Audit Trail Timeline */}
-                  <div style={{ borderTop: '1px solid #1e293b', paddingTop: 8 }}>
+                  <div style={{ borderTop: '1px solid #ede9f6', paddingTop: 8 }}>
                     <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Audit History:</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                       {(order.statusHistory || []).map((h, i) => (
-                        <div key={i} style={{ fontSize: 11, color: '#94a3b8' }}>
-                          • {new Date(h.timestamp).toLocaleTimeString()} ({new Date(h.timestamp).toLocaleDateString()}):{' '}
+                        <div key={i} style={{ fontSize: 11, color: '#64748b' }}>
+                          • {new Date(h.timestamp).toLocaleTimeString()} ({new Date(h.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}):{' '}
                           <strong style={{ color: '#f8fafc' }}>{h.status?.toUpperCase()}</strong> by {h.changedByName} ({h.changedByRole})
                           {h.note && ` — "${h.note}"`}
                         </div>
@@ -834,13 +835,14 @@ export default function MachineDetailPage() {
           {(isManager || isTechnician) && !isDecomm && (
             <Card title="Record Field Observation Note" subtitle="Submit physical findings or maintenance observations to this machine's permanent history">
               {noteSuccess && (
-                <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', color: '#a7f3d0', padding: 10, borderRadius: 6, marginBottom: 10 }}>
-                  ✓ {noteSuccess}
+                <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', padding: 10, borderRadius: 6, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="check" size={14} color="#16a34a" /> {noteSuccess}
                 </div>
               )}
               {noteError && (
-                <div className="login-error-alert" style={{ marginBottom: 10 }}>
-                  <span>⚠️ {noteError}</span>
+                <div className="login-error-alert" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="alert" size={14} color="#dc2626" />
+                  <span>{noteError}</span>
                 </div>
               )}
               <form onSubmit={handleAddNote} className="note-form">
@@ -953,7 +955,7 @@ export default function MachineDetailPage() {
                       </td>
                       <td>
                         <span className="text-sm">{ds.uploadedByName}</span>
-                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>{new Date(ds.createdAt).toLocaleDateString()}</div>
+                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>{new Date(ds.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                       </td>
                       <td>
                         <a
@@ -980,12 +982,15 @@ export default function MachineDetailPage() {
           <div className="modal-card" style={{ maxWidth: 540 }}>
             <div className="modal-header">
               <h2 className="modal-title">Create Maintenance Work Order</h2>
-              <button className="modal-close-btn" onClick={() => setShowCreateOrderModal(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setShowCreateOrderModal(false)} aria-label="Close modal">
+                <Icon name="close" size={16} />
+              </button>
             </div>
 
             {orderFormError && (
-              <div className="login-error-alert" style={{ marginBottom: 12 }}>
-                <span>⚠️ {orderFormError}</span>
+              <div className="login-error-alert" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="alert" size={14} color="#dc2626" />
+                <span>{orderFormError}</span>
               </div>
             )}
 
@@ -1044,8 +1049,8 @@ export default function MachineDetailPage() {
               <div className="form-group">
                 <label className="form-label">Assign Field Technician *</label>
                 {assignedTechs.length === 0 ? (
-                  <p style={{ fontSize: 12, color: '#fca5a5' }}>
-                    ⚠️ No technicians are currently assigned to this machine. You must assign a technician to the machine before assigning work orders.
+                  <p style={{ fontSize: 12, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon name="alert" size={14} color="#dc2626" /> No technicians are currently assigned to this machine. You must assign a technician to the machine before assigning work orders.
                   </p>
                 ) : (
                   <select
@@ -1082,7 +1087,9 @@ export default function MachineDetailPage() {
           <div className="modal-card" style={{ maxWidth: 540 }}>
             <div className="modal-header">
               <h2 className="modal-title">Complete Work Order: {showCompleteOrderModal.orderNumber}</h2>
-              <button className="modal-close-btn" onClick={() => setShowCompleteOrderModal(null)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setShowCompleteOrderModal(null)} aria-label="Close modal">
+                <Icon name="close" size={16} />
+              </button>
             </div>
 
             <form onSubmit={(e) => {
@@ -1143,7 +1150,9 @@ export default function MachineDetailPage() {
           <div className="modal-card" style={{ maxWidth: 500 }}>
             <div className="modal-header">
               <h2 className="modal-title">Manager Review & Closure</h2>
-              <button className="modal-close-btn" onClick={() => setShowReviewOrderModal(null)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setShowReviewOrderModal(null)} aria-label="Close modal">
+                <Icon name="close" size={16} />
+              </button>
             </div>
 
             <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 12px' }}>
@@ -1184,8 +1193,10 @@ export default function MachineDetailPage() {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card" style={{ maxWidth: 480 }}>
             <div className="modal-header">
-              <h2 className="modal-title" style={{ color: '#fca5a5' }}>Soft-Decommission Gearbox</h2>
-              <button className="modal-close-btn" onClick={() => setShowDecommissionModal(false)}>✕</button>
+              <h2 className="modal-title" style={{ color: '#dc2626' }}>Soft-Decommission Gearbox</h2>
+              <button className="modal-close-btn" onClick={() => setShowDecommissionModal(false)} aria-label="Close modal">
+                <Icon name="close" size={16} />
+              </button>
             </div>
 
             <p style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.5, margin: '0 0 12px' }}>

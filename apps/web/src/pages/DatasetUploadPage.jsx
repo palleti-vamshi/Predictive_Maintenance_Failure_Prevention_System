@@ -3,6 +3,7 @@ import Card from '../components/common/Card.jsx';
 import Button from '../components/common/Button.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import AlertCallout from '../components/common/AlertCallout.jsx';
+import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useRouter } from '../router/Router.jsx';
 import {
@@ -578,7 +579,9 @@ export default function DatasetUploadPage() {
                 onClick={() => fileInputRef.current?.click()}
                 style={{ cursor: 'pointer' }}
               >
-                <div className="dropzone-icon" aria-hidden="true">📁</div>
+                <div className="dropzone-icon" aria-hidden="true">
+                  <Icon name="upload" size={36} color="#7c3aed" />
+                </div>
                 <div className="dropzone-title">
                   {selectedFile ? selectedFile.name : 'Click or drag & drop CSV file here'}
                 </div>
@@ -675,7 +678,7 @@ export default function DatasetUploadPage() {
                               onChange={(e) => updateMapping(col.rawHeader, 'role', e.target.value)}
                               style={{ padding: '0.35rem 0.6rem', fontSize: '0.85rem' }}
                             >
-                              <option value="timestamp">⏱ Timestamp / Datetime</option>
+                              <option value="timestamp">Timestamp / Datetime</option>
                               <optgroup label="Gearbox Monitored Signals">
                                 {Object.values(GEARBOX_SIGNALS).map((sig) => (
                                   <option key={sig.key} value={sig.key}>
@@ -683,7 +686,7 @@ export default function DatasetUploadPage() {
                                   </option>
                                 ))}
                               </optgroup>
-                              <option value="label">🏷 Ground-Truth Fault Label</option>
+                              <option value="label">Ground-Truth Fault Label</option>
                               <option value="unmapped">— Ignore / Unmapped Column —</option>
                             </select>
                           </td>
@@ -968,9 +971,17 @@ export default function DatasetUploadPage() {
                     {recentDatasets.map((d) => (
                       <tr key={d._id}>
                         <td>
-                          <div className="table-primary-text" style={{ fontWeight: 600 }}>{d.title}</div>
+                          <div className="table-primary-text" style={{ fontWeight: 600 }}>
+                            {d.title}
+                            {(d.isSimulatorDerived || d.isDemoData || d.title?.includes('[Demo Data]')) && (
+                              <span className="badge badge-demo" style={{ marginLeft: 6, fontSize: 10, padding: '1px 5px' }}>Demo Data</span>
+                            )}
+                            {d.isSimulatorDerived && (
+                              <span className="badge badge-info" style={{ marginLeft: 4, fontSize: 10, padding: '1px 5px' }}>Simulator Test</span>
+                            )}
+                          </div>
                           <span className="mono-code text-muted" style={{ fontSize: '0.75rem' }}>
-                            Uploaded by {d.uploadedByName} • {new Date(d.createdAt).toLocaleDateString()}
+                            Uploaded by {d.uploadedByName} • {new Date(d.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
                         </td>
                         <td>
@@ -1002,9 +1013,10 @@ export default function DatasetUploadPage() {
                             href={`${API_BASE}/datasets/${d._id}/download`}
                             download
                             className="btn btn-secondary btn-sm"
-                            style={{ textDecoration: 'none', display: 'inline-block' }}
+                            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           >
-                            ⬇ Download CSV
+                            <Icon name="download" size={13} />
+                            <span>Download CSV</span>
                           </a>
                         </td>
                       </tr>

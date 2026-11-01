@@ -27,12 +27,17 @@ export default function Card({ title, subtitle, badge, action, children, style }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#131d33',
-    borderColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    borderColor: '#ede9f6',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     gap: 12,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -46,12 +51,12 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#1e1b4b',
     letterSpacing: -0.2,
   },
   cardSubtitle: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#64748b',
     marginTop: 2,
   },
   badgeSlot: {
@@ -61,10 +66,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardFooter: {
+    borderTopColor: '#f1f5f9',
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
     paddingTop: 10,
-    marginTop: 4,
+    marginTop: 2,
   },
 });
-

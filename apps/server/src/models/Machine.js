@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { OPERATIONAL_STATUS } from '@predictive-maintenance/shared';
+import { OPERATIONAL_STATUS, MACHINE_TYPES, INDUSTRIES } from '@predictive-maintenance/shared';
 
 const noteSchema = new mongoose.Schema(
   {
@@ -104,7 +104,18 @@ const machineSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      default: 'gearbox'
+      enum: Object.values(MACHINE_TYPES),
+      default: MACHINE_TYPES.GEARBOX
+    },
+    industry: {
+      type: String,
+      enum: Object.values(INDUSTRIES),
+      default: INDUSTRIES.MANUFACTURING,
+      trim: true
+    },
+    operatingContext: {
+      type: String,
+      trim: true
     },
     manufacturer: {
       type: String,
