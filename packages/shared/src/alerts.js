@@ -21,9 +21,4 @@ export const ANALYSIS_METHODS = Object.freeze({
   SUPERVISED_CLASSIFIER: 'supervised_classifier'
 });
 
-export const DATASET_TYPES = Object.freeze({
-  OPERATIONAL: 'operational',
-  RESEARCH_BENCHMARK: 'research_benchmark',
-  SIMULATED: 'simulated'
-});
 

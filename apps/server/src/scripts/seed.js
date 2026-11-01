@@ -7,13 +7,19 @@ import { Machine } from '../models/Machine.js';
 import { User } from '../models/User.js';
 import { Session } from '../models/Session.js';
 import { MaintenanceWorkOrder } from '../models/MaintenanceWorkOrder.js';
+import { Dataset } from '../models/Dataset.js';
+import { saveUploadedFile } from '../services/storage.service.js';
 import {
   USER_ROLES,
   MACHINE_TYPES,
   SIGNAL_CATEGORIES,
   OPERATIONAL_STATUS,
   WORK_ORDER_STATUS,
-  WORK_ORDER_PRIORITY
+  WORK_ORDER_PRIORITY,
+  DATASET_TYPES,
+  DATASET_STATUS,
+  DATASET_MODALITY,
+  AI_TASK_TYPES
 } from '@predictive-maintenance/shared';
 
 // Development demo passwords (strictly development only)
@@ -48,7 +54,8 @@ async function seed() {
     Machine.deleteMany({}),
     User.deleteMany({}),
     Session.deleteMany({}),
-    MaintenanceWorkOrder.deleteMany({})
+    MaintenanceWorkOrder.deleteMany({}),
+    Dataset.deleteMany({})
   ]);
 
   // 1. Create Organization
@@ -348,7 +355,297 @@ async function seed() {
     ]
   });
 
-  // 7. Create Factory 2 (Cleveland Plant #1) for Cross-Factory Scoping Tests
+  // 7. Seed Operational & Research Reference Datasets
+  console.log('[Seed] Seeding Operational and Research Reference Datasets...');
+
+  // 7a. Seed Operational Dataset for GB-104
+  let opCsv = 'timestamp,vibration_input_axial,vibration_input_radial,vibration_output_radial,temp_gearbox_sump,rotational_speed,load_torque\n';
+  const baseTime = Date.now() - 7 * 24 * 3600 * 1000;
+  for (let i = 0; i < 150; i++) {
+    const ts = new Date(baseTime + i * 60 * 1000).toISOString();
+    const vibAx = (1.2 + Math.sin(i * 0.1) * 0.25 + (Math.random() * 0.1)).toFixed(2);
+    const vibRad = (2.1 + Math.cos(i * 0.1) * 0.35 + (Math.random() * 0.15)).toFixed(2);
+    const vibOut = (1.8 + Math.sin(i * 0.05) * 0.2 + (Math.random() * 0.1)).toFixed(2);
+    const sump = (52.0 + i * 0.04 + (Math.random() * 0.4)).toFixed(1);
+    const rpm = Math.round(1490 + Math.random() * 15);
+    const tq = Math.round(480 + Math.random() * 10);
+    opCsv += `${ts},${vibAx},${vibRad},${vibOut},${sump},${rpm},${tq}\n`;
+  }
+
+  const opStorage = await saveUploadedFile({
+    buffer: Buffer.from(opCsv, 'utf-8'),
+    originalFilename: 'gb104_operational_baseline_oct2026.csv',
+    mimeType: 'text/csv'
+  });
+
+  await Dataset.create({
+    factoryId: factoryDetroit._id,
+    siteId: siteLine4._id,
+    machineId: machineGB104._id,
+    datasetType: DATASET_TYPES.OPERATIONAL,
+    title: 'GB-104 Extruder Baseline Steady-State Telemetry',
+    description: '150-minute high-fidelity steady state operational run under 485 Nm rated nominal load at 1495 RPM.',
+    status: DATASET_STATUS.READY,
+    uploadedById: techUser._id,
+    uploadedByName: techUser.fullName,
+    storageKey: opStorage.storageKey,
+    originalFilename: opStorage.originalFilename,
+    fileSizeBytes: opStorage.fileSizeBytes,
+    fileChecksumSha256: opStorage.fileChecksumSha256,
+    delimiter: ',',
+    encoding: 'utf-8',
+    dataSchemaVersion: '1.0.0',
+    featurePipelineVersion: '1.0.0',
+    modality: DATASET_MODALITY.UNLABELED_TELEMETRY,
+    timeRange: {
+      start: new Date(baseTime),
+      end: new Date(baseTime + 149 * 60 * 1000),
+      durationSeconds: 149 * 60
+    },
+    samplingRateHz: 0.017,
+    samplingIntervalMeanMs: 60000,
+    totalRows: 150,
+    totalColumns: 7,
+    columns: [
+      { rawHeader: 'timestamp', mappedSignal: 'timestamp', isTimestamp: true, dataType: 'datetime' },
+      { rawHeader: 'vibration_input_axial', mappedSignal: 'vibration_input_axial', sourceUnit: 'mm/s', targetUnit: 'mm/s', dataType: 'numeric' },
+      { rawHeader: 'vibration_input_radial', mappedSignal: 'vibration_input_radial', sourceUnit: 'mm/s', targetUnit: 'mm/s', dataType: 'numeric' },
+      { rawHeader: 'vibration_output_radial', mappedSignal: 'vibration_output_radial', sourceUnit: 'mm/s', targetUnit: 'mm/s', dataType: 'numeric' },
+      { rawHeader: 'temp_gearbox_sump', mappedSignal: 'temp_gearbox_sump', sourceUnit: 'degC', targetUnit: 'degC', dataType: 'numeric' },
+      { rawHeader: 'rotational_speed', mappedSignal: 'rotational_speed', sourceUnit: 'RPM', targetUnit: 'RPM', dataType: 'numeric' },
+      { rawHeader: 'load_torque', mappedSignal: 'load_torque', sourceUnit: 'Nm', targetUnit: 'Nm', dataType: 'numeric' }
+    ],
+    qualityFindings: [
+      {
+        severity: 'info',
+        code: 'CLEAN_BASELINE_SIGNALS',
+        message: 'All sensor channels fall within standard ISO 10816 engineering boundaries.'
+      }
+    ],
+    aiTaskCompatibility: {
+      [AI_TASK_TYPES.ANOMALY_DETECTION]: {
+        isCompatible: true,
+        reason: 'Compatible: 150 observations across 6 telemetry channels provide a stable baseline for Isolation Forest.',
+        recommendedModel: 'Isolation Forest (Unsupervised Outlier Detection)'
+      },
+      [AI_TASK_TYPES.FAULT_CLASSIFICATION]: {
+        isCompatible: false,
+        reason: 'Incompatible: No discrete ground-truth fault label column mapped.',
+        recommendedModel: 'Random Forest Multi-Class Classifier'
+      },
+      [AI_TASK_TYPES.REMAINING_USEFUL_LIFE]: {
+        isCompatible: false,
+        reason: 'Incompatible: Lacks run-to-failure progression or explicit time-to-failure targets.',
+        recommendedModel: 'Weibull Hazard / Temporal RUL Regressor'
+      }
+    }
+  });
+
+  // 7b. Seed NASA IMS Bearing Reference Dataset
+  let nasaCsv = 'timestamp,vibration_ch1_radial,vibration_ch2_radial,vibration_ch3_radial,vibration_ch4_radial,cycle_hours,health_index\n';
+  const nasaBaseTime = Date.now() - 30 * 24 * 3600 * 1000;
+  for (let i = 0; i < 160; i++) {
+    const ts = new Date(nasaBaseTime + i * 3600 * 1000).toISOString();
+    const wearFactor = Math.pow(i / 160, 3);
+    const ch1 = (0.12 + wearFactor * 3.5 + Math.random() * 0.05).toFixed(3);
+    const ch2 = (0.11 + wearFactor * 0.2 + Math.random() * 0.04).toFixed(3);
+    const ch3 = (0.13 + wearFactor * 0.15 + Math.random() * 0.04).toFixed(3);
+    const ch4 = (0.12 + wearFactor * 0.18 + Math.random() * 0.04).toFixed(3);
+    const cycleHours = (i * 1.0).toFixed(1);
+    const healthIdx = Math.max(0, 1.0 - wearFactor).toFixed(3);
+    nasaCsv += `${ts},${ch1},${ch2},${ch3},${ch4},${cycleHours},${healthIdx}\n`;
+  }
+
+  const nasaStorage = await saveUploadedFile({
+    buffer: Buffer.from(nasaCsv, 'utf-8'),
+    originalFilename: 'nasa_ims_bearing_experiment2_subset.csv',
+    mimeType: 'text/csv'
+  });
+
+  await Dataset.create({
+    factoryId: factoryDetroit._id,
+    datasetType: DATASET_TYPES.REFERENCE,
+    title: 'NASA IMS Bearing Run-to-Failure Benchmark (Experiment 2)',
+    description: 'High-speed industrial roller bearing run-to-failure test rig tracking continuous outer race defect progression over 160 operating hours until terminal flaking.',
+    status: DATASET_STATUS.READY,
+    uploadedById: managerUser._id,
+    uploadedByName: managerUser.fullName,
+    storageKey: nasaStorage.storageKey,
+    originalFilename: nasaStorage.originalFilename,
+    fileSizeBytes: nasaStorage.fileSizeBytes,
+    fileChecksumSha256: nasaStorage.fileChecksumSha256,
+    delimiter: ',',
+    encoding: 'utf-8',
+    dataSchemaVersion: '1.0.0',
+    featurePipelineVersion: '1.0.0',
+    modality: DATASET_MODALITY.RUN_TO_FAILURE,
+    timeRange: {
+      start: new Date(nasaBaseTime),
+      end: new Date(nasaBaseTime + 159 * 3600 * 1000),
+      durationSeconds: 159 * 3600
+    },
+    samplingRateHz: 0.00028,
+    samplingIntervalMeanMs: 3600000,
+    totalRows: 160,
+    totalColumns: 7,
+    columns: [
+      { rawHeader: 'timestamp', mappedSignal: 'timestamp', isTimestamp: true, dataType: 'datetime' },
+      { rawHeader: 'vibration_ch1_radial', mappedSignal: 'vibration_input_radial', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'vibration_ch2_radial', mappedSignal: null, sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'vibration_ch3_radial', mappedSignal: null, sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'vibration_ch4_radial', mappedSignal: null, sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'cycle_hours', mappedSignal: null, sourceUnit: 'hours', targetUnit: 'hours', dataType: 'numeric' },
+      { rawHeader: 'health_index', mappedSignal: null, sourceUnit: 'unitless', targetUnit: 'unitless', dataType: 'numeric' }
+    ],
+    qualityFindings: [
+      {
+        severity: 'info',
+        code: 'RUN_TO_FAILURE_CONFIRMED',
+        message: 'Continuous wear degradation trajectory confirmed with severe exponential vibration amplitude ramp.'
+      }
+    ],
+    aiTaskCompatibility: {
+      [AI_TASK_TYPES.ANOMALY_DETECTION]: {
+        isCompatible: true,
+        reason: 'Compatible: Normal operating baseline with subsequent degradation deviation.',
+        recommendedModel: 'Isolation Forest / Autoencoder'
+      },
+      [AI_TASK_TYPES.FAULT_CLASSIFICATION]: {
+        isCompatible: false,
+        reason: 'Incompatible: Single failure progression (outer race defect) without multi-class discrete fault targets.',
+        recommendedModel: 'Random Forest Multi-Class Classifier'
+      },
+      [AI_TASK_TYPES.REMAINING_USEFUL_LIFE]: {
+        isCompatible: true,
+        reason: 'Compatible: Complete run-to-failure lifecycle from pristine state to functional failure.',
+        recommendedModel: 'Weibull Hazard / Temporal RUL Regressor'
+      }
+    },
+    referenceDetails: {
+      sourceName: 'NASA Ames Prognostics Data Repository',
+      sourceUrl: 'https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/',
+      citation: 'J. Lee, H. Qiu, G. Yu, J. Lin, and Rexnord Technical Services (2007). "Bearing Data Set", IMS, University of Cincinnati.',
+      license: 'Public Domain / Open Access Research',
+      usageTerms: 'Permitted for research benchmarking and algorithm validation with attribution.',
+      machineType: 'Rexnord ZA-2115 Double Row Bearing Rig',
+      sensorChannels: ['Ch1 Radial Accel', 'Ch2 Radial Accel', 'Ch3 Radial Accel', 'Ch4 Radial Accel'],
+      units: ['g', 'g', 'g', 'g'],
+      operatingConditions: '2000 RPM continuous speed, 6000 lbs radial spring load.',
+      labelDefinitions: 'Progressive outer race spalling and flaking defect.',
+      knownLimitations: 'Constant steady-state speed; lacks variable load cycles or torque transients.',
+      userConfirmedTerms: true
+    }
+  });
+
+  // 7c. Seed CWRU Bearing Fault Classification Reference Dataset
+  let cwruCsv = 'timestamp,vibration_drive_end,vibration_fan_end,rotational_speed,fault_class\n';
+  const cwruBase = Date.now() - 15 * 24 * 3600 * 1000;
+  const classes = ['healthy', 'inner_race_fault', 'ball_defect', 'outer_race_fault'];
+  for (let i = 0; i < 160; i++) {
+    const ts = new Date(cwruBase + i * 10 * 1000).toISOString();
+    const cls = classes[i % 4];
+    let deVib = 0.08 + Math.random() * 0.04;
+    let feVib = 0.06 + Math.random() * 0.03;
+    if (cls === 'inner_race_fault') {
+      deVib = 1.45 + Math.random() * 0.3;
+      feVib = 0.65 + Math.random() * 0.15;
+    } else if (cls === 'ball_defect') {
+      deVib = 0.95 + Math.random() * 0.25;
+      feVib = 0.45 + Math.random() * 0.12;
+    } else if (cls === 'outer_race_fault') {
+      deVib = 2.10 + Math.random() * 0.45;
+      feVib = 0.88 + Math.random() * 0.2;
+    }
+    const rpm = Math.round(1772 + Math.random() * 8);
+    cwruCsv += `${ts},${deVib.toFixed(3)},${feVib.toFixed(3)},${rpm},${cls}\n`;
+  }
+
+  const cwruStorage = await saveUploadedFile({
+    buffer: Buffer.from(cwruCsv, 'utf-8'),
+    originalFilename: 'cwru_12k_drive_end_fault_benchmark.csv',
+    mimeType: 'text/csv'
+  });
+
+  await Dataset.create({
+    factoryId: factoryDetroit._id,
+    datasetType: DATASET_TYPES.REFERENCE,
+    title: 'Case Western Reserve University (CWRU) 12k Bearing Fault Benchmark',
+    description: 'Gold-standard multi-class benchmark containing electro-discharge seeded bearing defects (inner race, ball, outer race, healthy) at 1772 RPM.',
+    status: DATASET_STATUS.READY,
+    uploadedById: managerUser._id,
+    uploadedByName: managerUser.fullName,
+    storageKey: cwruStorage.storageKey,
+    originalFilename: cwruStorage.originalFilename,
+    fileSizeBytes: cwruStorage.fileSizeBytes,
+    fileChecksumSha256: cwruStorage.fileChecksumSha256,
+    delimiter: ',',
+    encoding: 'utf-8',
+    dataSchemaVersion: '1.0.0',
+    featurePipelineVersion: '1.0.0',
+    modality: DATASET_MODALITY.LABELED_FAULTS,
+    timeRange: {
+      start: new Date(cwruBase),
+      end: new Date(cwruBase + 159 * 10 * 1000),
+      durationSeconds: 1590
+    },
+    samplingRateHz: 0.1,
+    samplingIntervalMeanMs: 10000,
+    totalRows: 160,
+    totalColumns: 5,
+    columns: [
+      { rawHeader: 'timestamp', mappedSignal: 'timestamp', isTimestamp: true, dataType: 'datetime' },
+      { rawHeader: 'vibration_drive_end', mappedSignal: 'vibration_input_radial', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'vibration_fan_end', mappedSignal: 'vibration_output_radial', sourceUnit: 'g', targetUnit: 'g', dataType: 'numeric' },
+      { rawHeader: 'rotational_speed', mappedSignal: 'rotational_speed', sourceUnit: 'RPM', targetUnit: 'RPM', dataType: 'numeric' },
+      { rawHeader: 'fault_class', mappedSignal: 'label', isLabel: true, sourceUnit: 'class', targetUnit: 'categorical', dataType: 'string' }
+    ],
+    qualityFindings: [
+      {
+        severity: 'info',
+        code: 'BALANCED_MULTI_CLASS',
+        message: 'Dataset features 4 discrete classes with 40 samples per class (25.0% uniform distribution).'
+      }
+    ],
+    labelDistribution: {
+      healthy: 40,
+      inner_race_fault: 40,
+      ball_defect: 40,
+      outer_race_fault: 40
+    },
+    aiTaskCompatibility: {
+      [AI_TASK_TYPES.ANOMALY_DETECTION]: {
+        isCompatible: true,
+        reason: 'Compatible: Healthy baseline state and distinct anomaly patterns across channels.',
+        recommendedModel: 'Isolation Forest / One-Class SVM'
+      },
+      [AI_TASK_TYPES.FAULT_CLASSIFICATION]: {
+        isCompatible: true,
+        reason: 'Compatible: 4 distinct fault classes with balanced class distribution suitable for Random Forest multi-class classifier.',
+        recommendedModel: 'Random Forest Multi-Class Classifier / Gradient Boosted Trees'
+      },
+      [AI_TASK_TYPES.REMAINING_USEFUL_LIFE]: {
+        isCompatible: false,
+        reason: 'Incompatible: Seeded static defect snapshots; lacks continuous degradation time trajectory.',
+        recommendedModel: 'Weibull Hazard / Temporal RUL Regressor'
+      }
+    },
+    referenceDetails: {
+      sourceName: 'Case Western Reserve University Bearing Data Center',
+      sourceUrl: 'https://engineering.case.edu/bearingdatacenter',
+      citation: 'K.A. Loparo, "Bearing Vibration Data Set", Case Western Reserve University, 2012.',
+      license: 'Open Educational / Research Attribution License',
+      usageTerms: 'Permitted for machine learning benchmarking, algorithm development, and academic comparisons.',
+      machineType: 'Reliance Electric 2HP Induction Motor (Drive End 6205-2RS JEM SKF)',
+      sensorChannels: ['Drive End Accelerometer', 'Fan End Accelerometer', 'Shaft Tachometer'],
+      units: ['g', 'g', 'RPM'],
+      operatingConditions: '1772 RPM, 2 HP motor load, 0.007" EDM fault depth.',
+      labelDefinitions: 'Healthy (0), Inner Race Fault (1), Ball Defect (2), Outer Race Fault (3)',
+      knownLimitations: 'Synthetically seeded single-point electrical discharge machined faults; not natural fatigue wear.',
+      userConfirmedTerms: true
+    }
+  });
+
+  // 8. Create Factory 2 (Cleveland Plant #1) for Cross-Factory Scoping Tests
   console.log('[Seed] Creating Factory 2 (Cleveland) for Cross-Factory Authorization Tests...');
   const factoryCleveland = await Factory.create({
     organizationId: org._id,

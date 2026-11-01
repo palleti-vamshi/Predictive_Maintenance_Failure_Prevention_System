@@ -25,6 +25,7 @@ export default function MachineDetailPage() {
 
   const [machine, setMachine] = useState(null);
   const [workOrders, setWorkOrders] = useState([]);
+  const [machineDatasets, setMachineDatasets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -103,6 +104,16 @@ export default function MachineDetailPage() {
       if (woRes.ok) {
         const woData = await woRes.json();
         setWorkOrders(woData.workOrders || []);
+      }
+
+      // 3. Fetch uploaded datasets for this machine
+      const dsRes = await fetch(`${API_BASE}/datasets?machineId=${mData.machine._id}`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (dsRes.ok) {
+        const dsData = await dsRes.json();
+        setMachineDatasets(dsData.datasets || []);
       }
     } catch {
       // Offline fallback
@@ -445,6 +456,12 @@ export default function MachineDetailPage() {
           onClick={() => setActiveTab('notes')}
         >
           Field Notes & History ({notes.length})
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'datasets' ? 'tab-btn-active' : ''}`}
+          onClick={() => setActiveTab('datasets')}
+        >
+          Uploaded Datasets ({machineDatasets.length})
         </button>
       </div>
 
@@ -881,6 +898,80 @@ export default function MachineDetailPage() {
             )}
           </Card>
         </div>
+      )}
+
+      {/* ================= TAB 5: Uploaded Datasets ================= */}
+      {activeTab === 'datasets' && (
+        <Card
+          title="Machine Ingested Datasets"
+          subtitle="Historical raw and preprocessed operational datasets uploaded for this gearbox"
+          badge={
+            !isDecomm && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => navigate(ROUTES.DATASETS_UPLOAD)}
+              >
+                + Ingest New Dataset
+              </Button>
+            )
+          }
+        >
+          {machineDatasets.length === 0 ? (
+            <p className="text-secondary text-sm">No datasets uploaded yet for this gearbox specimen.</p>
+          ) : (
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Title & Filename</th>
+                    <th scope="col">Modality</th>
+                    <th scope="col">Observations</th>
+                    <th scope="col">Sampling Rate</th>
+                    <th scope="col">Quality Status</th>
+                    <th scope="col">Uploaded By</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {machineDatasets.map((ds) => (
+                    <tr key={ds._id}>
+                      <td>
+                        <div className="table-primary-text" style={{ fontWeight: 600 }}>{ds.title}</div>
+                        <span className="mono-code text-muted" style={{ fontSize: '0.75rem' }}>{ds.originalFilename}</span>
+                      </td>
+                      <td>
+                        <span className="badge badge-site">{ds.modality}</span>
+                      </td>
+                      <td><span className="mono-code">{ds.totalRows?.toLocaleString()}</span></td>
+                      <td><span className="mono-code">{ds.samplingRateHz ? `${ds.samplingRateHz} Hz` : 'Snapshot'}</span></td>
+                      <td>
+                        <StatusBadge
+                          status={ds.status === 'ready' ? 'healthy' : ds.status === 'needs_review' ? 'warning' : 'critical'}
+                          label={ds.status.toUpperCase()}
+                        />
+                      </td>
+                      <td>
+                        <span className="text-sm">{ds.uploadedByName}</span>
+                        <div className="text-muted" style={{ fontSize: '0.75rem' }}>{new Date(ds.createdAt).toLocaleDateString()}</div>
+                      </td>
+                      <td>
+                        <a
+                          href={`${API_BASE}/datasets/${ds._id}/download`}
+                          download
+                          className="btn btn-secondary btn-sm"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          ⬇ CSV
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* ================= MODAL: Create Work Order ================= */}

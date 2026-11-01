@@ -5,3 +5,5 @@ export * from './Machine.js';
 export * from './User.js';
 export * from './Session.js';
 export * from './MaintenanceWorkOrder.js';
+export * from './Dataset.js';
+

@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import machineRoutes from './routes/machine.routes.js';
 import siteRoutes from './routes/site.routes.js';
 import workOrderRoutes from './routes/workOrder.routes.js';
+import datasetRoutes from './routes/dataset.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
@@ -54,7 +55,7 @@ app.get('/', (req, res) => {
     name: 'AI-Based Predictive Maintenance and Failure Prevention System API',
     initialMachine: 'Gearbox',
     version: '0.1.0',
-    phase: 'Phase 4 - Factory, Site, and Gearbox Machine Management',
+    phase: 'Phase 5 - Dataset Upload, Validation, and Reference Dataset Catalog',
     docs: {
       health: '/api/health',
       liveness: '/api/liveness',
@@ -66,6 +67,13 @@ app.get('/', (req, res) => {
       sites: 'GET /api/sites',
       machines: 'GET /api/machines',
       workOrders: 'GET /api/work-orders',
+      datasets: {
+        list: 'GET /api/datasets',
+        referenceCatalog: 'GET /api/datasets/reference-catalog',
+        upload: 'POST /api/datasets/upload',
+        validate: 'POST /api/datasets/validate',
+        confirm: 'POST /api/datasets/confirm'
+      },
       admin: 'GET /api/admin/factory-users'
     }
   });
@@ -76,6 +84,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/sites', siteRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/work-orders', workOrderRoutes);
+app.use('/api/datasets', datasetRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health & Liveness Probes (Public)

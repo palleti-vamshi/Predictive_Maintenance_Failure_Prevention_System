@@ -1,126 +1,415 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  TextInput
+} from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import Card from '../components/Card.js';
 import Button from '../components/Button.js';
 import StatusBadge from '../components/StatusBadge.js';
-import { DEMO_MACHINES } from '@predictive-maintenance/shared';
+import { useAuth } from '../context/AuthContext.js';
+import {
+  GEARBOX_SIGNALS,
+  DATASET_TYPES,
+  DATASET_STATUS,
+  AI_TASK_TYPES
+} from '@predictive-maintenance/shared';
+
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5001/api';
 
 export default function UploadDatasetScreen() {
-  const [selectedMachine, setSelectedMachine] = useState(DEMO_MACHINES[0].id);
-  const [datasetType, setDatasetType] = useState('operational');
-  const [fileAttached, setFileAttached] = useState(false);
+  const { sessionToken } = useAuth();
+
+  const [assignedMachines, setAssignedMachines] = useState([]);
+  const [selectedMachineId, setSelectedMachineId] = useState('');
+  const [loadingMachines, setLoadingMachines] = useState(true);
+
+  // File picking & upload state
+  const [pickedFile, setPickedFile] = useState(null);
+  const [title, setTitle] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadedSession, setUploadedSession] = useState(null);
+
+  // Validation state
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
+
+  // Confirmation state
+  const [confirming, setConfirming] = useState(false);
+  const [confirmedDataset, setConfirmedDataset] = useState(null);
+
+  // Fetch assigned machines for the technician
+  useEffect(() => {
+    async function fetchMachines() {
+      try {
+        setLoadingMachines(true);
+        const headers = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {};
+        const res = await fetch(`${API_BASE}/machines`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.machines || [];
+          setAssignedMachines(list);
+          if (list.length > 0) {
+            setSelectedMachineId(list[0]._id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load assigned machines:', err);
+      } finally {
+        setLoadingMachines(false);
+      }
+    }
+    fetchMachines();
+  }, [sessionToken]);
+
+  // Pick Document via Expo
+  async function handlePickDocument() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'text/plain', '*/*'],
+        copyToCacheDirectory: true
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        const lowerName = file.name.toLowerCase();
+        if (!lowerName.endsWith('.csv') && !lowerName.endsWith('.txt')) {
+          Alert.alert('Unsupported Format', 'Please select a standard CSV file (.csv or .txt).');
+          return;
+        }
+
+        if (file.size && file.size > 25 * 1024 * 1024) {
+          Alert.alert('File Too Large', 'Maximum accepted upload size is 25 MB.');
+          return;
+        }
+
+        setPickedFile(file);
+        setUploadedSession(null);
+        setValidationResult(null);
+        setConfirmedDataset(null);
+        if (!title) {
+          setTitle(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
+        }
+      }
+    } catch (err) {
+      console.error('Document picker error:', err);
+      Alert.alert('File Picker Error', 'Could not open document picker.');
+    }
+  }
+
+  // Upload file to server
+  async function handleUploadAndParse() {
+    if (!pickedFile) return;
+    setUploading(true);
+
+    try {
+      const headers = sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {};
+      const formData = new FormData();
+      formData.append('file', {
+        uri: pickedFile.uri,
+        name: pickedFile.name,
+        type: pickedFile.mimeType || 'text/csv'
+      });
+
+      const res = await fetch(`${API_BASE}/datasets/upload`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Upload failed');
+      }
+
+      setUploadedSession(data);
+
+      // Auto-trigger initial validation with candidate mappings
+      runValidation(data.uploadId, data.candidateMappings || []);
+    } catch (err) {
+      console.error('Upload error:', err);
+      Alert.alert('Upload Failed', err.message || 'Could not upload dataset.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // Run validation
+  async function runValidation(uploadId, candidateMappings) {
+    setValidating(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+      };
+
+      const res = await fetch(`${API_BASE}/datasets/validate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          uploadId,
+          columnMappings: candidateMappings
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setValidationResult(data.validation);
+      } else {
+        throw new Error(data.message || 'Validation failed');
+      }
+    } catch (err) {
+      console.error('Validation error:', err);
+      Alert.alert('Validation Error', err.message || 'Could not validate dataset.');
+    } finally {
+      setValidating(false);
+    }
+  }
+
+  // Confirm Ingestion
+  async function handleConfirmIngestion() {
+    if (!uploadedSession?.uploadId || !selectedMachineId || !title.trim()) {
+      Alert.alert('Missing Details', 'Please enter a title and select a target machine.');
+      return;
+    }
+
+    setConfirming(true);
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+      };
+
+      const res = await fetch(`${API_BASE}/datasets/confirm`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          uploadId: uploadedSession.uploadId,
+          datasetType: DATASET_TYPES.OPERATIONAL,
+          title: title.trim(),
+          machineId: selectedMachineId,
+          columnMappings: uploadedSession.candidateMappings || []
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Ingestion confirmation failed');
+      }
+
+      setConfirmedDataset(data.dataset);
+      Alert.alert('Success', 'Dataset successfully ingested and verified!');
+    } catch (err) {
+      console.error('Confirmation error:', err);
+      Alert.alert('Ingestion Error', err.message || 'Failed to ingest dataset.');
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  function handleReset() {
+    setPickedFile(null);
+    setUploadedSession(null);
+    setValidationResult(null);
+    setConfirmedDataset(null);
+    setTitle('');
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerBox}>
         <View style={styles.badgeRow}>
-          <Text style={styles.headerLabel}>DATASET CHECK-IN</Text>
+          <Text style={styles.headerLabel}>FIELD DATASET INGESTION</Text>
           <View style={styles.demoBadge}>
-            <Text style={styles.demoBadgeText}>DEMO</Text>
+            <Text style={styles.demoBadgeText}>OPERATIONAL</Text>
           </View>
         </View>
-        <Text style={styles.title}>Upload Sensor Dataset</Text>
+        <Text style={styles.title}>Upload Machine Dataset</Text>
         <Text style={styles.subtitle}>
-          Check in historical CSV runs for automated condition analysis and baseline comparison.
+          Check in vibration & thermal CSV telemetry for assigned gearbox condition monitoring.
         </Text>
       </View>
 
-      {/* Target Equipment Selector */}
-      <Card title="1. Select Gearbox Equipment">
-        <View style={styles.selectorRow}>
-          {DEMO_MACHINES.map((m) => {
-            const isSelected = m.id === selectedMachine;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                onPress={() => setSelectedMachine(m.id)}
-                style={[styles.selectorBtn, isSelected && styles.selectorBtnActive]}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.selectorBtnText, isSelected && styles.selectorBtnTextActive]}>
-                  {m.id}
-                </Text>
-                <Text style={styles.selectorSubtext}>{m.name.split(' ')[0]}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </Card>
+      {confirmedDataset ? (
+        <Card title="Ingestion Confirmed">
+          <View style={styles.successBanner}>
+            <Text style={styles.successTitle}>✓ {confirmedDataset.title}</Text>
+            <Text style={styles.successSub}>
+              {confirmedDataset.totalRows} observations registered. Modality: {confirmedDataset.modality}.
+            </Text>
+          </View>
 
-      {/* Provenance Selector */}
-      <Card title="2. Dataset Provenance Category">
-        <TouchableOpacity
-          style={[styles.typeOption, datasetType === 'operational' && styles.typeOptionActive]}
-          onPress={() => setDatasetType('operational')}
-        >
-          <View style={styles.radioDot}>
-            {datasetType === 'operational' && <View style={styles.radioDotInner} />}
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Status</Text>
+              <Text style={styles.summaryVal}>{confirmedDataset.status?.toUpperCase()}</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Sampling</Text>
+              <Text style={styles.summaryVal}>
+                {confirmedDataset.samplingRateHz ? `${confirmedDataset.samplingRateHz} Hz` : 'Snapshot'}
+              </Text>
+            </View>
           </View>
-          <View style={styles.typeContent}>
-            <Text style={styles.typeTitle}>Operational Run</Text>
-            <Text style={styles.typeDesc}>Real factory floor measurements</Text>
-          </View>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.typeOption, datasetType === 'simulated' && styles.typeOptionActive]}
-          onPress={() => setDatasetType('simulated')}
-        >
-          <View style={styles.radioDot}>
-            {datasetType === 'simulated' && <View style={styles.radioDotInner} />}
-          </View>
-          <View style={styles.typeContent}>
-            <Text style={styles.typeTitle}>Simulated / Testbed</Text>
-            <Text style={styles.typeDesc}>Synthetically generated or lab run</Text>
-          </View>
-        </TouchableOpacity>
-      </Card>
-
-      {/* File Upload Zone */}
-      <Card title="3. Attach CSV Dataset File">
-        <TouchableOpacity
-          style={styles.dropzone}
-          onPress={() => setFileAttached(!fileAttached)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.dropzoneIcon}>📁</Text>
-          <Text style={styles.dropzoneTitle}>
-            {fileAttached ? 'GB104_field_run_demo.csv' : 'Choose CSV Dataset File'}
-          </Text>
-          <Text style={styles.dropzoneDesc}>
-            {fileAttached ? '2.4 MB • 24,000 samples @ 100 Hz' : 'Tap to select CSV file from device storage'}
-          </Text>
-          <StatusBadge
-            status={fileAttached ? 'healthy' : 'info'}
-            label={fileAttached ? 'ATTACHED [DEMO]' : 'AWAITING FILE'}
-            isSimulated={true}
-            style={{ marginTop: 6 }}
+          <Button
+            title="Upload Another Dataset"
+            variant="secondary"
+            onPress={handleReset}
           />
-        </TouchableOpacity>
+        </Card>
+      ) : (
+        <>
+          {/* Target Equipment Selector */}
+          <Card title="1. Select Assigned Machine">
+            {loadingMachines ? (
+              <ActivityIndicator color="#38bdf8" />
+            ) : assignedMachines.length === 0 ? (
+              <Text style={styles.emptyText}>No assigned machines found for your user.</Text>
+            ) : (
+              <View style={styles.selectorRow}>
+                {assignedMachines.map((m) => {
+                  const isSelected = m._id === selectedMachineId;
+                  return (
+                    <TouchableOpacity
+                      key={m._id}
+                      onPress={() => setSelectedMachineId(m._id)}
+                      style={[styles.selectorBtn, isSelected && styles.selectorBtnActive]}
+                      accessibilityRole="button"
+                    >
+                      <Text style={[styles.selectorBtnText, isSelected && styles.selectorBtnTextActive]}>
+                        {m.code}
+                      </Text>
+                      <Text style={styles.selectorSubtext} numberOfLines={1}>
+                        {m.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
 
-        <Button
-          title={fileAttached ? 'Submit Dataset for Analysis (Demo)' : 'Upload & Validate'}
-          variant="primary"
-          disabled={!fileAttached}
-          onPress={() => alert('Dataset check-in workflow will process uploads in Phase 5.')}
-        />
-      </Card>
+            <View style={{ marginTop: 12 }}>
+              <Text style={styles.inputLabel}>Dataset Run Title *</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. Oct 2026 Shift-1 Steady State"
+                placeholderTextColor="#64748b"
+                value={title}
+                onChangeText={setTitle}
+              />
+            </View>
+          </Card>
 
-      {/* Validation Checklist */}
-      <Card title="Data Integrity Validation Checks">
-        <View style={styles.checkRow}>
-          <Text style={styles.checkIcon}>✓</Text>
-          <Text style={styles.checkText}>Monotonic Timestamps (No backwards jumps)</Text>
-        </View>
-        <View style={styles.checkRow}>
-          <Text style={styles.checkIcon}>✓</Text>
-          <Text style={styles.checkText}>Sampling Gap Detection (&gt;500ms intervals)</Text>
-        </View>
-        <View style={styles.checkRow}>
-          <Text style={styles.checkIcon}>✓</Text>
-          <Text style={styles.checkText}>Physical Sensor Bounds Verification</Text>
-        </View>
-      </Card>
+          {/* File Picker */}
+          <Card title="2. Select CSV File from Device">
+            <TouchableOpacity
+              style={styles.dropzone}
+              onPress={handlePickDocument}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropzoneIcon}>📁</Text>
+              <Text style={styles.dropzoneTitle}>
+                {pickedFile ? pickedFile.name : 'Tap to Choose CSV File'}
+              </Text>
+              <Text style={styles.dropzoneDesc}>
+                {pickedFile
+                  ? `${((pickedFile.size || 0) / 1024).toFixed(1)} KB • Tap to change`
+                  : 'Accepted formats: .csv, .txt (Max 25 MB)'}
+              </Text>
+              <StatusBadge
+                status={pickedFile ? 'healthy' : 'info'}
+                label={pickedFile ? 'FILE SELECTED' : 'NO FILE'}
+                style={{ marginTop: 6 }}
+              />
+            </TouchableOpacity>
+
+            {pickedFile && !uploadedSession && (
+              <Button
+                title={uploading ? 'Uploading & Profiling...' : 'Upload & Inspect Headers'}
+                variant="primary"
+                disabled={uploading}
+                onPress={handleUploadAndParse}
+              />
+            )}
+
+            {uploadedSession && (
+              <View style={styles.profileBox}>
+                <Text style={styles.profileTitle}>✓ Headers & Delimiter Verified</Text>
+                <Text style={styles.profileText}>
+                  {uploadedSession.totalRows} rows • {uploadedSession.totalColumns} cols • Delimiter: &apos;{uploadedSession.delimiter}&apos;
+                </Text>
+              </View>
+            )}
+          </Card>
+
+          {/* Validation & AI Compatibility */}
+          {validationResult && (
+            <Card title="3. Quality & AI Compatibility Review">
+              <View style={styles.qualitySummary}>
+                <Text style={styles.qualityStatusTitle}>
+                  Validation Outcome: {validationResult.status?.toUpperCase()}
+                </Text>
+                <Text style={styles.qualityModality}>
+                  Modality: {validationResult.modality}
+                </Text>
+              </View>
+
+              {/* Compatibility Tags */}
+              <View style={styles.compatContainer}>
+                <View style={styles.compatPill}>
+                  <Text style={styles.compatName}>Anomaly Detection:</Text>
+                  <Text style={[
+                    styles.compatStatus,
+                    validationResult.aiTaskCompatibility[AI_TASK_TYPES.ANOMALY_DETECTION]?.isCompatible
+                      ? styles.compatYes
+                      : styles.compatNo
+                  ]}>
+                    {validationResult.aiTaskCompatibility[AI_TASK_TYPES.ANOMALY_DETECTION]?.isCompatible ? 'COMPATIBLE' : 'NO'}
+                  </Text>
+                </View>
+
+                <View style={styles.compatPill}>
+                  <Text style={styles.compatName}>Fault Classification:</Text>
+                  <Text style={[
+                    styles.compatStatus,
+                    validationResult.aiTaskCompatibility[AI_TASK_TYPES.FAULT_CLASSIFICATION]?.isCompatible
+                      ? styles.compatYes
+                      : styles.compatNo
+                  ]}>
+                    {validationResult.aiTaskCompatibility[AI_TASK_TYPES.FAULT_CLASSIFICATION]?.isCompatible ? 'COMPATIBLE' : 'NO'}
+                  </Text>
+                </View>
+
+                <View style={styles.compatPill}>
+                  <Text style={styles.compatName}>Remaining Useful Life:</Text>
+                  <Text style={[
+                    styles.compatStatus,
+                    validationResult.aiTaskCompatibility[AI_TASK_TYPES.REMAINING_USEFUL_LIFE]?.isCompatible
+                      ? styles.compatYes
+                      : styles.compatNo
+                  ]}>
+                    {validationResult.aiTaskCompatibility[AI_TASK_TYPES.REMAINING_USEFUL_LIFE]?.isCompatible ? 'COMPATIBLE' : 'NO'}
+                  </Text>
+                </View>
+              </View>
+
+              <Button
+                title={confirming ? 'Ingesting...' : 'Confirm Dataset Ingestion'}
+                variant="primary"
+                disabled={confirming || validationResult.status === DATASET_STATUS.REJECTED}
+                onPress={handleConfirmIngestion}
+              />
+            </Card>
+          )}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -151,13 +440,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   demoBadge: {
-    backgroundColor: 'rgba(168, 85, 247, 0.25)',
+    backgroundColor: 'rgba(2, 132, 199, 0.25)',
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 2,
   },
   demoBadgeText: {
-    color: '#d8b4fe',
+    color: '#38bdf8',
     fontSize: 9,
     fontWeight: '800',
   },
@@ -170,25 +459,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
   },
+  emptyText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
   selectorRow: {
     flexDirection: 'row',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   selectorBtn: {
-    flex: 1,
     backgroundColor: '#0f172a',
     borderColor: '#1e293b',
     borderWidth: 1,
     borderRadius: 6,
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 100,
     alignItems: 'center',
   },
   selectorBtnActive: {
     borderColor: '#0284c7',
-    backgroundColor: 'rgba(2, 132, 199, 0.1)',
+    backgroundColor: 'rgba(2, 132, 199, 0.15)',
   },
   selectorBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#94a3b8',
     fontFamily: 'monospace',
@@ -197,66 +493,42 @@ const styles = StyleSheet.create({
     color: '#38bdf8',
   },
   selectorSubtext: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748b',
     marginTop: 2,
   },
-  typeOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#0f172a',
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#cbd5e1',
+    marginBottom: 4,
+  },
+  textInput: {
+    backgroundColor: '#090e1a',
     borderColor: '#1e293b',
     borderWidth: 1,
     borderRadius: 6,
-    padding: 12,
-  },
-  typeOptionActive: {
-    borderColor: '#0284c7',
-  },
-  radioDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#64748b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioDotInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#38bdf8',
-  },
-  typeContent: {
-    flex: 1,
-  },
-  typeTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     color: '#f8fafc',
-  },
-  typeDesc: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 1,
+    fontSize: 13,
   },
   dropzone: {
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#334155',
     borderRadius: 8,
-    padding: 20,
+    padding: 18,
     alignItems: 'center',
     backgroundColor: '#0f172a',
     gap: 4,
+    marginBottom: 8,
   },
   dropzoneIcon: {
-    fontSize: 32,
+    fontSize: 28,
   },
   dropzoneTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#f8fafc',
   },
@@ -265,19 +537,111 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
   },
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  profileBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 6,
+    padding: 10,
+    marginTop: 8,
   },
-  checkIcon: {
-    color: '#10b981',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  checkText: {
-    color: '#94a3b8',
+  profileTitle: {
     fontSize: 12,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  profileText: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 2,
+  },
+  qualitySummary: {
+    backgroundColor: '#090e1a',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 10,
+  },
+  qualityStatusTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  qualityModality: {
+    fontSize: 11,
+    color: '#38bdf8',
+    marginTop: 2,
+  },
+  compatContainer: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  compatPill: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  compatName: {
+    fontSize: 12,
+    color: '#cbd5e1',
+  },
+  compatStatus: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  compatYes: {
+    color: '#10b981',
+  },
+  compatNo: {
+    color: '#f43f5e',
+  },
+  successBanner: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 12,
+  },
+  successTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  successSub: {
+    fontSize: 11,
+    color: '#cbd5e1',
+    marginTop: 2,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  summaryItem: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  summaryVal: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#f8fafc',
+    marginTop: 2,
   },
 });
-
