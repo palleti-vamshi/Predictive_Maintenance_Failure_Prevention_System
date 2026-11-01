@@ -147,3 +147,24 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+
+# Expo and React Native
+.expo/
+.expo-shared/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Local uploaded datasets & temporary file storage
+uploads/
+**/uploads/
+data/uploads/
+*.csv.tmp
+
+# macOS system files
+.DS_Store

@@ -1,0 +1,12 @@
+{
+  "name": "@predictive-maintenance/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared constants, data contracts, and domain models for Predictive Maintenance",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  }
+}
+

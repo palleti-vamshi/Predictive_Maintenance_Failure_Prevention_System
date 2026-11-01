@@ -1,0 +1,35 @@
+{
+  "name": "predictive-maintenance-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-Based Predictive Maintenance and Failure Prevention System for Mechanical Systems",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace=@predictive-maintenance/server",
+    "dev:web": "npm run dev --workspace=@predictive-maintenance/web",
+    "dev:mobile": "npm run start --workspace=@predictive-maintenance/mobile",
+    "start:server": "npm run start --workspace=@predictive-maintenance/server",
+    "build:web": "npm run build --workspace=@predictive-maintenance/web",
+    "preview:web": "npm run preview --workspace=@predictive-maintenance/web",
+    "seed": "npm run seed --workspace=@predictive-maintenance/server",
+    "test:server": "npm run test --workspace=@predictive-maintenance/server"
+  },
+  "keywords": [
+    "predictive-maintenance",
+    "failure-prevention",
+    "gearbox",
+    "vibration-analysis",
+    "anomaly-detection",
+    "react",
+    "react-native",
+    "express"
+  ],
+  "author": "Vamsh_i07",
+  "license": "MIT",
+  "dependencies": {
+    "expo-secure-store": "~14.0.1"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@predictive-maintenance/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vite + React Web Client for Predictive Maintenance System",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@predictive-maintenance/shared": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}
+
