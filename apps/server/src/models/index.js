@@ -7,4 +7,6 @@ export * from './Session.js';
 export * from './MaintenanceWorkOrder.js';
 export * from './Dataset.js';
 export * from './ModelArtifact.js';
+export * from './AnalysisRun.js';
+export * from './Alert.js';
 

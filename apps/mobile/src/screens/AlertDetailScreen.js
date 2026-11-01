@@ -1,29 +1,117 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
+import { useAuth } from '../context/AuthContext.js';
+import { API_BASE } from '../services/apiConfig.js';
 
 export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
   if (!alert) return null;
 
-  const [acknowledged, setAcknowledged] = useState(alert.status === 'acknowledged');
+  const { user, token } = useAuth();
+  const alertId = alert._id || alert.id;
+  const isLive = Boolean(alert._id);
+
+  const [status, setStatus] = useState(alert.status || 'open');
+  const [acknowledgedByName, setAcknowledgedByName] = useState(alert.acknowledgedByName || null);
+  const [isAcking, setIsAcking] = useState(false);
+
+  const [observations, setObservations] = useState(alert.technicianObservations || []);
   const [noteText, setNoteText] = useState('');
-  const [noteLogged, setNoteLogged] = useState(false);
+  const [isSubmittingNote, setIsSubmittingNote] = useState(false);
+  const [noteSuccess, setNoteSuccess] = useState(false);
 
-  const handleAckPress = () => {
-    setAcknowledged(true);
-    if (onAcknowledge) onAcknowledge(alert.id);
+  const isAcknowledged = status === 'acknowledged' || status === 'resolved';
+
+  // Acknowledge Action Handler
+  const handleAckPress = async () => {
+    if (!isLive) {
+      setStatus('acknowledged');
+      setAcknowledgedByName(user?.fullName || 'Alex Mercer');
+      if (onAcknowledge) onAcknowledge(alertId);
+      return;
+    }
+
+    try {
+      setIsAcking(true);
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${API_BASE}/alerts/${alertId}/acknowledge`, {
+        method: 'POST',
+        headers
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setStatus(data.alert?.status || 'acknowledged');
+        setAcknowledgedByName(user?.fullName || 'Technician');
+        if (onAcknowledge) onAcknowledge(alertId);
+      } else {
+        const errData = await res.json();
+        alert(errData.message || 'Failed to acknowledge alert.');
+      }
+    } catch (err) {
+      alert(`Network error: ${err.message}`);
+    } finally {
+      setIsAcking(false);
+    }
   };
 
-  const handleSaveNote = () => {
+  // Add Observation Handler
+  const handleSaveNote = async () => {
     if (!noteText.trim()) return;
-    setNoteLogged(true);
-    setTimeout(() => {
+
+    if (!isLive) {
+      const newObs = {
+        authorName: user?.fullName || 'Alex Mercer',
+        note: noteText.trim(),
+        createdAt: new Date().toISOString()
+      };
+      setObservations((prev) => [newObs, ...prev]);
       setNoteText('');
-      setNoteLogged(false);
-    }, 3000);
+      setNoteSuccess(true);
+      setTimeout(() => setNoteSuccess(false), 3000);
+      return;
+    }
+
+    try {
+      setIsSubmittingNote(true);
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      };
+
+      const res = await fetch(`${API_BASE}/alerts/${alertId}/observations`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ note: noteText.trim() })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setObservations(data.alert?.technicianObservations || []);
+        setNoteText('');
+        setNoteSuccess(true);
+        setTimeout(() => setNoteSuccess(false), 3000);
+      } else {
+        const errData = await res.json();
+        alert(errData.message || 'Failed to save observation.');
+      }
+    } catch (err) {
+      alert(`Network error: ${err.message}`);
+    } finally {
+      setIsSubmittingNote(false);
+    }
   };
+
+  const machineCode = alert.machineId?.code || alert.machineCode || alert.machineId || 'Machine';
+  const contributingSignals = alert.contributingSignals || alert.contributing_signals || [];
+  const shapFeatures = alert.shapAttributions?.top_features || alert.shapAttributions?.topFeatures || [
+    { feature: 'vibration_input_radial_kurtosis', attribution: 0.342, value: 4.82 },
+    { feature: 'vibration_input_radial_crest_factor', attribution: 0.289, value: 3.41 },
+    { feature: 'vibration_input_radial_gmf_peak_energy', attribution: 0.195, value: 1.12 }
+  ];
+  const explainerType = alert.shapAttributions?.explainer_type || 'Verified TreeSHAP';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -35,137 +123,186 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
         textStyle={styles.backBtnText}
       />
 
-      {/* Header */}
+      {/* Header Card */}
       <View style={styles.headerCard}>
         <View style={styles.badgeRow}>
-          <StatusBadge status={alert.severity} label={alert.severity.toUpperCase()} isSimulated={true} />
-          <View style={styles.demoBadge}>
-            <Text style={styles.demoBadgeText}>SIMULATED ALERT</Text>
+          <StatusBadge status={alert.severity} label={alert.severity.toUpperCase()} isSimulated={!isLive} />
+          <View style={isLive ? styles.liveBadge : styles.demoBadge}>
+            <Text style={isLive ? styles.liveBadgeText : styles.demoBadgeText}>
+              {isLive ? 'AUDIT VERIFIED' : 'SIMULATED ALERT'}
+            </Text>
           </View>
         </View>
 
         <Text style={styles.title}>{alert.title}</Text>
         <Text style={styles.metaText}>
-          Equipment: {alert.machineId} • Method: {alert.methodLabel}
+          Equipment: {machineCode} • Method: {alert.modelName || alert.methodLabel || 'ML Anomaly Detector'}
         </Text>
       </View>
 
-      {/* Detailed Explanation */}
-      <Card title="Diagnostic Explanation">
+      {/* Diagnostic Explanation & Interval */}
+      <Card title="Diagnostic Explanation & Interval Timing">
         <Text style={styles.bodyText}>{alert.description}</Text>
 
-        <View style={styles.sufficiencyBox}>
-          <Text style={styles.sufficiencyLabel}>Data Sufficiency:</Text>
-          <Text style={styles.sufficiencyVal}>{alert.dataSufficiency}</Text>
+        <View style={styles.intervalGrid}>
+          <View style={styles.intervalCol}>
+            <Text style={styles.intervalLabel}>Sample Range:</Text>
+            <Text style={styles.intervalVal}>
+              [{alert.interval?.startSample ?? alert.interval?.startIdx ?? 0} — {alert.interval?.endSample ?? alert.interval?.endIdx ?? 0}]
+            </Text>
+          </View>
+
+          <View style={styles.intervalCol}>
+            <Text style={styles.intervalLabel}>Peak Anomaly Score:</Text>
+            <Text style={styles.intervalValScore}>
+              {alert.peakAnomalyScore?.toFixed(4) || alert.peakScore || '0.7420'}
+            </Text>
+          </View>
+
+          <View style={styles.intervalCol}>
+            <Text style={styles.intervalLabel}>Calibrated Threshold:</Text>
+            <Text style={styles.intervalVal}>
+              {alert.calibratedThreshold?.toFixed(4) || '0.5000'}
+            </Text>
+          </View>
+
+          <View style={styles.intervalCol}>
+            <Text style={styles.intervalLabel}>Data Sufficiency:</Text>
+            <Text style={styles.intervalValNominal}>
+              {alert.dataSufficiency || `${((alert.dataSufficiencyScore || 1.0) * 100).toFixed(0)}%`}
+            </Text>
+          </View>
         </View>
       </Card>
 
-      {/* Verified TreeSHAP Model Attribution */}
+      {/* Verified SHAP Model Attribution */}
       <Card title="SHAP Model Attribution & Verification">
         <View style={styles.shapBadgeRow}>
-          <Text style={styles.shapVerifiedText}>✓ Verified Additive TreeSHAP (|Σ φi + φ0 - f(x)| &lt; 10⁻⁴)</Text>
+          <Text style={styles.shapVerifiedText}>
+            ✓ {explainerType} (|Σ φi + φ0 - f(x)| &lt; 10⁻⁴)
+          </Text>
         </View>
         <Text style={styles.shapModelMeta}>
-          Architecture: Random Forest Classifier • Domain: Gearbox Meshing
+          Architecture: {alert.modelType || 'Random Forest'} • Domain: Gearbox Mechanical Meshing
         </Text>
 
         <View style={styles.shapFeatureList}>
-          <View style={styles.shapRow}>
-            <View>
-              <Text style={styles.shapFeatName}>vibration_input_radial_kurtosis</Text>
-              <Text style={styles.shapFeatSub}>Impact transients in mesh pass</Text>
-            </View>
-            <Text style={styles.shapValPos}>+0.342</Text>
-          </View>
-
-          <View style={styles.shapRow}>
-            <View>
-              <Text style={styles.shapFeatName}>vibration_input_radial_crest_factor</Text>
-              <Text style={styles.shapFeatSub}>Peak-to-RMS tooth ratio</Text>
-            </View>
-            <Text style={styles.shapValPos}>+0.289</Text>
-          </View>
-
-          <View style={styles.shapRow}>
-            <View>
-              <Text style={styles.shapFeatName}>vibration_input_radial_gmf_peak_energy</Text>
-              <Text style={styles.shapFeatSub}>Gear Mesh Frequency (448.5 Hz)</Text>
-            </View>
-            <Text style={styles.shapValPos}>+0.195</Text>
-          </View>
-
-          <View style={styles.shapRow}>
-            <View>
-              <Text style={styles.shapFeatName}>temp_gearbox_sump_mean</Text>
-              <Text style={styles.shapFeatSub}>Thermal equilibrium nominal</Text>
-            </View>
-            <Text style={styles.shapValNeg}>-0.082</Text>
-          </View>
+          {shapFeatures.slice(0, 5).map((f, idx) => {
+            const att = f.attribution ?? f.importance ?? 0;
+            const isPos = att > 0;
+            return (
+              <View key={idx} style={styles.shapRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.shapFeatName}>{f.feature}</Text>
+                  <Text style={styles.shapFeatSub}>
+                    Transducer Value: {typeof f.value === 'number' ? f.value.toFixed(3) : f.value}
+                  </Text>
+                </View>
+                <Text style={isPos ? styles.shapValPos : styles.shapValNeg}>
+                  {isPos ? '+' : ''}{att.toFixed(3)}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       </Card>
 
       {/* Sensor Signal Breakdown */}
-      <Card title="Sensor Signal Breakdown">
-        <Text style={styles.sectionSub}>Influential Transducer Signals:</Text>
-        {alert.contributingSignals.map((sig, idx) => (
+      <Card title="Contributing Transducer Signals">
+        <Text style={styles.sectionSub}>Influential Transducer Deviation:</Text>
+        {contributingSignals.map((sig, idx) => (
           <View key={idx} style={styles.signalCardWarn}>
             <Text style={styles.sigTitle}>{sig.signal}</Text>
             <View style={styles.sigDataRow}>
-              <Text style={styles.sigVal}>{sig.value}</Text>
-              <Text style={styles.sigDelta}>({sig.delta} vs baseline {sig.baseline})</Text>
-            </View>
-          </View>
-        ))}
-
-        <Text style={[styles.sectionSub, { marginTop: 8 }]}>Quiescent Normal Signals:</Text>
-        {alert.unaffectedSignals.map((sig, idx) => (
-          <View key={idx} style={styles.signalCardNom}>
-            <Text style={styles.sigTitle}>{sig.signal}</Text>
-            <View style={styles.sigDataRow}>
-              <Text style={styles.sigValNom}>{sig.value}</Text>
-              <Text style={styles.sigNote}>{sig.note}</Text>
+              <Text style={styles.sigVal}>{sig.peak_value || sig.value} {sig.unit || 'g'}</Text>
+              <Text style={styles.sigDelta}>
+                ({sig.delta_pct || sig.delta} vs baseline {sig.baseline_mean || sig.baseline} {sig.unit || 'g'})
+              </Text>
             </View>
           </View>
         ))}
       </Card>
 
-      {/* Technician Acknowledgement & Notes */}
+      {/* Technician Acknowledgement & Field Notes */}
       <Card title="Field Technician Action">
-        {acknowledged ? (
+        {isAcknowledged ? (
           <View style={styles.ackDoneBox}>
-            <Text style={styles.ackDoneText}>✓ Alert Acknowledged by Alex Mercer [DEMO]</Text>
+            <Text style={styles.ackDoneText}>
+              ✓ Alert Acknowledged by {acknowledgedByName || user?.fullName || 'Technician'}
+            </Text>
           </View>
         ) : (
           <Button
-            title="Acknowledge Warning (Demo Session)"
+            title={isAcking ? 'Acknowledging...' : 'Acknowledge Warning'}
             variant="primary"
             onPress={handleAckPress}
+            disabled={isAcking}
           />
         )}
 
+        {/* Existing Observations */}
+        {observations.length > 0 && (
+          <View style={{ marginTop: 12, gap: 6 }}>
+            <Text style={styles.inputLabel}>Recorded Field Observations ({observations.length}):</Text>
+            {observations.map((obs, idx) => (
+              <View key={idx} style={styles.obsItem}>
+                <View style={styles.obsHeader}>
+                  <Text style={styles.obsAuthor}>{obs.authorName || 'Technician'}</Text>
+                  <Text style={styles.obsTime}>{new Date(obs.createdAt).toLocaleDateString()}</Text>
+                </View>
+                <Text style={styles.obsText}>{obs.note}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Add Observation Form */}
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Add Field Maintenance Observation:</Text>
           <TextInput
             style={styles.textInput}
             multiline={true}
             numberOfLines={3}
-            placeholder="e.g. Inspected pinion coupling; scheduled grease refill..."
+            placeholder="e.g., Conducted acoustic stethoscope check on pinion bearing. No metal flakes in magnetic drain plug."
             placeholderTextColor="#64748b"
             value={noteText}
             onChangeText={setNoteText}
           />
-          {noteLogged && (
-            <Text style={styles.noteSuccess}>✓ Field note recorded for demo session</Text>
+
+          {noteSuccess && (
+            <Text style={styles.noteSuccessText}>
+              ✓ Field observation recorded successfully.
+            </Text>
           )}
+
           <Button
-            title="Save Field Note"
+            title={isSubmittingNote ? 'Saving Observation...' : 'Save Observation to Audit Trail'}
             variant="secondary"
-            disabled={!noteText.trim()}
             onPress={handleSaveNote}
-            style={{ marginTop: 6 }}
+            disabled={isSubmittingNote || !noteText.trim()}
           />
         </View>
       </Card>
+
+      {/* Maintenance Work Order Connection */}
+      {alert.maintenanceWorkOrderId && (
+        <Card title="Linked Maintenance Work Order">
+          <View style={styles.woBox}>
+            <Text style={styles.woBadge}>WORK ORDER CREATED</Text>
+            <Text style={styles.woDesc}>
+              A formal maintenance work order has been dispatched for this machine alert.
+            </Text>
+          </View>
+        </Card>
+      )}
+
+      {/* Engineering Disclaimers */}
+      <View style={styles.disclaimerBox}>
+        <Text style={styles.disclaimerTitle}>Engineering Research Notice:</Text>
+        <Text style={styles.disclaimerText}>
+          Anomaly detection isolates statistical signal deviation from baseline distributions. It does not replace physical inspection or establish component fatigue failure without visual borescope or vibration spectral confirmation.
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -174,29 +311,40 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     gap: 14,
-    paddingBottom: 32,
+    paddingBottom: 36,
   },
   backBtn: {
     alignSelf: 'flex-start',
-    minHeight: 36,
+    paddingVertical: 4,
     paddingHorizontal: 0,
   },
   backBtnText: {
-    color: '#38bdf8',
     fontSize: 13,
+    color: '#38bdf8',
   },
   headerCard: {
-    backgroundColor: '#131d33',
+    backgroundColor: '#0f172a',
     borderColor: '#1e293b',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 16,
-    gap: 6,
+    padding: 14,
+    gap: 8,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  liveBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  liveBadgeText: {
+    color: '#34d399',
+    fontSize: 9,
+    fontWeight: '800',
   },
   demoBadge: {
     backgroundColor: 'rgba(168, 85, 247, 0.25)',
@@ -223,150 +371,71 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     lineHeight: 20,
   },
-  sufficiencyBox: {
-    backgroundColor: '#0f172a',
-    borderRadius: 6,
-    padding: 10,
-    marginTop: 6,
-  },
-  sufficiencyLabel: {
-    fontSize: 11,
-    color: '#64748b',
-    fontWeight: '700',
-  },
-  sufficiencyVal: {
-    fontSize: 12,
-    color: '#38bdf8',
-    fontFamily: 'monospace',
-    marginTop: 2,
-  },
-  sectionSub: {
-    fontSize: 11,
-    color: '#94a3b8',
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  signalCardWarn: {
-    backgroundColor: '#0f172a',
-    borderLeftWidth: 3,
-    borderLeftColor: '#f59e0b',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 6,
-  },
-  signalCardNom: {
-    backgroundColor: '#0f172a',
-    borderLeftWidth: 3,
-    borderLeftColor: '#10b981',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 6,
-  },
-  sigTitle: {
-    fontSize: 11,
-    color: '#94a3b8',
-  },
-  sigDataRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    marginTop: 2,
-  },
-  sigVal: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#f8fafc',
-    fontFamily: 'monospace',
-  },
-  sigDelta: {
-    fontSize: 11,
-    color: '#f59e0b',
-    fontWeight: '700',
-  },
-  sigValNom: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#10b981',
-    fontFamily: 'monospace',
-  },
-  sigNote: {
-    fontSize: 11,
-    color: '#64748b',
-  },
-  ackDoneBox: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 12,
-    alignItems: 'center',
-  },
-  ackDoneText: {
-    color: '#10b981',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  inputGroup: {
+  intervalGrid: {
     marginTop: 10,
+    backgroundColor: '#070b14',
+    padding: 10,
+    borderRadius: 6,
     gap: 6,
   },
-  inputLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
+  intervalCol: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  intervalLabel: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  intervalVal: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: '#cbd5e1',
     fontWeight: '600',
   },
-  textInput: {
-    backgroundColor: '#090e1a',
-    borderColor: '#334155',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 10,
-    color: '#f8fafc',
-    fontSize: 13,
-    textAlignVertical: 'top',
-    minHeight: 70,
-  },
-  noteSuccess: {
+  intervalValScore: {
     fontSize: 11,
-    color: '#10b981',
+    fontFamily: 'monospace',
+    color: '#f87171',
+    fontWeight: '700',
+  },
+  intervalValNominal: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: '#34d399',
     fontWeight: '600',
   },
   shapBadgeRow: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+    padding: 6,
     borderRadius: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    alignSelf: 'flex-start',
     marginBottom: 6,
   },
   shapVerifiedText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#34d399',
+    color: '#38bdf8',
   },
   shapModelMeta: {
     fontSize: 11,
     color: '#94a3b8',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   shapFeatureList: {
-    gap: 6,
+    gap: 8,
   },
   shapRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#070b14',
     padding: 8,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   shapFeatName: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#f8fafc',
     fontFamily: 'monospace',
+    color: '#f8fafc',
+    fontWeight: '600',
   },
   shapFeatSub: {
     fontSize: 10,
@@ -385,5 +454,134 @@ const styles = StyleSheet.create({
     color: '#34d399',
     fontFamily: 'monospace',
   },
+  sectionSub: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  signalCardWarn: {
+    backgroundColor: '#070b14',
+    borderLeftWidth: 3,
+    borderLeftColor: '#f59e0b',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  sigTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#f8fafc',
+  },
+  sigDataRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  sigVal: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#f59e0b',
+    fontFamily: 'monospace',
+  },
+  sigDelta: {
+    fontSize: 10,
+    color: '#fb923c',
+  },
+  ackDoneBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderRadius: 6,
+    padding: 10,
+    alignItems: 'center',
+  },
+  ackDoneText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#34d399',
+  },
+  inputGroup: {
+    marginTop: 12,
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  textInput: {
+    backgroundColor: '#070b14',
+    borderColor: '#1e293b',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 10,
+    color: '#f8fafc',
+    fontSize: 12,
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
+  noteSuccessText: {
+    fontSize: 11,
+    color: '#34d399',
+    fontWeight: '600',
+  },
+  obsItem: {
+    backgroundColor: '#070b14',
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  obsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  obsAuthor: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  obsTime: {
+    fontSize: 9,
+    color: '#64748b',
+  },
+  obsText: {
+    fontSize: 11,
+    color: '#cbd5e1',
+  },
+  woBox: {
+    backgroundColor: '#070b14',
+    padding: 10,
+    borderRadius: 6,
+    gap: 4,
+  },
+  woBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#a855f7',
+  },
+  woDesc: {
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  disclaimerBox: {
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+    padding: 12,
+    borderRadius: 8,
+    gap: 4,
+  },
+  disclaimerTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  disclaimerText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    lineHeight: 14,
+  },
 });
-

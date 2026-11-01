@@ -64,12 +64,16 @@ export function getSafeFilePath(storageKey) {
   if (!storageKey || typeof storageKey !== 'string') {
     throw new Error('Invalid storage key');
   }
-  const safeName = path.basename(storageKey);
-  const resolved = path.resolve(storageDir, safeName);
+  const normalized = path.normalize(storageKey).replace(/^(\.\.[\/\\])+/, '');
+  const resolved = path.resolve(storageDir, normalized);
   if (!resolved.startsWith(storageDir)) {
     throw new Error('Path traversal attempt detected');
   }
   if (!fs.existsSync(resolved)) {
+    const flatResolved = path.resolve(storageDir, path.basename(storageKey));
+    if (fs.existsSync(flatResolved)) {
+      return flatResolved;
+    }
     const err = new Error('Stored file not found on disk');
     err.status = 404;
     throw err;

@@ -115,7 +115,18 @@ const maintenanceWorkOrderSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    statusHistory: [statusHistorySchema]
+    statusHistory: [statusHistorySchema],
+    sourceAlertId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Alert',
+      default: null,
+      index: true
+    },
+    sourceAnalysisRunId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'AnalysisRun',
+      default: null
+    }
   },
   { timestamps: true }
 );

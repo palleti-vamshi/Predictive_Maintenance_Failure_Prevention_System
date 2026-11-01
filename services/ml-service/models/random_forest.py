@@ -127,9 +127,8 @@ def train_and_evaluate_random_forest(
     # 4. TreeSHAP Explanations and Additivity Verification
     shap_results = {}
     try:
-        # Background dataset for TreeExplainer
-        background_sample = X_train[:min(50, len(X_train))]
-        explainer = shap.TreeExplainer(clf, data=background_sample)
+        # TreeSHAP with exact conditional expectation (tree_path_dependent)
+        explainer = shap.TreeExplainer(clf, feature_perturbation="tree_path_dependent")
 
         # Sample test instances for explanation
         sample_size = min(15, len(X_test))

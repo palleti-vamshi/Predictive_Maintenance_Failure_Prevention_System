@@ -178,3 +178,131 @@ def test_random_forest_rejects_single_class():
     with pytest.raises(ValueError, match="at least 2 distinct classes"):
         train_and_evaluate_random_forest(X, y, meta)
 
+
+def test_run_analysis_pipeline_and_interval_detection(tmp_path):
+    """End-to-end test of training a model and executing inference analysis with interval generation and SHAP."""
+    from pipeline import run_pipeline, run_analysis
+
+    # 1. Generate training dataset with 6 runs and 3 classes
+    train_data = []
+    classes = ["healthy", "chipped_tooth", "broken_tooth"]
+    for r in range(6):
+        run_name = f"RUN_{r + 1}"
+        cls = classes[r // 2]
+        for i in range(40):
+            vib = 1.2 + (r // 2) * 2.5 + np.random.randn() * 0.1
+            train_data.append({
+                "timestamp": f"2026-11-01T{r:02d}:{i:02d}:00Z",
+                "vib_radial": vib,
+                "fault_class": cls,
+                "run_id": run_name
+            })
+    train_df = pd.DataFrame(train_data)
+    train_csv = str(tmp_path / "train_gearbox.csv")
+    train_df.to_csv(train_csv, index=False)
+
+    col_mappings = [
+        {"rawHeader": "timestamp", "isTimestamp": True},
+        {"rawHeader": "vib_radial", "mappedSignal": "vibration_input_radial"},
+        {"rawHeader": "fault_class", "isLabel": True},
+        {"rawHeader": "run_id"}
+    ]
+
+    model_dir = str(tmp_path / "model_out")
+    train_res = run_pipeline(
+        csv_path=train_csv,
+        model_type="random_forest",
+        column_mappings=col_mappings,
+        output_dir=model_dir,
+        window_size=16,
+        overlap_ratio=0.5,
+        random_state=42
+    )
+    assert train_res["model_type"] == "random_forest"
+    model_artifact = os.path.join(model_dir, "model.joblib")
+    assert os.path.exists(model_artifact)
+
+    # 2. Generate operational test dataset with healthy prefix followed by broken tooth interval
+    test_data = []
+    for i in range(60):
+        # first 30 healthy, next 30 broken tooth
+        cls = "healthy" if i < 30 else "broken_tooth"
+        vib = 1.2 + (0 if i < 30 else 5.0) + np.random.randn() * 0.1
+        test_data.append({
+            "timestamp": f"2026-11-02T00:{i:02d}:00Z",
+            "vib_radial": vib
+        })
+    test_df = pd.DataFrame(test_data)
+    test_csv = str(tmp_path / "test_operational.csv")
+    test_df.to_csv(test_csv, index=False)
+
+    analysis_dir = str(tmp_path / "analysis_out")
+    analysis_res = run_analysis(
+        csv_path=test_csv,
+        model_path=model_artifact,
+        column_mappings=col_mappings,
+        output_dir=analysis_dir,
+        window_size=16,
+        overlap_ratio=0.5
+    )
+
+    assert analysis_res["analysis_status"] == "completed"
+    assert analysis_res["analysis_task"] == "fault_classification"
+    assert analysis_res["summary"]["total_windows"] > 0
+    assert analysis_res["summary"]["anomalous_windows_count"] > 0
+    assert len(analysis_res["intervals"]) > 0
+
+    first_interval = analysis_res["intervals"][0]
+    assert "start_time" in first_interval
+    assert "score" in first_interval
+    assert "severity" in first_interval
+    assert first_interval["severity"] in ["warning", "critical"]
+    assert "disclaimer" in first_interval
+    assert "Model prediction" in first_interval["disclaimer"]
+
+    # Verify SHAP attributions in interval
+    shap_attr = first_interval["shap_attribution"]
+    assert shap_attr["additivity_verified"] is True
+    assert shap_attr["max_discrepancy"] < 1e-4
+    assert len(shap_attr["feature_contributions"]) > 0
+
+
+def test_run_analysis_rejects_incompatible_signals(tmp_path):
+    """Verify that run_analysis rejects a dataset whose signals do not match the model's feature space."""
+    from pipeline import run_pipeline, run_analysis
+
+    # Train model on vib_radial
+    train_df = pd.DataFrame({
+        "vib_radial": np.random.randn(80),
+        "label": ["healthy"] * 40 + ["broken_tooth"] * 40,
+        "run_id": ["RUN_1"] * 20 + ["RUN_2"] * 20 + ["RUN_3"] * 20 + ["RUN_4"] * 20
+    })
+    train_csv = str(tmp_path / "train.csv")
+    train_df.to_csv(train_csv, index=False)
+
+    model_dir = str(tmp_path / "m_out")
+    run_pipeline(
+        csv_path=train_csv,
+        model_type="random_forest",
+        column_mappings=[{"rawHeader": "vib_radial", "mappedSignal": "vibration_input_radial"}, {"rawHeader": "label", "isLabel": True}],
+        output_dir=model_dir,
+        window_size=16,
+        overlap_ratio=0.5
+    )
+    model_artifact = os.path.join(model_dir, "model.joblib")
+
+    # Incompatible test CSV with temperature only
+    bad_df = pd.DataFrame({"ambient_humidity": [45.0] * 50})
+    bad_csv = str(tmp_path / "bad.csv")
+    bad_df.to_csv(bad_csv, index=False)
+
+    with pytest.raises(ValueError, match="Incompatible dataset"):
+        run_analysis(
+            csv_path=bad_csv,
+            model_path=model_artifact,
+            column_mappings=[{"rawHeader": "ambient_humidity", "mappedSignal": "ambient_humidity"}],
+            output_dir=str(tmp_path / "bad_out"),
+            window_size=16
+        )
+
+

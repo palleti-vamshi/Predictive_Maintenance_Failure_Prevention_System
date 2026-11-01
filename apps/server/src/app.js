@@ -10,6 +10,8 @@ import siteRoutes from './routes/site.routes.js';
 import workOrderRoutes from './routes/workOrder.routes.js';
 import datasetRoutes from './routes/dataset.routes.js';
 import modelRoutes from './routes/model.routes.js';
+import analysisRunRoutes from './routes/analysisRun.routes.js';
+import alertRoutes from './routes/alert.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
@@ -56,7 +58,7 @@ app.get('/', (req, res) => {
     name: 'AI-Based Predictive Maintenance and Failure Prevention System API',
     initialMachine: 'Gearbox',
     version: '0.1.0',
-    phase: 'Phase 6 - Feature Engineering, Model Training, and Evaluation',
+    phase: 'Phase 7 - Verified Analysis Runs and Explainable Alerts',
     docs: {
       health: '/api/health',
       liveness: '/api/liveness',
@@ -81,6 +83,18 @@ app.get('/', (req, res) => {
         get: 'GET /api/models/:id',
         delete: 'DELETE /api/models/:id'
       },
+      analysisRuns: {
+        create: 'POST /api/analysis-runs',
+        list: 'GET /api/analysis-runs',
+        get: 'GET /api/analysis-runs/:id'
+      },
+      alerts: {
+        list: 'GET /api/alerts',
+        get: 'GET /api/alerts/:id',
+        acknowledge: 'POST /api/alerts/:id/acknowledge',
+        observations: 'POST /api/alerts/:id/observations',
+        workOrder: 'POST /api/alerts/:id/work-order'
+      },
       admin: 'GET /api/admin/factory-users'
     }
   });
@@ -93,6 +107,8 @@ app.use('/api/machines', machineRoutes);
 app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/datasets', datasetRoutes);
 app.use('/api/models', modelRoutes);
+app.use('/api/analysis-runs', analysisRunRoutes);
+app.use('/api/alerts', alertRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health & Liveness Probes (Public)

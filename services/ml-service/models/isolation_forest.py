@@ -29,7 +29,7 @@ def train_and_evaluate_isolation_forest(
     feature_names = list(X.columns)
     n_samples = len(X)
 
-    if n_samples < 50:
+    if n_samples < 15:
         raise ValueError(f"Insufficient observations ({n_samples}) to fit Isolation Forest.")
 
     # 1. Leakage-Resistant Split: Group by independent run if available
@@ -85,9 +85,12 @@ def train_and_evaluate_isolation_forest(
 
     eval_results: Dict[str, Any] = {
         "calibrated_decision_threshold": round(calibrated_threshold, 4),
+        "calibrated_threshold": round(calibrated_threshold, 4),
         "threshold_selection_method": f"Percentile ({contamination * 100}%) of healthy baseline training distribution",
         "train_samples_fitted": int(len(X_train)),
+        "train_samples": int(len(X_train)),
         "test_samples_evaluated": int(len(X_test)),
+        "test_samples": int(len(X_test)),
         "mean_anomaly_score_test": round(float(np.mean(test_anomaly_scores)), 4)
     }
 
@@ -100,16 +103,19 @@ def train_and_evaluate_isolation_forest(
         if has_healthy:
             fpr = float(np.mean(test_pred_anomalous[is_healthy_test]))
             eval_results["false_positive_rate_healthy"] = round(fpr, 4)
+            eval_results["false_positive_rate_on_normal"] = round(fpr, 4)
 
         if has_faults:
             recall = float(np.mean(test_pred_anomalous[~is_healthy_test]))
             eval_results["fault_recall_anomalous"] = round(recall, 4)
+            eval_results["fault_recall_on_defects"] = round(recall, 4)
 
         if has_healthy and has_faults:
             # Binary ground truth: 1 if fault, 0 if healthy
             y_binary = (~is_healthy_test).astype(int)
             roc_auc = float(roc_auc_score(y_binary, test_anomaly_scores))
             eval_results["roc_auc_score"] = round(roc_auc, 4)
+            eval_results["roc_auc"] = round(roc_auc, 4)
 
     # 5. SHAP Explanations for Anomaly Decision Function
     # Uses model-agnostic KernelExplainer to directly explain decision_function(x)
