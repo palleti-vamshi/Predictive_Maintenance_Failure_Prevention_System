@@ -12,9 +12,9 @@ export default function Shell({ children, apiStatus }) {
     <div className="app-shell-root">
       {/* Top Universal Demo Mode Banner */}
       <div className="demo-global-banner" role="status">
-        <span className="banner-tag" aria-hidden="true">DEMO ENVIRONMENT</span>
+        <span className="banner-tag" aria-hidden="true">BENCHMARK & DEMO ENVIRONMENT</span>
         <span className="banner-message">
-          Phase 2 Product Shell • All machines, alerts, and sensor baselines are simulated specimens. No physical machinery is connected.
+          Phase 9 Industrial Command Center • Telemetry and alerts reflect verified research benchmarks & seeded specimens. Seeded records are tagged [SIMULATED].
         </span>
       </div>
 
@@ -37,10 +37,10 @@ export default function Shell({ children, apiStatus }) {
 
           <footer className="shell-footer">
             <div className="footer-left">
-              <span>Predictive Maintenance & Failure Prevention System • Phase 2 Shell</span>
+              <span>Predictive Maintenance & Failure Prevention System • Phase 9 Industrial Command Center</span>
             </div>
             <div className="footer-right">
-              <span>Next: Phase 3 (Authentication & Scoped Access Control)</span>
+              <span>Verified API & Role Scoped • Next: Phase 10 Native Mobile Workflows</span>
             </div>
           </footer>
         </main>

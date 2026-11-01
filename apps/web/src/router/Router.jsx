@@ -91,25 +91,36 @@ export function RouterProvider({ children }) {
 
   // Parse route and parameters
   const parseRoute = (hash) => {
+    // Separate path from query string: e.g. #/alerts?severity=critical -> [ '#/alerts', 'severity=critical' ]
+    const [pathPart, queryPart] = hash.split('?');
+    const queryParams = {};
+    if (queryPart) {
+      const searchParams = new URLSearchParams(queryPart);
+      for (const [key, val] of searchParams.entries()) {
+        queryParams[key] = val;
+      }
+    }
+
     // Check for machine detail pattern: #/machines/GB-104
-    const machineMatch = hash.match(/^#\/machines\/([^/?]+)/);
+    const machineMatch = pathPart.match(/^#\/machines\/([^/?]+)/);
     if (machineMatch) {
       return {
         routeKey: 'machine_detail',
         baseRoute: ROUTES.MACHINE_DETAIL,
-        params: { id: decodeURIComponent(machineMatch[1]) }
+        params: { id: decodeURIComponent(machineMatch[1]) },
+        queryParams
       };
     }
 
-    if (hash === ROUTES.MACHINES) return { routeKey: 'machines', baseRoute: ROUTES.MACHINES, params: {} };
-    if (hash === ROUTES.DATASETS_UPLOAD) return { routeKey: 'datasets', baseRoute: ROUTES.DATASETS_UPLOAD, params: {} };
-    if (hash === ROUTES.ANALYSIS) return { routeKey: 'analysis', baseRoute: ROUTES.ANALYSIS, params: {} };
-    if (hash === ROUTES.ALERTS) return { routeKey: 'alerts', baseRoute: ROUTES.ALERTS, params: {} };
-    if (hash === ROUTES.RESEARCH) return { routeKey: 'research', baseRoute: ROUTES.RESEARCH, params: {} };
-    if (hash === ROUTES.SETTINGS) return { routeKey: 'settings', baseRoute: ROUTES.SETTINGS, params: {} };
+    if (pathPart === ROUTES.MACHINES) return { routeKey: 'machines', baseRoute: ROUTES.MACHINES, params: {}, queryParams };
+    if (pathPart === ROUTES.DATASETS_UPLOAD) return { routeKey: 'datasets', baseRoute: ROUTES.DATASETS_UPLOAD, params: {}, queryParams };
+    if (pathPart === ROUTES.ANALYSIS) return { routeKey: 'analysis', baseRoute: ROUTES.ANALYSIS, params: {}, queryParams };
+    if (pathPart === ROUTES.ALERTS) return { routeKey: 'alerts', baseRoute: ROUTES.ALERTS, params: {}, queryParams };
+    if (pathPart === ROUTES.RESEARCH) return { routeKey: 'research', baseRoute: ROUTES.RESEARCH, params: {}, queryParams };
+    if (pathPart === ROUTES.SETTINGS) return { routeKey: 'settings', baseRoute: ROUTES.SETTINGS, params: {}, queryParams };
 
     // Default to Overview
-    return { routeKey: 'overview', baseRoute: ROUTES.OVERVIEW, params: {} };
+    return { routeKey: 'overview', baseRoute: ROUTES.OVERVIEW, params: {}, queryParams };
   };
 
   const activeRouteInfo = parseRoute(currentHash);
@@ -120,6 +131,7 @@ export function RouterProvider({ children }) {
         currentHash,
         routeKey: activeRouteInfo.routeKey,
         params: activeRouteInfo.params,
+        queryParams: activeRouteInfo.queryParams,
         navigate
       }}
     >

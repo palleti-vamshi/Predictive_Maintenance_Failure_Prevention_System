@@ -65,9 +65,9 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
         {/* Operational Disclaimer */}
         <div className="sidebar-footer">
           <div className="sim-disclaimer-box">
-            <span className="sim-badge" aria-hidden="true">SIMULATION ENVIRONMENT</span>
+            <span className="sim-badge" aria-hidden="true">BENCHMARK ENVIRONMENT</span>
             <p className="sim-text">
-              Demonstration product shell. Sensor readings and machines are simulated specimens.
+              Calibrated baseline telemetry & verified benchmark specimens. Seeded data labeled [SIMULATED].
             </p>
           </div>
         </div>

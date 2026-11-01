@@ -48,9 +48,9 @@ export default function LoginPage() {
     <div className="login-page-root">
       {/* Top Banner */}
       <div className="demo-global-banner">
-        <span className="banner-tag" aria-hidden="true">SECURITY PROTOTYPE</span>
+        <span className="banner-tag" aria-hidden="true">AUTHENTICATED ACCESS</span>
         <span>
-          Phase 3 Authentication • Server-enforced sessions & hierarchical factory scoping.
+          Phase 9 Industrial Command Center • Server-enforced sessions & scoped factory access.
         </span>
       </div>
 

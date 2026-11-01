@@ -105,6 +105,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/sites', siteRoutes);
 app.use('/api/machines', machineRoutes);
 app.use('/api/work-orders', workOrderRoutes);
+app.use('/api/maintenance/work-orders', workOrderRoutes);
+app.use('/api/maintenance', workOrderRoutes);
 app.use('/api/datasets', datasetRoutes);
 app.use('/api/models', modelRoutes);
 app.use('/api/analysis-runs', analysisRunRoutes);
