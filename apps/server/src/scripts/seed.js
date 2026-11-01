@@ -14,8 +14,12 @@ const DEMO_TECH_PW = process.env.DEMO_TECH_PASSWORD || 'Tech123!';
 const DEMO_VIEWER_PW = process.env.DEMO_VIEWER_PASSWORD || 'Viewer123!';
 
 async function seed() {
-  if (env.isProd) {
-    console.error('[Seed] ERROR: Seed script cannot be run in production mode.');
+  // Strict production lockout: demo accounts and sample telemetry must NEVER be seeded in production
+  if (env.isProd || process.env.NODE_ENV === 'production') {
+    console.error('============================================================');
+    console.error('[Seed] FATAL: Seeder execution blocked in production mode.');
+    console.error('[Seed] Demo accounts and sample telemetry must NEVER be created in production.');
+    console.error('============================================================');
     process.exit(1);
   }
 

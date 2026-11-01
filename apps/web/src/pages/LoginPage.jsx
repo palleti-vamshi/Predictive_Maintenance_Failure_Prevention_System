@@ -124,50 +124,52 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            {/* Development Quick-Login Drawer */}
-            <div className="dev-demo-accounts-box">
-              <div className="dev-accounts-header">
-                <span className="dev-tag">DEVELOPMENT ONLY</span>
-                <span className="dev-title">Quick Demo Login</span>
-              </div>
-              <p className="dev-accounts-desc">
-                Log in as a seeded local prototype account to test role permissions and factory access boundaries:
-              </p>
+            {/* Development Quick-Login Drawer (Rendered strictly in development builds) */}
+            {import.meta.env.DEV && (
+              <div className="dev-demo-accounts-box">
+                <div className="dev-accounts-header">
+                  <span className="dev-tag">DEVELOPMENT ONLY</span>
+                  <span className="dev-title">Quick Demo Login</span>
+                </div>
+                <p className="dev-accounts-desc">
+                  Log in as a seeded local prototype account to test role permissions and factory access boundaries:
+                </p>
 
-              <div className="dev-buttons-grid">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleQuickLogin('manager')}
-                  disabled={loading}
-                  title="Full management of Detroit Plant #2 (users, machines, alerts)"
-                >
-                  🏢 Factory Manager (Sarah Vance)
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleQuickLogin('technician')}
-                  disabled={loading}
-                  title="Assigned to GB-104 only; write notes; no user admin"
-                >
-                  🔧 Field Technician (Alex Mercer)
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => handleQuickLogin('viewer')}
-                  disabled={loading}
-                  title="Read-only access to assigned assets"
-                >
-                  👁️ Factory Viewer (David Sterling)
-                </Button>
-              </div>
+                <div className="dev-buttons-grid">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleQuickLogin('manager')}
+                    disabled={loading}
+                    title="Full management of Detroit Plant #2 (users, machines, alerts)"
+                  >
+                    🏢 Factory Manager (Sarah Vance)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleQuickLogin('technician')}
+                    disabled={loading}
+                    title="Assigned to GB-104 only; write notes; no user admin"
+                  >
+                    🔧 Field Technician (Alex Mercer)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleQuickLogin('viewer')}
+                    disabled={loading}
+                    title="Read-only access to assigned assets"
+                  >
+                    👁️ Factory Viewer (David Sterling)
+                  </Button>
+                </div>
 
-              <div className="dev-notice-text">
-                Passwords seeded via <code>npm run seed</code>. User IDs from different factories cannot access each other's data.
+                <div className="dev-notice-text">
+                  Passwords seeded via <code>npm run seed</code>. User IDs from different factories cannot access each other's data.
+                </div>
               </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>

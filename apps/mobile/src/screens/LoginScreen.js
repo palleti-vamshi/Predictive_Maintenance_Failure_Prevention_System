@@ -129,66 +129,68 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Development Quick-Login Accounts Card */}
-          <View style={styles.devCard}>
-            <View style={styles.devHeaderRow}>
-              <Text style={styles.devTag}>DEV / DEMO</Text>
-              <Text style={styles.devTitle}>Pre-Seeded Factory Accounts</Text>
+          {/* Development Quick-Login Accounts Card (Rendered strictly in development mode) */}
+          {__DEV__ && (
+            <View style={styles.devCard}>
+              <View style={styles.devHeaderRow}>
+                <Text style={styles.devTag}>DEV / DEMO</Text>
+                <Text style={styles.devTitle}>Pre-Seeded Factory Accounts</Text>
+              </View>
+              <Text style={styles.devDescription}>
+                Tap any role to immediately test scoped authentication against Detroit Plant #2:
+              </Text>
+
+              <View style={styles.quickButtons}>
+                <TouchableOpacity
+                  style={styles.quickBtn}
+                  onPress={() => handleQuickFillAndLogin('tech@detroit.factory', 'Tech123!')}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.quickRoleBadgeTech}>
+                    <Text style={styles.quickRoleText}>TECHNICIAN</Text>
+                  </View>
+                  <View style={styles.quickInfo}>
+                    <Text style={styles.quickName}>Alex Mercer</Text>
+                    <Text style={styles.quickScope}>Detroit #2 • Assigned to GB-104</Text>
+                  </View>
+                  <Text style={styles.quickArrow}>→</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickBtn}
+                  onPress={() => handleQuickFillAndLogin('manager@detroit.factory', 'Manager123!')}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.quickRoleBadgeManager}>
+                    <Text style={styles.quickRoleText}>MANAGER</Text>
+                  </View>
+                  <View style={styles.quickInfo}>
+                    <Text style={styles.quickName}>Sarah Vance</Text>
+                    <Text style={styles.quickScope}>Detroit #2 • Full Plant Scope</Text>
+                  </View>
+                  <Text style={styles.quickArrow}>→</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickBtn}
+                  onPress={() => handleQuickFillAndLogin('viewer@detroit.factory', 'Viewer123!')}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.quickRoleBadgeViewer}>
+                    <Text style={styles.quickRoleText}>VIEWER</Text>
+                  </View>
+                  <View style={styles.quickInfo}>
+                    <Text style={styles.quickName}>David Sterling</Text>
+                    <Text style={styles.quickScope}>Detroit #2 • Read-Only Scope</Text>
+                  </View>
+                  <Text style={styles.quickArrow}>→</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <Text style={styles.devDescription}>
-              Tap any role to immediately test scoped authentication against Detroit Plant #2:
-            </Text>
-
-            <View style={styles.quickButtons}>
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => handleQuickFillAndLogin('tech@detroit.factory', 'Tech123!')}
-                disabled={isLoading}
-                accessibilityRole="button"
-              >
-                <View style={styles.quickRoleBadgeTech}>
-                  <Text style={styles.quickRoleText}>TECHNICIAN</Text>
-                </View>
-                <View style={styles.quickInfo}>
-                  <Text style={styles.quickName}>Alex Mercer</Text>
-                  <Text style={styles.quickScope}>Detroit #2 • Assigned to GB-104</Text>
-                </View>
-                <Text style={styles.quickArrow}>→</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => handleQuickFillAndLogin('manager@detroit.factory', 'Manager123!')}
-                disabled={isLoading}
-                accessibilityRole="button"
-              >
-                <View style={styles.quickRoleBadgeManager}>
-                  <Text style={styles.quickRoleText}>MANAGER</Text>
-                </View>
-                <View style={styles.quickInfo}>
-                  <Text style={styles.quickName}>Sarah Vance</Text>
-                  <Text style={styles.quickScope}>Detroit #2 • Full Plant Scope</Text>
-                </View>
-                <Text style={styles.quickArrow}>→</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => handleQuickFillAndLogin('viewer@detroit.factory', 'Viewer123!')}
-                disabled={isLoading}
-                accessibilityRole="button"
-              >
-                <View style={styles.quickRoleBadgeViewer}>
-                  <Text style={styles.quickRoleText}>VIEWER</Text>
-                </View>
-                <View style={styles.quickInfo}>
-                  <Text style={styles.quickName}>David Sterling</Text>
-                  <Text style={styles.quickScope}>Detroit #2 • Read-Only Scope</Text>
-                </View>
-                <Text style={styles.quickArrow}>→</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
