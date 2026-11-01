@@ -1,15 +1,144 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
 import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
 import AlertCallout from '../components/AlertCallout.js';
-import { DEMO_ALERTS } from '@predictive-maintenance/shared';
+import { DEMO_ALERTS, WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
+import { useAuth } from '../context/AuthContext.js';
+import { API_BASE } from '../services/apiConfig.js';
 
-export default function MachineDetailScreen({ machine, onBack, onNavigateAlerts, onNavigateUpload }) {
+export default function MachineDetailScreen({
+  machine: initialMachine,
+  onBack,
+  onNavigateAlerts,
+  onNavigateUpload
+}) {
+  const { token, user } = useAuth();
+  const machineId = initialMachine?.id || initialMachine?.code || 'GB-104';
+
+  const [machine, setMachine] = useState(initialMachine);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  // Field note state
+  const [noteContent, setNoteContent] = useState('');
+  const [noteSubmitting, setNoteSubmitting] = useState(false);
+  const [noteSuccess, setNoteSuccess] = useState(false);
+
+  // Work order completion state
+  const [completingOrderId, setCompletingOrderId] = useState(null);
+  const [findings, setFindings] = useState('');
+  const [workPerformed, setWorkPerformed] = useState('');
+
+  const loadWorkOrders = useCallback(async () => {
+    if (!token) return;
+    setLoadingOrders(true);
+    try {
+      const res = await fetch(`${API_BASE}/machines/${machineId}/work-orders`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWorkOrders(data.workOrders || []);
+      }
+    } catch (err) {
+      console.warn('[MachineDetailScreen] Error loading work orders:', err.message);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, [machineId, token]);
+
+  useEffect(() => {
+    loadWorkOrders();
+  }, [loadWorkOrders]);
+
+  // Submit field note
+  const handleSubmitNote = async () => {
+    if (!noteContent.trim() || !token) return;
+    setNoteSubmitting(true);
+    setNoteSuccess(false);
+
+    try {
+      const res = await fetch(`${API_BASE}/machines/${machineId}/notes`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          content: noteContent.trim(),
+          category: 'Field Observation'
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        Alert.alert('Error', data.message || 'Failed to submit field note.');
+        return;
+      }
+
+      setNoteContent('');
+      setNoteSuccess(true);
+      setTimeout(() => setNoteSuccess(false), 3000);
+    } catch (err) {
+      Alert.alert('Network Error', err.message);
+    } finally {
+      setNoteSubmitting(false);
+    }
+  };
+
+  // Update Work Order Status
+  const handleUpdateOrderStatus = async (orderId, targetStatus, feedback = {}) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/work-orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          status: targetStatus,
+          ...feedback
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        Alert.alert('Action Blocked', data.message || 'Status update failed.');
+        return;
+      }
+
+      setCompletingOrderId(null);
+      setFindings('');
+      setWorkPerformed('');
+      loadWorkOrders();
+    } catch (err) {
+      Alert.alert('Network Error', err.message);
+    }
+  };
+
   if (!machine) return null;
 
-  const machineAlert = DEMO_ALERTS.find((a) => a.machineId === machine.id);
+  const isDecomm = machine.isDecommissioned || machine.operationalStatus === 'decommissioned';
+  const machineAlert = DEMO_ALERTS.find((a) => a.machineId === machineId);
+  const stages = machine.stages || [];
+  const signals = machine.monitoredSignals || [];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -25,19 +154,37 @@ export default function MachineDetailScreen({ machine, onBack, onNavigateAlerts,
       {/* Machine Header */}
       <View style={styles.headerCard}>
         <View style={styles.badgeRow}>
-          <Text style={styles.machineId}>{machine.id}</Text>
-          <View style={styles.demoBadge}>
-            <Text style={styles.demoBadgeText}>DEMO SPECIMEN</Text>
+          <Text style={styles.machineId}>{machineId}</Text>
+          <View style={styles.operationalBadge}>
+            <Text style={styles.operationalBadgeText}>
+              {machine.operationalStatus?.toUpperCase() || 'OPERATIONAL'}
+            </Text>
           </View>
-          <StatusBadge status={machine.status} label={machine.status === 'healthy' ? 'NOMINAL' : 'ATTENTION'} isSimulated={true} />
+          <StatusBadge
+            status={machine.status}
+            label={machine.status === 'healthy' ? 'NOMINAL' : 'ATTENTION'}
+            isSimulated={!machine.isLive}
+          />
         </View>
 
         <Text style={styles.machineName}>{machine.name}</Text>
         <Text style={styles.subtext}>
           {machine.manufacturer} • Model {machine.model}
         </Text>
-        <Text style={styles.locationText}>Location: {machine.site}</Text>
+        <Text style={styles.locationText}>
+          Location: {machine.site || machine.siteId?.name || 'Detroit Plant #2'}
+        </Text>
       </View>
+
+      {/* Decommission Notice */}
+      {isDecomm && (
+        <View style={styles.decommBanner}>
+          <Text style={styles.decommTitle}>🛑 Soft-Decommissioned Gearbox</Text>
+          <Text style={styles.decommDesc}>
+            This gearbox has been taken out of active operational rotation. Uploads and new work orders are disabled.
+          </Text>
+        </View>
+      )}
 
       {/* Warning Callout if alert active */}
       {machineAlert && (
@@ -59,26 +206,191 @@ export default function MachineDetailScreen({ machine, onBack, onNavigateAlerts,
         />
       )}
 
+      {/* Assigned Maintenance Work Orders */}
+      <Card
+        title={`Maintenance Work Orders (${workOrders.length})`}
+        subtitle="Assigned field work orders and task execution"
+      >
+        {loadingOrders ? (
+          <ActivityIndicator size="small" color="#38bdf8" />
+        ) : workOrders.length === 0 ? (
+          <Text style={styles.emptyText}>No work orders currently assigned to this machine.</Text>
+        ) : (
+          workOrders.map((order) => {
+            const isAssignedToUser = order.assignedTechnicianId?._id === user?._id;
+            const canUpdate = isAssignedToUser || user?.role === 'factory_manager';
+
+            return (
+              <View key={order._id} style={styles.orderBox}>
+                <View style={styles.orderHeader}>
+                  <Text style={styles.orderNumber}>{order.orderNumber}</Text>
+                  <View style={styles.orderBadges}>
+                    <View style={[styles.prioBadge, order.priority === 'urgent' || order.priority === 'high' ? styles.prioHigh : styles.prioMed]}>
+                      <Text style={styles.prioText}>{order.priority?.toUpperCase()}</Text>
+                    </View>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>{order.status?.toUpperCase()}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <Text style={styles.orderTitle}>{order.title}</Text>
+                <Text style={styles.orderDesc}>{order.description}</Text>
+                <Text style={styles.orderDue}>Due: {new Date(order.dueDate).toLocaleDateString()}</Text>
+
+                {/* Technician feedback if present */}
+                {order.technicianFeedback?.findings && (
+                  <View style={styles.feedbackBox}>
+                    <Text style={styles.feedbackTitle}>Inspection Report:</Text>
+                    <Text style={styles.feedbackText}>{order.technicianFeedback.findings}</Text>
+                    {order.technicianFeedback.workPerformed && (
+                      <Text style={styles.feedbackText}>Work: {order.technicianFeedback.workPerformed}</Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Action Buttons for Technician */}
+                {canUpdate && order.status === WORK_ORDER_STATUS.OPEN && (
+                  <Button
+                    title="Accept Work Order"
+                    variant="secondary"
+                    onPress={() => handleUpdateOrderStatus(order._id, WORK_ORDER_STATUS.ACCEPTED, { note: 'Accepted on mobile terminal' })}
+                    style={styles.orderActionBtn}
+                  />
+                )}
+
+                {canUpdate && (order.status === WORK_ORDER_STATUS.OPEN || order.status === WORK_ORDER_STATUS.ACCEPTED) && (
+                  <Button
+                    title="Start Field Work"
+                    variant="primary"
+                    onPress={() => handleUpdateOrderStatus(order._id, WORK_ORDER_STATUS.IN_PROGRESS, { note: 'Started work via mobile terminal' })}
+                    style={styles.orderActionBtn}
+                  />
+                )}
+
+                {canUpdate && order.status === WORK_ORDER_STATUS.IN_PROGRESS && (
+                  completingOrderId === order._id ? (
+                    <View style={styles.completionForm}>
+                      <Text style={styles.inputLabel}>Inspection Findings *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. Backlash nominal; slight seal weeping"
+                        placeholderTextColor="#64748b"
+                        value={findings}
+                        onChangeText={setFindings}
+                      />
+                      <Text style={styles.inputLabel}>Work Performed *</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="e.g. Torqued bolts; replenished 250ml oil"
+                        placeholderTextColor="#64748b"
+                        value={workPerformed}
+                        onChangeText={setWorkPerformed}
+                      />
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                        <Button
+                          title="Submit & Complete"
+                          variant="primary"
+                          onPress={() => handleUpdateOrderStatus(order._id, WORK_ORDER_STATUS.COMPLETED, {
+                            findings,
+                            workPerformed,
+                            note: 'Completed via mobile terminal'
+                          })}
+                          style={{ flex: 1 }}
+                          disabled={!findings.trim() || !workPerformed.trim()}
+                        />
+                        <Button
+                          title="Cancel"
+                          variant="secondary"
+                          onPress={() => setCompletingOrderId(null)}
+                          style={{ width: 80 }}
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <Button
+                      title="Complete Work Order..."
+                      variant="primary"
+                      onPress={() => setCompletingOrderId(order._id)}
+                      style={styles.orderActionBtn}
+                    />
+                  )
+                )}
+              </View>
+            );
+          })
+        )}
+      </Card>
+
+      {/* Record Field Note */}
+      {!isDecomm && (
+        <Card title="Log Field Observation" subtitle="Record physical inspection findings to permanent machine history">
+          {noteSuccess && (
+            <View style={styles.noteSuccessBox}>
+              <Text style={styles.noteSuccessText}>✓ Field observation note logged to server.</Text>
+            </View>
+          )}
+          <TextInput
+            style={[styles.textInput, { height: 72 }]}
+            placeholder="e.g. Checked lube level; inspected sight glass; no abnormal rattle"
+            placeholderTextColor="#64748b"
+            value={noteContent}
+            onChangeText={setNoteContent}
+            multiline
+          />
+          <Button
+            title="Submit Observation Note"
+            variant="primary"
+            loading={noteSubmitting}
+            disabled={noteSubmitting || !noteContent.trim()}
+            onPress={handleSubmitNote}
+            style={{ marginTop: 8 }}
+          />
+        </Card>
+      )}
+
       {/* Transmission Stages */}
-      <Card title="Mechanical Stages & Ratios">
-        {machine.stages.map((stg) => (
-          <View key={stg.stage} style={styles.stageItem}>
+      <Card title={`Mechanical Stages (${stages.length})`}>
+        {stages.map((stg, i) => (
+          <View key={stg.stage || i} style={styles.stageItem}>
             <View style={styles.stageHeader}>
-              <Text style={styles.stageTitle}>Stage {stg.stage}: {stg.type}</Text>
+              <Text style={styles.stageTitle}>Stage {stg.stage || i + 1}: {stg.type}</Text>
               <Text style={styles.stageRatio}>{stg.ratio}</Text>
             </View>
-            <Text style={styles.stageCondition}>Condition: {stg.condition}</Text>
+            {stg.conditionNotes && (
+              <Text style={styles.stageCondition}>{stg.conditionNotes}</Text>
+            )}
           </View>
         ))}
         <View style={styles.overallRatioBox}>
           <Text style={styles.overallLabel}>Overall Gearbox Ratio:</Text>
-          <Text style={styles.overallVal}>{machine.gearRatio}</Text>
+          <Text style={styles.overallVal}>{machine.gearRatio || '14.2:1'}</Text>
+        </View>
+      </Card>
+
+      {/* Lubrication Specifications */}
+      <Card title="Lubrication & Fluid Specs">
+        <View style={styles.specRow}>
+          <Text style={styles.specKey}>Oil Type:</Text>
+          <Text style={styles.specValue}>{machine.lubrication?.oilType || machine.lubricantType || 'ISO VG 220 Synthetic'}</Text>
+        </View>
+        <View style={styles.specRow}>
+          <Text style={styles.specKey}>Viscosity Grade:</Text>
+          <Text style={styles.specValue}>{machine.lubrication?.isoVgGrade || 'ISO VG 220'}</Text>
+        </View>
+        <View style={styles.specRow}>
+          <Text style={styles.specKey}>Rated Speed:</Text>
+          <Text style={styles.specValue}>{machine.ratedSpeedRpm || 1780} RPM</Text>
+        </View>
+        <View style={styles.specRow}>
+          <Text style={styles.specKey}>Rated Torque:</Text>
+          <Text style={styles.specValue}>{machine.ratedTorqueNm || 480} Nm</Text>
         </View>
       </Card>
 
       {/* Monitored Sensor Channels */}
-      <Card title={`Monitored Sensor Channels (${machine.monitoredSignals.length})`}>
-        {machine.monitoredSignals.map((sig) => (
+      <Card title={`Monitored Sensor Channels (${signals.length})`}>
+        {signals.map((sig) => (
           <View key={sig.key} style={styles.signalRow}>
             <View style={styles.signalMain}>
               <Text style={styles.signalLabel}>{sig.label}</Text>
@@ -86,7 +398,7 @@ export default function MachineDetailScreen({ machine, onBack, onNavigateAlerts,
             </View>
             <View style={styles.signalMeta}>
               <View style={[styles.catBadge, sig.category === 'vibration' ? styles.catVib : sig.category === 'thermal' ? styles.catTherm : styles.catReg]}>
-                <Text style={styles.catText}>{sig.category.substring(0, 3).toUpperCase()}</Text>
+                <Text style={styles.catText}>{sig.category?.substring(0, 3).toUpperCase()}</Text>
               </View>
               <Text style={styles.unitText}>{sig.unit}</Text>
             </View>
@@ -97,9 +409,10 @@ export default function MachineDetailScreen({ machine, onBack, onNavigateAlerts,
       {/* Action Buttons */}
       <View style={styles.actionGrid}>
         <Button
-          title="Upload Dataset for GB-104"
+          title={`Upload Dataset for ${machineId}`}
           variant="primary"
           onPress={onNavigateUpload}
+          disabled={isDecomm}
         />
       </View>
     </ScrollView>
@@ -142,14 +455,16 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontFamily: 'monospace',
   },
-  demoBadge: {
-    backgroundColor: 'rgba(168, 85, 247, 0.25)',
+  operationalBadge: {
+    backgroundColor: 'rgba(2, 132, 199, 0.25)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
   },
-  demoBadgeText: {
-    color: '#d8b4fe',
+  operationalBadgeText: {
+    color: '#38bdf8',
     fontSize: 9,
     fontWeight: '800',
   },
@@ -167,10 +482,153 @@ const styles = StyleSheet.create({
     color: '#64748b',
     marginTop: 2,
   },
-  stageItem: {
+  decommBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: '#ef4444',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  decommTitle: {
+    color: '#fca5a5',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  decommDesc: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  orderBox: {
+    backgroundColor: '#070b14',
+    borderColor: '#1e293b',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 12,
+    gap: 6,
+    marginBottom: 8,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderNumber: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  orderBadges: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  prioBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  prioHigh: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  prioMed: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  prioText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
+  statusBadge: {
+    backgroundColor: '#1e293b',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#cbd5e1',
+  },
+  orderTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  orderDesc: {
+    fontSize: 12,
+    color: '#94a3b8',
+    lineHeight: 16,
+  },
+  orderDue: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  feedbackBox: {
     backgroundColor: '#0f172a',
+    borderRadius: 4,
+    padding: 8,
+    marginTop: 4,
+  },
+  feedbackTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  feedbackText: {
+    fontSize: 11,
+    color: '#cbd5e1',
+    marginTop: 2,
+  },
+  orderActionBtn: {
+    marginTop: 6,
+  },
+  completionForm: {
+    backgroundColor: '#0f172a',
+    borderColor: '#1e293b',
+    borderWidth: 1,
     borderRadius: 6,
     padding: 10,
+    marginTop: 6,
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 11,
+    color: '#cbd5e1',
+    fontWeight: '600',
+  },
+  textInput: {
+    backgroundColor: '#070b14',
+    borderColor: '#334155',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
+    color: '#f8fafc',
+  },
+  noteSuccessBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: '#10b981',
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+  },
+  noteSuccessText: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  stageItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
     gap: 2,
   },
   stageHeader: {
@@ -184,10 +642,10 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
   },
   stageRatio: {
-    fontSize: 13,
+    fontSize: 12,
+    fontFamily: 'monospace',
     fontWeight: '700',
     color: '#38bdf8',
-    fontFamily: 'monospace',
   },
   stageCondition: {
     fontSize: 11,
@@ -197,23 +655,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(2, 132, 199, 0.1)',
-    borderRadius: 6,
-    padding: 10,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.3)',
+    paddingTop: 10,
   },
   overallLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: '#cbd5e1',
   },
   overallVal: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#38bdf8',
+    fontSize: 13,
     fontFamily: 'monospace',
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  specRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  specKey: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  specValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#f8fafc',
   },
   signalRow: {
     flexDirection: 'row',
@@ -221,7 +690,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+    borderBottomColor: '#1e293b',
   },
   signalMain: {
     flex: 1,
@@ -235,36 +704,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     fontFamily: 'monospace',
+    marginTop: 1,
   },
   signalMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   catBadge: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  catVib: { backgroundColor: 'rgba(245, 158, 11, 0.2)' },
-  catTherm: { backgroundColor: 'rgba(244, 63, 94, 0.2)' },
-  catReg: { backgroundColor: 'rgba(14, 165, 233, 0.2)' },
+  catVib: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+  },
+  catTherm: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+  },
+  catReg: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+  },
   catText: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#f8fafc',
-    fontFamily: 'monospace',
   },
   unitText: {
-    fontSize: 12,
-    color: '#94a3b8',
+    fontSize: 11,
+    color: '#cbd5e1',
     fontFamily: 'monospace',
     minWidth: 40,
     textAlign: 'right',
   },
   actionGrid: {
-    gap: 10,
     marginTop: 4,
   },
 });
-

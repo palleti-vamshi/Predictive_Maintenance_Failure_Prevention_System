@@ -6,6 +6,8 @@ import { env } from './config/env.js';
 import healthRoutes from './routes/health.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import machineRoutes from './routes/machine.routes.js';
+import siteRoutes from './routes/site.routes.js';
+import workOrderRoutes from './routes/workOrder.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
@@ -52,7 +54,7 @@ app.get('/', (req, res) => {
     name: 'AI-Based Predictive Maintenance and Failure Prevention System API',
     initialMachine: 'Gearbox',
     version: '0.1.0',
-    phase: 'Phase 3 - Authentication & Scoped Access Control',
+    phase: 'Phase 4 - Factory, Site, and Gearbox Machine Management',
     docs: {
       health: '/api/health',
       liveness: '/api/liveness',
@@ -61,7 +63,9 @@ app.get('/', (req, res) => {
         me: 'GET /api/auth/me',
         logout: 'POST /api/auth/logout'
       },
+      sites: 'GET /api/sites',
       machines: 'GET /api/machines',
+      workOrders: 'GET /api/work-orders',
       admin: 'GET /api/admin/factory-users'
     }
   });
@@ -69,7 +73,9 @@ app.get('/', (req, res) => {
 
 // Protected & Core API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/sites', siteRoutes);
 app.use('/api/machines', machineRoutes);
+app.use('/api/work-orders', workOrderRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health & Liveness Probes (Public)

@@ -1,53 +1,235 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
 import Card from '../components/Card.js';
 import Button from '../components/Button.js';
-import { DEMO_MAINTENANCE_NOTES, DEMO_MACHINES } from '@predictive-maintenance/shared';
+import { DEMO_MAINTENANCE_NOTES, DEMO_MACHINES, WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
+import { useAuth } from '../context/AuthContext.js';
+import { API_BASE } from '../services/apiConfig.js';
 
 export default function MaintenanceNotesScreen() {
+  const { token, user } = useAuth();
   const [notes, setNotes] = useState(DEMO_MAINTENANCE_NOTES);
   const [selectedMachine, setSelectedMachine] = useState('GB-104');
   const [category, setCategory] = useState('Field Inspection');
   const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
 
-  const handleSave = () => {
+  // Assigned Work Orders
+  const [myTasks, setMyTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
+  const loadTasks = useCallback(async () => {
+    if (!token) return;
+    setLoadingTasks(true);
+    try {
+      const res = await fetch(`${API_BASE}/work-orders/my-tasks`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMyTasks(data.workOrders || []);
+      }
+    } catch (err) {
+      console.warn('[MaintenanceNotesScreen] Error loading tasks:', err.message);
+    } finally {
+      setLoadingTasks(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
+
+  const handleSave = async () => {
     if (!content.trim()) return;
 
-    const newNote = {
-      id: `mnt-${Date.now()}`,
-      machineId: selectedMachine,
-      author: 'Alex Mercer (Lead Technician) [DEMO]',
-      timestamp: new Date().toLocaleTimeString() + ' (Today)',
-      category,
-      content: content.trim(),
-      status: 'Recorded',
-      isDemo: true
-    };
+    if (!token) {
+      // Local fallback
+      const newNote = {
+        id: `mnt-${Date.now()}`,
+        machineId: selectedMachine,
+        author: `${user?.fullName || 'Alex Mercer'} (Technician) [DEMO]`,
+        timestamp: new Date().toLocaleTimeString() + ' (Today)',
+        category,
+        content: content.trim(),
+        status: 'Recorded',
+        isDemo: true
+      };
+      setNotes([newNote, ...notes]);
+      setContent('');
+      setSuccessMsg(true);
+      setTimeout(() => setSuccessMsg(false), 3000);
+      return;
+    }
 
-    setNotes([newNote, ...notes]);
-    setContent('');
-    setSuccessMsg(true);
-    setTimeout(() => setSuccessMsg(false), 3000);
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/machines/${selectedMachine}/notes`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          content: content.trim(),
+          category
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        Alert.alert('Error', data.message || 'Failed to submit maintenance note.');
+        return;
+      }
+
+      const data = await res.json();
+      const serverNote = {
+        id: data.note?._id || `mnt-${Date.now()}`,
+        machineId: selectedMachine,
+        author: data.note?.author || `${user?.fullName} (${user?.role})`,
+        timestamp: new Date().toLocaleTimeString() + ' (Just now)',
+        category,
+        content: content.trim(),
+        status: 'Server Recorded',
+        isDemo: false
+      };
+
+      setNotes([serverNote, ...notes]);
+      setContent('');
+      setSuccessMsg(true);
+      setTimeout(() => setSuccessMsg(false), 3000);
+    } catch (err) {
+      Alert.alert('Network Error', err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleTaskStatusUpdate = async (taskId, targetStatus) => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/work-orders/${taskId}/status`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          status: targetStatus,
+          note: `Technician transitioned task to ${targetStatus} via mobile terminal`
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        Alert.alert('Action Blocked', data.message || 'Failed to update task.');
+        return;
+      }
+
+      loadTasks();
+    } catch (err) {
+      Alert.alert('Network Error', err.message);
+    }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.headerBox}>
         <View style={styles.badgeRow}>
-          <Text style={styles.headerLabel}>FIELD LOGS</Text>
-          <View style={styles.demoBadge}>
-            <Text style={styles.demoBadgeText}>DEMO</Text>
+          <Text style={styles.headerLabel}>FIELD MAINTENANCE TERMINAL</Text>
+          <View style={styles.scopeBadge}>
+            <Text style={styles.scopeBadgeText}>
+              {token ? 'BACKEND VERIFIED' : 'DEMO'}
+            </Text>
           </View>
         </View>
-        <Text style={styles.title}>Maintenance Notes</Text>
+        <Text style={styles.title}>Field Tasks & Notes</Text>
         <Text style={styles.subtitle}>
-          Immutable record of field lubrication, seal inspections, and technician repairs.
+          Execute assigned maintenance work orders and log physical observations directly to machine history.
         </Text>
       </View>
 
+      {/* Assigned Tasks Section */}
+      <Card
+        title={`My Assigned Work Orders (${myTasks.length})`}
+        subtitle="Active work orders assigned to your technician account"
+      >
+        {loadingTasks ? (
+          <ActivityIndicator size="small" color="#38bdf8" />
+        ) : myTasks.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No work orders currently assigned to you. Contact your plant manager for new work orders.
+          </Text>
+        ) : (
+          myTasks.map((task) => (
+            <View key={task._id} style={styles.taskCard}>
+              <View style={styles.taskHeader}>
+                <Text style={styles.taskNumber}>{task.orderNumber}</Text>
+                <View style={[styles.prioBadge, task.priority === 'high' || task.priority === 'urgent' ? styles.prioHigh : styles.prioMed]}>
+                  <Text style={styles.prioText}>{task.priority?.toUpperCase()}</Text>
+                </View>
+              </View>
+
+              <Text style={styles.taskTitle}>{task.title}</Text>
+              <Text style={styles.taskMachine}>
+                Machine: {task.machineId?.code || 'GB-104'} ({task.machineId?.name || 'Gearbox'})
+              </Text>
+              <Text style={styles.taskDue}>Due Date: {new Date(task.dueDate).toLocaleDateString()}</Text>
+
+              <View style={styles.taskActions}>
+                {task.status === WORK_ORDER_STATUS.OPEN && (
+                  <Button
+                    title="Accept Work Order"
+                    variant="secondary"
+                    onPress={() => handleTaskStatusUpdate(task._id, WORK_ORDER_STATUS.ACCEPTED)}
+                    style={styles.taskBtn}
+                  />
+                )}
+                {(task.status === WORK_ORDER_STATUS.OPEN || task.status === WORK_ORDER_STATUS.ACCEPTED) && (
+                  <Button
+                    title="Start Work"
+                    variant="primary"
+                    onPress={() => handleTaskStatusUpdate(task._id, WORK_ORDER_STATUS.IN_PROGRESS)}
+                    style={styles.taskBtn}
+                  />
+                )}
+                {task.status === WORK_ORDER_STATUS.IN_PROGRESS && (
+                  <View style={styles.inProgressNotice}>
+                    <Text style={styles.inProgressText}>⚙️ In Progress — View machine profile to complete</Text>
+                  </View>
+                )}
+                {task.status === WORK_ORDER_STATUS.COMPLETED && (
+                  <View style={styles.completedNotice}>
+                    <Text style={styles.completedText}>✓ Completed — Pending Manager Review</Text>
+                  </View>
+                )}
+                {task.status === WORK_ORDER_STATUS.REVIEWED && (
+                  <View style={styles.reviewedNotice}>
+                    <Text style={styles.reviewedText}>✓ Reviewed & Closed by Manager</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))
+        )}
+      </Card>
+
       {/* Log Form */}
-      <Card title="Add Field Maintenance Log">
+      <Card title="Log Field Maintenance Observation">
         <View style={styles.formGroup}>
           <Text style={styles.label}>Target Machine:</Text>
           <View style={styles.chipRow}>
@@ -66,7 +248,7 @@ export default function MaintenanceNotesScreen() {
         <View style={styles.formGroup}>
           <Text style={styles.label}>Action Category:</Text>
           <View style={styles.chipRow}>
-            {['Field Inspection', 'Lubrication', 'Sensor Calibration'].map((cat) => (
+            {['Field Inspection', 'Lubrication', 'Sensor Calibration', 'Acoustic Check'].map((cat) => (
               <Button
                 key={cat}
                 title={cat}
@@ -93,13 +275,13 @@ export default function MaintenanceNotesScreen() {
         </View>
 
         {successMsg && (
-          <Text style={styles.successText}>✓ Maintenance note added to session log</Text>
+          <Text style={styles.successText}>✓ Maintenance observation recorded to machine ledger</Text>
         )}
 
         <Button
-          title="Save Maintenance Note (Demo)"
+          title={submitting ? 'Submitting...' : 'Save Maintenance Note'}
           variant="primary"
-          disabled={!content.trim()}
+          disabled={!content.trim() || submitting}
           onPress={handleSave}
         />
       </Card>
@@ -120,6 +302,7 @@ export default function MaintenanceNotesScreen() {
             <View style={styles.catTag}>
               <Text style={styles.catTagText}>{note.category}</Text>
             </View>
+            <Text style={styles.statusPill}>{note.status}</Text>
           </View>
           <Text style={styles.noteBody}>{note.content}</Text>
         </View>
@@ -153,15 +336,17 @@ const styles = StyleSheet.create({
     color: '#38bdf8',
     letterSpacing: 0.5,
   },
-  demoBadge: {
-    backgroundColor: 'rgba(168, 85, 247, 0.25)',
-    paddingHorizontal: 4,
+  scopeBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: '#10b981',
+    borderWidth: 1,
+    paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 2,
+    borderRadius: 3,
   },
-  demoBadgeText: {
-    color: '#d8b4fe',
-    fontSize: 9,
+  scopeBadgeText: {
+    color: '#34d399',
+    fontSize: 8,
     fontWeight: '800',
   },
   title: {
@@ -172,15 +357,107 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     color: '#94a3b8',
+    lineHeight: 16,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+  },
+  taskCard: {
+    backgroundColor: '#070b14',
+    borderColor: '#1e293b',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 12,
+    gap: 4,
+    marginBottom: 8,
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  taskNumber: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  prioBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  prioHigh: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  prioMed: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  prioText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
+  taskTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#f8fafc',
+  },
+  taskMachine: {
+    fontSize: 11,
+    color: '#38bdf8',
+  },
+  taskDue: {
+    fontSize: 11,
+    color: '#64748b',
+  },
+  taskActions: {
+    marginTop: 6,
+    gap: 6,
+  },
+  taskBtn: {
+    minHeight: 38,
+  },
+  inProgressNotice: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 4,
+    padding: 6,
+  },
+  inProgressText: {
+    color: '#fcd34d',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  completedNotice: {
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderRadius: 4,
+    padding: 6,
+  },
+  completedText: {
+    color: '#38bdf8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  reviewedNotice: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 4,
+    padding: 6,
+  },
+  reviewedText: {
+    color: '#34d399',
+    fontSize: 11,
+    fontWeight: '600',
   },
   formGroup: {
-    gap: 6,
-    marginBottom: 8,
+    marginBottom: 10,
+    gap: 4,
   },
   label: {
     fontSize: 12,
-    color: '#94a3b8',
     fontWeight: '600',
+    color: '#cbd5e1',
   },
   chipRow: {
     flexDirection: 'row',
@@ -188,46 +465,45 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   chipBtn: {
-    minHeight: 36,
-    paddingHorizontal: 12,
-  },
-  catBtn: {
     minHeight: 34,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
+  catBtn: {
+    minHeight: 32,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   textArea: {
-    backgroundColor: '#090e1a',
+    backgroundColor: '#070b14',
     borderColor: '#334155',
     borderWidth: 1,
     borderRadius: 6,
     padding: 10,
     color: '#f8fafc',
     fontSize: 13,
-    minHeight: 75,
+    minHeight: 70,
     textAlignVertical: 'top',
   },
   successText: {
     color: '#10b981',
     fontSize: 12,
     fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   sectionHeader: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#cbd5e1',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: 4,
   },
   noteCard: {
-    backgroundColor: '#131d33',
+    backgroundColor: '#0f172a',
     borderColor: '#1e293b',
     borderWidth: 1,
     borderRadius: 8,
-    padding: 14,
+    padding: 12,
     gap: 6,
   },
   noteTop: {
@@ -238,46 +514,49 @@ const styles = StyleSheet.create({
   noteAuthor: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#38bdf8',
+    color: '#f8fafc',
   },
   noteTime: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#64748b',
-    fontFamily: 'monospace',
   },
   noteMetaRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   machineTag: {
-    backgroundColor: '#1a2744',
+    backgroundColor: '#1e293b',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 3,
   },
   machineTagText: {
-    color: '#cbd5e1',
     fontSize: 10,
-    fontWeight: '700',
     fontFamily: 'monospace',
+    fontWeight: '700',
+    color: '#38bdf8',
   },
   catTag: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
+    backgroundColor: 'rgba(2, 132, 199, 0.15)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 3,
   },
   catTagText: {
-    color: '#94a3b8',
     fontSize: 10,
+    fontWeight: '700',
+    color: '#38bdf8',
+  },
+  statusPill: {
+    fontSize: 10,
+    color: '#94a3b8',
+    marginLeft: 'auto',
   },
   noteBody: {
     fontSize: 12,
-    color: '#f8fafc',
+    color: '#cbd5e1',
     lineHeight: 18,
     marginTop: 2,
   },
 });
-

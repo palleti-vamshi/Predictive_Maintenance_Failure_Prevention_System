@@ -52,12 +52,17 @@ export default function AssignedMachinesScreen({ onSelectMachine, onNavigateUplo
           name: m.name,
           manufacturer: m.manufacturer,
           model: m.model,
+          serialNumber: m.serialNumber,
+          operationalStatus: m.operationalStatus || 'operational',
+          isDecommissioned: m.isDecommissioned,
+          arrangement: m.arrangement || 'Helical-Planetary',
           status: m.status || 'healthy',
           site: m.siteId?.name || 'Assigned Site',
           gearRatio: m.gearRatio || '14.2:1',
           ratedSpeedRpm: m.ratedSpeedRpm || 1780,
           ratedTorqueNm: m.ratedTorqueNm || 480,
-          lubricantType: m.lubricantType || 'ISO VG 220',
+          lubrication: m.lubrication,
+          lubricantType: m.lubrication?.isoVgGrade || m.lubricantType || 'ISO VG 220',
           stages: m.stages || [],
           monitoredSignals: m.monitoredSignals || [],
           notes: m.notes || [],
@@ -149,11 +154,27 @@ export default function AssignedMachinesScreen({ onSelectMachine, onNavigateUplo
           title={`${machine.id}: ${machine.name}`}
           subtitle={`${machine.manufacturer} • Model ${machine.model}`}
           badge={
-            <StatusBadge
-              status={machine.status}
-              label={machine.status === 'healthy' ? 'NOMINAL' : 'ATTENTION'}
-              isSimulated={!isLiveApi}
-            />
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+              <View style={{
+                backgroundColor: machine.isDecommissioned ? 'rgba(239, 68, 68, 0.2)' : 'rgba(2, 132, 199, 0.2)',
+                paddingHorizontal: 5,
+                paddingVertical: 1,
+                borderRadius: 3
+              }}>
+                <Text style={{
+                  color: machine.isDecommissioned ? '#fca5a5' : '#38bdf8',
+                  fontSize: 8,
+                  fontWeight: '800'
+                }}>
+                  {machine.operationalStatus?.toUpperCase() || 'OPERATIONAL'}
+                </Text>
+              </View>
+              <StatusBadge
+                status={machine.status}
+                label={machine.status === 'healthy' ? 'NOMINAL' : 'ATTENTION'}
+                isSimulated={!isLiveApi}
+              />
+            </View>
           }
           action={
             <View style={styles.cardActions}>

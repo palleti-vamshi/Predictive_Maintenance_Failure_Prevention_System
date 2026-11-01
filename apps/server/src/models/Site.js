@@ -18,6 +18,18 @@ const siteSchema = new mongoose.Schema(
       required: true,
       uppercase: true,
       trim: true
+    },
+    description: {
+      type: String,
+      trim: true
+    },
+    area: {
+      type: String,
+      trim: true
+    },
+    isArchived: {
+      type: Boolean,
+      default: false
     }
   },
   { timestamps: true }
@@ -26,4 +38,3 @@ const siteSchema = new mongoose.Schema(
 siteSchema.index({ factoryId: 1, code: 1 }, { unique: true });
 
 export const Site = mongoose.model('Site', siteSchema);
-
