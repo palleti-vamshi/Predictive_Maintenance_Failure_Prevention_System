@@ -174,6 +174,7 @@ def train_and_evaluate_isolation_forest(
     # 6. Persist model artifact
     if save_path:
         bundle = {
+            "model_type": "isolation_forest",
             "model": iso,
             "scaler": scaler,
             "feature_names": feature_names,

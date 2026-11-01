@@ -123,11 +123,47 @@ export default function ActiveAlertsScreen({ onSelectAlert }) {
               title={`${machineCode}: ${alert.title}`}
               subtitle={`Method: ${alert.modelName || alert.methodLabel || 'Anomaly Detector'}`}
               badge={
-                <StatusBadge
-                  status={alert.severity}
-                  label={alert.severity.toUpperCase()}
-                  isSimulated={!isLive}
-                />
+                <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                  {alert.triggeringPath && (
+                    <View
+                      style={[
+                        styles.pathChip,
+                        alert.triggeringPath === 'thermal_path'
+                          ? styles.pathChipThermal
+                          : alert.triggeringPath === 'fused_multisignal'
+                          ? styles.pathChipFused
+                          : styles.pathChipVib
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.pathChipText,
+                          alert.triggeringPath === 'thermal_path'
+                            ? styles.pathChipTextThermal
+                            : alert.triggeringPath === 'fused_multisignal'
+                            ? styles.pathChipTextFused
+                            : styles.pathChipTextVib
+                        ]}
+                      >
+                        {alert.triggeringPath === 'thermal_path'
+                          ? 'THERMAL'
+                          : alert.triggeringPath === 'fused_multisignal'
+                          ? 'FUSED'
+                          : 'VIB'}
+                      </Text>
+                    </View>
+                  )}
+                  {alert.operatingRegime?.regimeId && (
+                    <View style={styles.regimeChip}>
+                      <Text style={styles.regimeChipText}>{alert.operatingRegime.regimeId}</Text>
+                    </View>
+                  )}
+                  <StatusBadge
+                    status={alert.severity}
+                    label={alert.severity.toUpperCase()}
+                    isSimulated={!isLive}
+                  />
+                </View>
               }
               action={
                 <Button
@@ -335,5 +371,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#94a3b8',
     marginTop: 4,
+  },
+  pathChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pathChipVib: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+  },
+  pathChipThermal: {
+    backgroundColor: 'rgba(251, 146, 60, 0.15)',
+    borderWidth: 1,
+    borderColor: '#fb923c',
+  },
+  pathChipFused: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: '#a855f7',
+  },
+  pathChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  pathChipTextVib: {
+    color: '#38bdf8',
+  },
+  pathChipTextThermal: {
+    color: '#fb923c',
+  },
+  pathChipTextFused: {
+    color: '#d8b4fe',
+  },
+  regimeChip: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  regimeChipText: {
+    fontSize: 10,
+    color: '#94a3b8',
+    fontWeight: '600',
   },
 });

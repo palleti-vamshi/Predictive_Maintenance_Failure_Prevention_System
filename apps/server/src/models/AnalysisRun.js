@@ -104,6 +104,24 @@ const analysisRunSchema = new mongoose.Schema(
       missingValuePct: { type: Number, default: 0 },
       steadyStateConfirmed: { type: Boolean, default: true }
     },
+    regimeSummary: {
+      regimeMethod: { type: String, default: 'global_unconditioned' },
+      detectedRegimes: [{ type: String }],
+      regimeStability: { type: String, default: 'steady_state' },
+      regimeLimitations: { type: String, default: null }
+    },
+    signalPathsSummary: {
+      vibrationPathActive: { type: Boolean, default: true },
+      thermalPathActive: { type: Boolean, default: false },
+      operatingContextPathActive: { type: Boolean, default: false },
+      fusedIntervalsCount: { type: Number, default: 0 },
+      thermalIsolatedIntervalsCount: { type: Number, default: 0 },
+      vibrationIsolatedIntervalsCount: { type: Number, default: 0 }
+    },
+    sensorCoverage: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
     intervals: {
       type: mongoose.Schema.Types.Mixed,
       default: []
@@ -138,3 +156,4 @@ const analysisRunSchema = new mongoose.Schema(
 analysisRunSchema.index({ factoryId: 1, machineId: 1, createdAt: -1 });
 
 export const AnalysisRun = mongoose.model('AnalysisRun', analysisRunSchema);
+

@@ -133,6 +133,50 @@ export function runPythonCli({ csvPath, modelType, config, outputDir }) {
 }
 
 /**
+ * Executes Python CLI evaluate command to generate research evaluation metrics
+ * comparing global vs regime-conditioned baselines and signal-specific paths.
+ */
+export async function runResearchEvaluationCli() {
+  const pythonPath = getPythonExecutable();
+  const cliScript = CLI_PATH;
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonPath, [cliScript, 'evaluate'], {
+      cwd: ML_SERVICE_DIR,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdoutData += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderrData += chunk.toString();
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        try {
+          const parsed = JSON.parse(stdoutData.trim());
+          return resolve(parsed.data || parsed);
+        } catch {
+          return resolve({ raw: stdoutData });
+        }
+      } else {
+        return reject(new Error(stderrData.trim() || `Evaluation process exited with code ${code}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(new Error(`Failed to spawn evaluation process: ${err.message}`));
+    });
+  });
+}
+
+/**
  * End-to-end model training orchestrator.
  * Supports synchronous await or non-blocking async execution.
  */
@@ -181,7 +225,7 @@ export async function startModelTrainingJob(modelArtifactId, { sync = false } = 
 
       // Map Python results to ModelArtifact fields
       const evalData = results.evaluation || {};
-      const shapData = results.shap_explanation || {};
+      const shapData = results.shap_explanation || results.shap_summary || {};
       const dsSummary = results.dataset_summary || {};
 
       const classMapping = {};
@@ -431,7 +475,8 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
     sampling_rate_hz: analysisRun.configuration?.samplingRateHz || null,
     shaft_speed_rpm: analysisRun.configuration?.shaftSpeedRpm || null,
     pinion_teeth: analysisRun.configuration?.pinionTeeth || null,
-    threshold_override: analysisRun.configuration?.thresholdOverride || null
+    threshold_override: analysisRun.configuration?.thresholdOverride || null,
+    regime_aware: analysisRun.configuration?.regimeAware !== false
   };
 
   const execute = async () => {
@@ -462,6 +507,32 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
             missingValuePct: summaryData.missing_value_pct ?? 0,
             steadyStateConfirmed: summaryData.steady_state_confirmed ?? true
           },
+          regimeSummary: {
+            regimeMethod: (results.regimes_summary?.regime_method || results.regime_summary?.regime_method) || 'global_unconditioned',
+            detectedRegimes: (results.regimes_summary?.detected_regimes || results.regime_summary?.detected_regimes) || [],
+            regimeStability: (results.regimes_summary?.regime_stability || results.regime_summary?.regime_stability) || 'steady_state',
+            regimeLimitations: (results.regimes_summary?.regime_limitations || results.regime_summary?.regime_limitations) || null
+          },
+          signalPathsSummary: {
+            vibrationPathActive: Boolean(results.signal_paths_summary?.vibration_path_active ?? true),
+            thermalPathActive: Boolean(results.signal_paths_summary?.thermal_path_active),
+            operatingContextPathActive: Boolean(results.signal_paths_summary?.operating_context_path_active),
+            fusedIntervalsCount: results.signal_paths_summary?.fused_intervals_count || 0,
+            thermalIsolatedIntervalsCount: results.signal_paths_summary?.thermal_isolated_intervals_count || 0,
+            vibrationIsolatedIntervalsCount: results.signal_paths_summary?.vibration_isolated_intervals_count || 0
+          },
+          sensorCoverage: {
+            coverageScore: results.sensor_coverage?.coverage_score ?? 1.0,
+            coverage_score: results.sensor_coverage?.coverage_score ?? 1.0,
+            availableModalities: results.sensor_coverage?.available_modalities || [],
+            available_modalities: results.sensor_coverage?.available_modalities || [],
+            missingModalities: results.sensor_coverage?.missing_modalities || [],
+            missing_modalities: results.sensor_coverage?.missing_modalities || [],
+            uncertaintyLevel: results.sensor_coverage?.uncertainty_level || 'low',
+            uncertainty_level: results.sensor_coverage?.uncertainty_level || 'low',
+            uncertaintyNote: results.sensor_coverage?.uncertainty_note || null,
+            uncertainty_note: results.sensor_coverage?.uncertainty_note || null
+          },
           intervals,
           isImmutable: true
         },
@@ -489,6 +560,22 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
             intv.severity_note ||
             intv.disclaimer ||
             'Calibrated statistical deviation; model prediction does not prove physical failure.',
+          triggeringPath: intv.triggering_path || 'vibration_path',
+          fusionRule: intv.fusion_rule || 'unimodal_vibration_default',
+          fusionRationale: intv.fusion_rationale || null,
+          operatingRegime: {
+            regimeId: intv.operating_regime?.regime_id || intv.regime || 'UNKNOWN',
+            isSteadyState: intv.operating_regime?.is_steady_state ?? true,
+            meanSpeedRpm: intv.operating_regime?.mean_speed_rpm ?? null,
+            meanLoadTorque: intv.operating_regime?.mean_load_torque ?? null,
+            rationale: intv.operating_regime?.rationale || null
+          },
+          detectorBreakdown: {
+            vibrationDetector: intv.detector_breakdown?.vibration_detector || null,
+            thermalDetector: intv.detector_breakdown?.thermal_detector || null
+          },
+          sensorCoverage: intv.sensor_coverage || results.sensor_coverage || {},
+          pathLimitations: intv.path_limitations || [],
           status: ALERT_STATUSES.OPEN,
           analysisTask: results.analysis_task,
           modelDetails: {

@@ -308,7 +308,50 @@ export default function AlertsPage() {
                 title={alert.title}
                 subtitle={`Machine: ${alert.machineId?.code || 'Equipment'} • Task: ${alert.analysisTask} • Model: ${alert.modelDetails?.modelName || 'Condition Model'}`}
                 badge={
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {alert.triggeringPath && (
+                      <span
+                        style={{
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background:
+                            alert.triggeringPath === 'thermal_path'
+                              ? 'rgba(251,146,60,0.2)'
+                              : alert.triggeringPath === 'fused_multisignal'
+                              ? 'rgba(168,85,247,0.2)'
+                              : 'rgba(56,189,248,0.2)',
+                          color:
+                            alert.triggeringPath === 'thermal_path'
+                              ? '#fb923c'
+                              : alert.triggeringPath === 'fused_multisignal'
+                              ? '#d8b4fe'
+                              : '#38bdf8',
+                          border: '1px solid currentColor'
+                        }}
+                      >
+                        {alert.triggeringPath === 'thermal_path'
+                          ? 'THERMAL PATH'
+                          : alert.triggeringPath === 'fused_multisignal'
+                          ? 'MULTI-SIGNAL FUSED'
+                          : 'VIBRATION PATH'}
+                      </span>
+                    )}
+                    {alert.operatingRegime?.regimeId && (
+                      <span
+                        style={{
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                          background: '#1e293b',
+                          color: '#94a3b8',
+                          border: '1px solid #334155'
+                        }}
+                      >
+                        {alert.operatingRegime.regimeId}
+                      </span>
+                    )}
                     <StatusBadge
                       status={alert.severity}
                       label={alert.severity.toUpperCase()}
@@ -342,6 +385,13 @@ export default function AlertsPage() {
                   </div>
                 }
               >
+                {/* Multi-Signal Fusion Rationale */}
+                {alert.fusionRationale && (
+                  <div style={{ padding: '0.65rem 0.85rem', background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', borderRadius: '6px', fontSize: '0.8rem', color: '#e9d5ff', marginBottom: '1rem' }}>
+                    <strong>Multi-Signal Fusion Rationale:</strong> {alert.fusionRationale}
+                  </div>
+                )}
+
                 {/* Scientific Disclaimer & Severity Note */}
                 <div style={{ padding: '0.75rem', background: '#0f172a', borderRadius: '6px', borderLeft: '4px solid #f59e0b', marginBottom: '1rem' }}>
                   <div style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
@@ -397,6 +447,44 @@ export default function AlertsPage() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Multi-Signal Detector Breakdown */}
+                {alert.detectorBreakdown && (
+                  <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                    <div style={{ padding: '0.6rem 0.8rem', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8' }}>⚙️ Mechanical Vibration Path</div>
+                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                        Detector:{' '}
+                        <strong style={{ color: alert.detectorBreakdown.vibrationDetector?.isAnomalous ? '#f87171' : '#34d399' }}>
+                          {alert.detectorBreakdown.vibrationDetector?.isAnomalous ? 'ANOMALOUS DEVIATION' : 'NOMINAL'}
+                        </strong>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        Score: {Number(alert.detectorBreakdown.vibrationDetector?.score || 0).toFixed(4)} (Threshold: {Number(alert.detectorBreakdown.vibrationDetector?.threshold || 0).toFixed(4)})
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '0.6rem 0.8rem', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fb923c' }}>🌡️ Thermal Path</div>
+                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1', marginTop: '0.2rem' }}>
+                        Detector:{' '}
+                        <strong style={{ color: alert.detectorBreakdown.thermalDetector?.isAnomalous ? '#f87171' : '#34d399' }}>
+                          {alert.detectorBreakdown.thermalDetector?.isAnomalous ? 'THERMAL RUNAWAY / DRIFT' : 'NORMAL'}
+                        </strong>
+                      </div>
+                      {alert.detectorBreakdown.thermalDetector?.temperatureMean !== undefined && (
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          Temp Mean: {alert.detectorBreakdown.thermalDetector.temperatureMean} °C • Drift: {alert.detectorBreakdown.thermalDetector.driftRateCPerMin} °C/min
+                        </div>
+                      )}
+                      {alert.detectorBreakdown.thermalDetector?.findings && (
+                        <div style={{ fontSize: '0.7rem', color: '#fb923c', marginTop: '0.2rem' }}>
+                          {alert.detectorBreakdown.thermalDetector.findings}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

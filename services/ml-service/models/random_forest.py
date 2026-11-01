@@ -203,6 +203,7 @@ def train_and_evaluate_random_forest(
     # 5. Persist model artifact
     if save_path:
         bundle = {
+            "model_type": "random_forest",
             "model": clf,
             "scaler": scaler,
             "feature_names": feature_names,

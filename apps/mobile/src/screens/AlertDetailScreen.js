@@ -175,6 +175,83 @@ export default function AlertDetailScreen({ alert, onBack, onAcknowledge }) {
         </View>
       </Card>
 
+      {/* Operating Regime & Multi-Signal Path */}
+      <Card title="Operating Regime & Multi-Signal Fusion">
+        <View style={styles.regimeRow}>
+          <View style={styles.regimeBadge}>
+            <Text style={styles.regimeBadgeText}>
+              {alert.operatingRegime?.regimeId || 'RATED_NOMINAL'}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.pathBadge,
+              alert.triggeringPath === 'thermal_path'
+                ? styles.pathBadgeThermal
+                : alert.triggeringPath === 'fused_multisignal'
+                ? styles.pathBadgeFused
+                : styles.pathBadgeVib
+            ]}
+          >
+            <Text
+              style={[
+                styles.pathBadgeText,
+                alert.triggeringPath === 'thermal_path'
+                  ? styles.pathBadgeTextThermal
+                  : alert.triggeringPath === 'fused_multisignal'
+                  ? styles.pathBadgeTextFused
+                  : styles.pathBadgeTextVib
+              ]}
+            >
+              {alert.triggeringPath === 'thermal_path'
+                ? 'THERMAL PATH ISOLATED'
+                : alert.triggeringPath === 'fused_multisignal'
+                ? 'MULTI-SIGNAL CROSS-CONFIRMED'
+                : 'MECHANICAL VIBRATION PATH'}
+            </Text>
+          </View>
+        </View>
+
+        {alert.fusionRationale && (
+          <View style={styles.fusionBox}>
+            <Text style={styles.fusionTitle}>Fusion Rationale:</Text>
+            <Text style={styles.fusionText}>{alert.fusionRationale}</Text>
+          </View>
+        )}
+
+        {alert.detectorBreakdown && (
+          <View style={styles.detectorGrid}>
+            <View style={styles.detectorCard}>
+              <Text style={styles.detectorTitle}>⚙️ Vibration Detector</Text>
+              <Text style={styles.detectorSub}>
+                Status: {alert.detectorBreakdown.vibrationDetector?.isAnomalous ? 'ANOMALOUS' : 'NOMINAL'}
+              </Text>
+              <Text style={styles.detectorVal}>
+                Score: {Number(alert.detectorBreakdown.vibrationDetector?.score || 0).toFixed(3)}
+              </Text>
+            </View>
+
+            <View style={styles.detectorCard}>
+              <Text style={styles.detectorTitle}>🌡️ Thermal Detector</Text>
+              <Text style={styles.detectorSub}>
+                Status: {alert.detectorBreakdown.thermalDetector?.isAnomalous ? 'ANOMALOUS' : 'NORMAL'}
+              </Text>
+              {alert.detectorBreakdown.thermalDetector?.temperatureMean !== undefined && (
+                <Text style={styles.detectorVal}>
+                  {alert.detectorBreakdown.thermalDetector.temperatureMean} °C ({alert.detectorBreakdown.thermalDetector.driftRateCPerMin} °C/min)
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        <View style={styles.coverageRow}>
+          <Text style={styles.coverageText}>
+            Sensor Coverage: {((alert.sensorCoverage?.coverageScore ?? alert.sensorCoverage?.coverage_score ?? 1.0) * 100).toFixed(0)}% • Uncertainty: {(alert.sensorCoverage?.uncertaintyLevel || alert.sensorCoverage?.uncertainty_level || 'low').toUpperCase()}
+          </Text>
+        </View>
+      </Card>
+
       {/* Verified SHAP Model Attribution */}
       <Card title="SHAP Model Attribution & Verification">
         <View style={styles.shapBadgeRow}>
@@ -583,5 +660,113 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#94a3b8',
     lineHeight: 14,
+  },
+  regimeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  regimeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  regimeBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  pathBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  pathBadgeVib: {
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderWidth: 1,
+    borderColor: '#38bdf8',
+  },
+  pathBadgeThermal: {
+    backgroundColor: 'rgba(251, 146, 60, 0.15)',
+    borderWidth: 1,
+    borderColor: '#fb923c',
+  },
+  pathBadgeFused: {
+    backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    borderWidth: 1,
+    borderColor: '#a855f7',
+  },
+  pathBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  pathBadgeTextVib: {
+    color: '#38bdf8',
+  },
+  pathBadgeTextThermal: {
+    color: '#fb923c',
+  },
+  pathBadgeTextFused: {
+    color: '#d8b4fe',
+  },
+  fusionBox: {
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.3)',
+    borderRadius: 6,
+    padding: 8,
+    marginBottom: 8,
+  },
+  fusionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#e9d5ff',
+    marginBottom: 2,
+  },
+  fusionText: {
+    fontSize: 11,
+    color: '#cbd5e1',
+    lineHeight: 15,
+  },
+  detectorGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  detectorCard: {
+    flex: 1,
+    backgroundColor: '#070b14',
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  detectorTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#f8fafc',
+    marginBottom: 2,
+  },
+  detectorSub: {
+    fontSize: 10,
+    color: '#94a3b8',
+  },
+  detectorVal: {
+    fontSize: 10,
+    color: '#38bdf8',
+    fontFamily: 'monospace',
+    marginTop: 2,
+  },
+  coverageRow: {
+    paddingTop: 4,
+  },
+  coverageText: {
+    fontSize: 10,
+    color: '#34d399',
+    fontWeight: '600',
   },
 });

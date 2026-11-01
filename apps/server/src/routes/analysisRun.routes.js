@@ -5,7 +5,7 @@ import { ModelArtifact } from '../models/ModelArtifact.js';
 import { Dataset } from '../models/Dataset.js';
 import { Machine } from '../models/Machine.js';
 import { authenticate } from '../middleware/authenticate.js';
-import { startAnalysisRunJob } from '../services/mlJob.service.js';
+import { startAnalysisRunJob, runResearchEvaluationCli } from '../services/mlJob.service.js';
 import {
   ANALYSIS_RUN_STATUS,
   MODEL_STATUS,
@@ -292,6 +292,28 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       error: 'InternalServerError',
       message: 'Failed to retrieve analysis runs.'
+    });
+  }
+});
+
+/**
+ * GET /api/analysis-runs/research-comparison
+ * Evaluates research comparison metrics across global vs regime-conditioned baselines,
+ * signal-path isolates (vibration-only, thermal-only, fused), and benchmark provenance.
+ */
+router.get('/research-comparison', async (req, res) => {
+  try {
+    const data = await runResearchEvaluationCli();
+    return res.status(200).json({
+      success: true,
+      comparison: data,
+      evaluation: data
+    });
+  } catch (err) {
+    console.error('[AnalysisRunRoute:ResearchComparison] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to generate research comparison metrics: ' + err.message
     });
   }
 });

@@ -91,6 +91,38 @@ const alertSchema = new mongoose.Schema(
       default: ALERT_STATUSES.OPEN,
       index: true
     },
+    triggeringPath: {
+      type: String,
+      default: 'vibration_path'
+    },
+    fusionRule: {
+      type: String,
+      default: 'vibration_isolated'
+    },
+    fusionRationale: {
+      type: String,
+      default: null
+    },
+    operatingRegime: {
+      regimeId: { type: String, default: 'UNKNOWN' },
+      regimeLabel: { type: String, default: 'Unknown Operating Regime' },
+      stability: { type: String, default: 'steady_state' },
+      speedRpm: { type: Number, default: null },
+      loadNm: { type: Number, default: null }
+    },
+    detectorBreakdown: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
+    sensorCoverage: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null
+    },
+    pathLimitations: [
+      {
+        type: String
+      }
+    ],
     analysisTask: {
       type: String,
       enum: Object.values(ALERT_TASK_TYPES),
@@ -189,3 +221,4 @@ const alertSchema = new mongoose.Schema(
 alertSchema.index({ factoryId: 1, machineId: 1, status: 1, createdAt: -1 });
 
 export const Alert = mongoose.model('Alert', alertSchema);
+
