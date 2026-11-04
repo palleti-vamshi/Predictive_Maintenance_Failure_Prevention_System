@@ -25,6 +25,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // All model routes require authentication
 router.use(authenticate);
 
+// Validate id parameter format across all routes
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Invalid model ID format.'
+    });
+  }
+  next();
+});
+
 /**
  * POST /api/models/train
  * Initiates training for Random Forest classifier or Isolation Forest anomaly detector.

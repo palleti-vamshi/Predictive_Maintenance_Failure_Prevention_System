@@ -8,6 +8,7 @@ import { Dataset } from '../models/Dataset.js';
 import { Machine } from '../models/Machine.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireManager, requireTechnicianOrManager } from '../middleware/authorize.js';
+import { uploadRateLimiter } from '../middleware/rateLimiter.js';
 import {
   saveUploadedFile,
   readStoredFile,
@@ -67,11 +68,22 @@ function handleMulterUpload(req, res, next) {
 // All dataset endpoints require authentication
 router.use(authenticate);
 
+// Validate id parameter format across all routes
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Invalid dataset ID format.'
+    });
+  }
+  next();
+});
+
 /**
  * POST /api/datasets/upload
  * Stage 1: Uploads file, saves it securely to storage, and generates preview & candidate signal mappings.
  */
-router.post('/upload', requireTechnicianOrManager, handleMulterUpload, async (req, res) => {
+router.post('/upload', requireTechnicianOrManager, uploadRateLimiter, handleMulterUpload, async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({

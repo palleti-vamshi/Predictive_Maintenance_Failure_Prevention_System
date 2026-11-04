@@ -587,8 +587,9 @@ export default function MaintenancePage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
           {isManager ? (
-            <>
+            <React.Fragment key="mgr-tabs">
               <button
+                key="tab-board"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'board' ? 'active' : ''}`}
                 onClick={() => setActiveTab('board')}
@@ -596,6 +597,7 @@ export default function MaintenancePage() {
                 Work Board ({workOrders.filter((o) => ![WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED].includes(o.status)).length})
               </button>
               <button
+                key="tab-create"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'create' ? 'active' : ''}`}
                 onClick={() => setActiveTab('create')}
@@ -603,6 +605,7 @@ export default function MaintenancePage() {
                 Create & Assign
               </button>
               <button
+                key="tab-requests"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'requests' ? 'active' : ''}`}
                 onClick={() => setActiveTab('requests')}
@@ -610,16 +613,18 @@ export default function MaintenancePage() {
                 Requests Awaiting Review ({metrics.actionNeeded + metrics.reviewPending})
               </button>
               <button
+                key="tab-history"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'history' ? 'active' : ''}`}
                 onClick={() => setActiveTab('history')}
               >
                 Maintenance History ({metrics.completed})
               </button>
-            </>
+            </React.Fragment>
           ) : (
-            <>
+            <React.Fragment key="tech-tabs">
               <button
+                key="tab-mywork"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'my_work' ? 'active' : ''}`}
                 onClick={() => setActiveTab('my_work')}
@@ -627,13 +632,14 @@ export default function MaintenancePage() {
                 My Work ({metrics.myOrders})
               </button>
               <button
+                key="tab-all"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'all' ? 'active' : ''}`}
                 onClick={() => setActiveTab('all')}
               >
                 All Plant Orders ({workOrders.length})
               </button>
-            </>
+            </React.Fragment>
           )}
         </div>
 
@@ -674,6 +680,7 @@ export default function MaintenancePage() {
       {isTech && activeTab === 'my_work' && (
         <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
           <button
+            key="subtab-todo"
             type="button"
             className={`tab-btn ${techSubTab === 'todo' ? 'tab-btn-active' : ''}`}
             onClick={() => setTechSubTab('todo')}
@@ -681,6 +688,7 @@ export default function MaintenancePage() {
             To Do ({metrics.myTodo})
           </button>
           <button
+            key="subtab-in_progress"
             type="button"
             className={`tab-btn ${techSubTab === 'in_progress' ? 'tab-btn-active' : ''}`}
             onClick={() => setTechSubTab('in_progress')}
@@ -688,6 +696,7 @@ export default function MaintenancePage() {
             In Progress ({metrics.myInProgress})
           </button>
           <button
+            key="subtab-waiting"
             type="button"
             className={`tab-btn ${techSubTab === 'waiting' ? 'tab-btn-active' : ''}`}
             onClick={() => setTechSubTab('waiting')}
@@ -695,6 +704,7 @@ export default function MaintenancePage() {
             Waiting for Approval ({metrics.myWaiting})
           </button>
           <button
+            key="subtab-submitted"
             type="button"
             className={`tab-btn ${techSubTab === 'submitted' ? 'tab-btn-active' : ''}`}
             onClick={() => setTechSubTab('submitted')}
@@ -1170,9 +1180,10 @@ export default function MaintenancePage() {
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         {/* Technician View Buttons */}
                         {isTech && (
-                          <>
+                          <React.Fragment key={`tech-actions-${order._id}`}>
                             {[WORK_ORDER_STATUS.OPEN, WORK_ORDER_STATUS.ASSIGNED].includes(order.status) && (
                               <Button
+                                key={`start-${order._id}`}
                                 variant="primary"
                                 size="sm"
                                 icon="play"
@@ -1182,6 +1193,7 @@ export default function MaintenancePage() {
                               </Button>
                             )}
                             <Button
+                              key={`details-${order._id}`}
                               variant={order.status === WORK_ORDER_STATUS.IN_PROGRESS ? 'primary' : 'outline'}
                               size="sm"
                               icon="wrench"
@@ -1189,12 +1201,13 @@ export default function MaintenancePage() {
                             >
                               {order.status === WORK_ORDER_STATUS.IN_PROGRESS ? 'Continue & Record Telemetry' : 'Job Details & Checklist'}
                             </Button>
-                          </>
+                          </React.Fragment>
                         )}
 
                         {/* Manager View Buttons */}
                         {isManager && (
                           <Button
+                            key={`reassign-${order._id}`}
                             variant="secondary"
                             size="sm"
                             icon="user"
@@ -1478,6 +1491,7 @@ export default function MaintenancePage() {
                   <div style={{ marginTop: '0.75rem', padding: '0.85rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
                       <button
+                        key="req-parts"
                         type="button"
                         className={`segmented-btn ${executionHelpType === 'parts' ? 'active' : ''}`}
                         onClick={() => setExecutionHelpType('parts')}
@@ -1485,6 +1499,7 @@ export default function MaintenancePage() {
                         Request Parts
                       </button>
                       <button
+                        key="req-permission"
                         type="button"
                         className={`segmented-btn ${executionHelpType === 'permission' ? 'active' : ''}`}
                         onClick={() => setExecutionHelpType('permission')}

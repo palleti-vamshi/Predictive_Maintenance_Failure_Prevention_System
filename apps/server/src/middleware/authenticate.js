@@ -1,12 +1,6 @@
 import { Session } from '../models/Session.js';
 import { User } from '../models/User.js';
-import { env } from '../config/env.js';
-
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  env.CORS_ORIGIN
-].filter(Boolean);
+import { isOriginAllowed } from '../config/cors.js';
 
 /**
  * Authentication Middleware:
@@ -44,7 +38,7 @@ export async function authenticate(req, res, next) {
     if (isCookieAuth && isStateChanging) {
       const origin = req.headers.origin;
       // If origin header is present, ensure it is in the allowed list
-      if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+      if (origin && !isOriginAllowed(origin)) {
         return res.status(403).json({
           error: 'Forbidden',
           message: 'Origin verification failed. Potential cross-site request forgery.'

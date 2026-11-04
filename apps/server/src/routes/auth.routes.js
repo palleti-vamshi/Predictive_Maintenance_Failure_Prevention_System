@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import { Factory } from '../models/Factory.js';
 import { Session } from '../models/Session.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { authRateLimiter, otpRateLimiter } from '../middleware/rateLimiter.js';
 import { env } from '../config/env.js';
 import { USER_ROLES } from '@predictive-maintenance/shared';
 
@@ -11,11 +12,33 @@ const router = Router();
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
+ * POST /api/auth/otp
+ * Explicitly disabled: OTP verification requires a real SMS/Email provider configuration.
+ */
+router.post('/otp', otpRateLimiter, (req, res) => {
+  return res.status(501).json({
+    error: 'NotImplemented',
+    message: 'OTP authentication is disabled: no verified SMS/email gateway provider is configured in this deployment. Please sign in using your credentials.'
+  });
+});
+
+/**
+ * POST /api/auth/password-recovery
+ * Explicitly disabled self-service recovery until a verified notification provider is configured.
+ */
+router.post('/password-recovery', otpRateLimiter, (req, res) => {
+  return res.status(501).json({
+    error: 'NotImplemented',
+    message: 'Self-service password recovery is disabled. Please contact your factory manager to reset your credentials.'
+  });
+});
+
+/**
  * POST /api/auth/login
  * Authenticates user credentials, creates a server-side session,
  * sets an HttpOnly cookie for web browsers, and returns a sessionToken for mobile.
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimiter, async (req, res) => {
   try {
     const rawIdentifier = req.body.emailOrUsername || req.body.email || req.body.username;
     const { password } = req.body;

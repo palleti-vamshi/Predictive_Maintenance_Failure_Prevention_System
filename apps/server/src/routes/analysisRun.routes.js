@@ -18,6 +18,17 @@ const router = Router();
 // All analysis run routes require authentication
 router.use(authenticate);
 
+// Validate runId parameter format across all routes
+router.param('runId', (req, res, next, runId) => {
+  if (!mongoose.Types.ObjectId.isValid(runId)) {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Invalid analysis run ID format.'
+    });
+  }
+  next();
+});
+
 /**
  * POST /api/analysis-runs
  * Initiates an inference analysis run on an uploaded operational dataset or approved reference dataset

@@ -19,6 +19,17 @@ const router = Router();
 // All alert routes require authentication
 router.use(authenticate);
 
+// Validate id parameter format across all routes
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Invalid alert ID format.'
+    });
+  }
+  next();
+});
+
 /**
  * GET /api/alerts
  * Lists alerts scoped to user's factory.
@@ -85,6 +96,9 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Invalid alert ID format.' });
+    }
     const userFactoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
     const alert = await Alert.findById(req.params.id)
       .populate('machineId', 'code name status operationalStatus arrangement stages')
@@ -130,6 +144,9 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/:id/acknowledge', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Invalid alert ID format.' });
+    }
     if (req.user.role === USER_ROLES.VIEWER) {
       return res.status(403).json({
         error: 'Forbidden',
@@ -182,6 +199,9 @@ router.post('/:id/acknowledge', async (req, res) => {
  */
 router.post('/:id/observations', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Invalid alert ID format.' });
+    }
     if (req.user.role === USER_ROLES.VIEWER) {
       return res.status(403).json({
         error: 'Forbidden',
@@ -237,6 +257,9 @@ router.post('/:id/observations', async (req, res) => {
  */
 router.post('/:id/work-order', requireManager, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Invalid alert ID format.' });
+    }
     const userFactoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
     const { title, description, priority, dueDate, assignedTechnicianId } = req.body;
 

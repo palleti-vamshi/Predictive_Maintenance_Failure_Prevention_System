@@ -13,27 +13,24 @@ import modelRoutes from './routes/model.routes.js';
 import analysisRunRoutes from './routes/analysisRun.routes.js';
 import alertRoutes from './routes/alert.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import { corsOptions } from './config/cors.js';
 
 const app = express();
 
-// Allowed origins for CORS with credentials
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  env.CORS_ORIGIN
-].filter(Boolean);
+// Disable Express fingerprinting header
+app.disable('x-powered-by');
 
-// CORS configuration (no wildcard credentialed CORS)
-app.use(cors({
-  origin: (origin, callback) => {
-    // Requests with no origin (e.g. mobile apps via fetch, curl, native HTTP) are allowed
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error(`Origin ${origin} not allowed by CORS policy`));
-  },
-  credentials: true
-}));
+// Security Response Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// Explicit CORS with credentials (supporting primary Vite 5173, fallback 5174/5175, and explicit production domains)
+app.use(cors(corsOptions));
 
 // Body & Cookie Parsers
 app.use(express.json({ limit: '10mb' }));

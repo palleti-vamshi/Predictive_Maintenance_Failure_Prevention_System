@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { MaintenanceWorkOrder } from '../models/MaintenanceWorkOrder.js';
 import { Machine } from '../models/Machine.js';
 import { User } from '../models/User.js';
@@ -10,6 +11,17 @@ const router = Router();
 
 // All work order routes require authentication
 router.use(authenticate);
+
+// Validate orderId parameter format across all routes
+router.param('orderId', (req, res, next, orderId) => {
+  if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Invalid work order ID format.'
+    });
+  }
+  next();
+});
 
 /**
  * GET /api/work-orders/eligible-technicians

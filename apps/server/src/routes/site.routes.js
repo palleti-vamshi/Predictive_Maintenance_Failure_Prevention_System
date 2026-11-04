@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { Site } from '../models/Site.js';
 import { Machine } from '../models/Machine.js';
 import { authenticate } from '../middleware/authenticate.js';
@@ -8,6 +9,17 @@ const router = Router();
 
 // All site routes require authentication
 router.use(authenticate);
+
+// Validate id parameter format across all routes
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Invalid site ID format.'
+    });
+  }
+  next();
+});
 
 /**
  * GET /api/sites
