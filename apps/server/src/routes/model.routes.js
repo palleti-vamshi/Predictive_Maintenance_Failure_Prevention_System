@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { ModelArtifact } from '../models/ModelArtifact.js';
 import { Dataset } from '../models/Dataset.js';
 import { Machine } from '../models/Machine.js';
@@ -19,6 +20,7 @@ import {
 } from '@predictive-maintenance/shared';
 
 const router = Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // All model routes require authentication
 router.use(authenticate);
@@ -245,6 +247,45 @@ router.get('/', async (req, res) => {
     return res.status(500).json({
       error: 'InternalServerError',
       message: 'Failed to retrieve models.'
+    });
+  }
+});
+
+/**
+ * GET /api/models/benchmarks
+ * Returns verified benchmark evaluation reports for CWRU and NASA IMS.
+ */
+router.get('/benchmarks', async (req, res) => {
+  try {
+    const benchmarksDir = path.resolve(
+      __dirname,
+      '../../../../services/ml-service/artifacts/benchmarks'
+    );
+    const cwruPath = path.join(benchmarksDir, 'cwru_evaluation_report.json');
+    const imsPath = path.join(benchmarksDir, 'nasa_ims_evaluation_report.json');
+
+    let cwru = null;
+    let nasaIms = null;
+
+    if (fs.existsSync(cwruPath)) {
+      cwru = JSON.parse(fs.readFileSync(cwruPath, 'utf8'));
+    }
+    if (fs.existsSync(imsPath)) {
+      nasaIms = JSON.parse(fs.readFileSync(imsPath, 'utf8'));
+    }
+
+    return res.status(200).json({
+      success: true,
+      benchmarks: {
+        cwru,
+        nasaIms
+      }
+    });
+  } catch (err) {
+    console.error('[ModelRoutes:benchmarks] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to retrieve benchmark evaluations.'
     });
   }
 });

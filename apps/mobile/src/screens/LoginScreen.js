@@ -45,7 +45,7 @@ export default function LoginScreen() {
             <View style={styles.logoBadge}>
               <Feather name="activity" size={24} color="#ffffff" />
             </View>
-            <Text style={styles.appTitle}>Presight</Text>
+            <Text style={styles.appTitle}>MechGuard AI</Text>
             <Text style={styles.appSubtitle}>
               AI-Based Predictive Maintenance System
             </Text>

@@ -29,7 +29,7 @@ export default function Shell({ children, apiStatus }) {
 
           <footer className="shell-footer">
             <div className="footer-left">
-              <span>Presight — AI Predictive Maintenance & Failure Prevention System</span>
+              <span>MechGuard AI — Predictive Maintenance & Failure Prevention System</span>
             </div>
             <div className="footer-right">
               <span>Multi-Signal Telemetry • Gearbox Kinematic Surveillance</span>

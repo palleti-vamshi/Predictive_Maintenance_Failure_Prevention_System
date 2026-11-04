@@ -180,10 +180,27 @@ def main():
                 fused_preds=fused_preds
             )
 
+            # Load verified bearing benchmark evaluation reports
+            benchmarks_dir = os.path.join(os.path.dirname(__file__), "artifacts", "benchmarks")
+            cwru_report = None
+            ims_report = None
+            cwru_path = os.path.join(benchmarks_dir, "cwru_evaluation_report.json")
+            ims_path = os.path.join(benchmarks_dir, "nasa_ims_evaluation_report.json")
+            if os.path.exists(cwru_path):
+                with open(cwru_path, "r") as f:
+                    cwru_report = json.load(f)
+            if os.path.exists(ims_path):
+                with open(ims_path, "r") as f:
+                    ims_report = json.load(f)
+
             output = {
                 "provenance_registry": BENCHMARK_PROVENANCE_REGISTRY,
                 "regime_comparison": regime_comp,
-                "signal_paths_comparison": signal_comp
+                "signal_paths_comparison": signal_comp,
+                "bearing_benchmarks": {
+                    "cwru": cwru_report,
+                    "nasa_ims": ims_report
+                }
             }
             print(json.dumps({"success": True, "data": output}))
             sys.exit(0)

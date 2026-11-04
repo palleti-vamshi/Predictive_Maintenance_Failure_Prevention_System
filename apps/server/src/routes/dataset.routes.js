@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { Dataset } from '../models/Dataset.js';
 import { Machine } from '../models/Machine.js';
 import { authenticate } from '../middleware/authenticate.js';
@@ -23,6 +24,7 @@ import {
 } from '@predictive-maintenance/shared';
 
 const router = Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Multer memory storage configuration with 25MB bounded limit
 const upload = multer({
@@ -372,6 +374,33 @@ router.get('/reference-catalog', async (req, res) => {
     return res.status(500).json({
       error: 'InternalServerError',
       message: 'Failed to retrieve reference catalog.'
+    });
+  }
+});
+
+/**
+ * GET /api/datasets/manifest
+ * Returns the verified dataset manifest containing download metadata, checksums, and terms.
+ */
+router.get('/manifest', (req, res) => {
+  try {
+    const manifestPath = path.resolve(__dirname, '../../../../data/manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      return res.status(404).json({
+        error: 'NotFound',
+        message: 'Dataset manifest not found on disk.'
+      });
+    }
+    const manifestData = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    return res.status(200).json({
+      success: true,
+      manifest: manifestData
+    });
+  } catch (err) {
+    console.error('[DatasetManifest] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to read dataset manifest.'
     });
   }
 });

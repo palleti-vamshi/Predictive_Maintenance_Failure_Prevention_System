@@ -164,6 +164,13 @@ web-build/
 uploads/
 **/uploads/
 data/uploads/
+data/raw/
+data/processed/
+data/*.zip
+data/*.mat
+data/*.7z
+data/*.tar*
+data/cache/
 *.csv.tmp
 
 # macOS system files

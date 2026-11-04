@@ -760,8 +760,8 @@ async function seed() {
       }
     },
     referenceDetails: {
-      sourceName: 'NASA Ames Prognostics Data Repository',
-      sourceUrl: 'https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/',
+      sourceName: 'NASA Ames Prognostics Data Repository / University of Cincinnati IMS',
+      sourceUrl: 'https://data.nasa.gov/dataset/ims-bearings',
       citation: 'J. Lee, H. Qiu, G. Yu, J. Lin, and Rexnord Technical Services (2007). "Bearing Data Set", IMS, University of Cincinnati.',
       license: 'Public Domain / Open Access Research',
       usageTerms: 'Permitted for research benchmarking and algorithm validation with attribution.',
@@ -869,7 +869,7 @@ async function seed() {
     },
     referenceDetails: {
       sourceName: 'Case Western Reserve University Bearing Data Center',
-      sourceUrl: 'https://engineering.case.edu/bearingdatacenter',
+      sourceUrl: 'https://engineering.case.edu/bearingdatacenter/download-data-file',
       citation: 'K.A. Loparo, "Bearing Vibration Data Set", Case Western Reserve University, 2012.',
       license: 'Open Educational / Research Attribution License',
       usageTerms: 'Permitted for machine learning benchmarking, algorithm development, and academic comparisons.',
@@ -1256,11 +1256,11 @@ async function seed() {
     await machineGB104.save();
   }
 
-  // Model 3: Random Forest Bearing Fault Classifier (CWRU Benchmark 12k)
+  // Model 3: Random Forest Bearing Fault Classifier (CWRU Benchmark 12k - RF-Bearing-Fault v1.2)
   const rfBearingModel = await ModelArtifact.create({
-    name: 'Random Forest Bearing Fault Classifier (CWRU Benchmark 12k)',
+    name: 'RF-Bearing-Fault v1.2',
     modelType: MODEL_TYPES.RANDOM_FOREST,
-    version: '1.0.0',
+    version: '1.2.0',
     status: MODEL_STATUS.READY,
     factoryId: factoryDetroit._id,
     datasetId: datasetCWRU._id,
@@ -1271,68 +1271,144 @@ async function seed() {
     parameters: {
       n_estimators: 100,
       max_depth: 12,
-      window_size: 256,
+      window_size: 2048,
       overlap_ratio: 0.5,
-      random_state: 42
+      random_state: 42,
+      training_version: 'train-cwru-2025-03-10',
+      eval_version: 'eval-cwru-2025-03-12'
     },
     featureNames: [
-      'vibration_drive_end_kurtosis',
-      'vibration_drive_end_crest_factor',
-      'vibration_drive_end_impulse_factor',
-      'vibration_fan_end_rms'
+      'spectral_centroid',
+      'vib_peak_to_peak',
+      'vib_rms',
+      'band_power_high',
+      'vib_crest_factor',
+      'vib_kurtosis',
+      'vib_skewness',
+      'band_power_mid',
+      'band_power_low'
     ],
     classMapping: {
-      0: 'healthy',
-      1: 'inner_race_fault',
-      2: 'ball_defect',
-      3: 'outer_race_fault'
+      0: 'ball',
+      1: 'inner_race',
+      2: 'normal',
+      3: 'outer_race'
     },
     metrics: {
-      accuracy: 0.9875,
-      macroF1: 0.9874,
-      classes: ['healthy', 'inner_race_fault', 'ball_defect', 'outer_race_fault'],
+      accuracy: 1.0,
+      macroF1: 1.0,
+      classes: ['ball', 'inner_race', 'normal', 'outer_race'],
       perClassMetrics: {
-        healthy: { precision: 1.0, recall: 1.0, f1_score: 1.0, support: 40 },
-        inner_race_fault: { precision: 0.975, recall: 0.975, f1_score: 0.975, support: 40 },
-        ball_defect: { precision: 0.975, recall: 0.975, f1_score: 0.975, support: 40 },
-        outer_race_fault: { precision: 1.0, recall: 1.0, f1_score: 1.0, support: 40 }
+        normal: { precision: 1.0, recall: 1.0, f1_score: 1.0, support: 473 },
+        inner_race: { precision: 1.0, recall: 1.0, f1_score: 1.0, support: 119 },
+        ball: { precision: 1.0, recall: 1.0, f1_score: 1.0, support: 117 },
+        outer_race: { precision: 1.0, recall: 1.0, f1_score: 1.0, support: 118 }
       },
       confusionMatrix: [
-        [40, 0, 0, 0],
-        [0, 39, 1, 0],
-        [0, 1, 39, 0],
-        [0, 0, 0, 40]
+        [117, 0, 0, 0],
+        [0, 119, 0, 0],
+        [0, 0, 473, 0],
+        [0, 0, 0, 118]
       ],
-      trainSamples: 360,
-      testSamples: 120,
-      splitMethod: 'GroupShuffleSplit'
+      falseAlarmRate: 0.0,
+      trainSamples: 2237,
+      testSamples: 827,
+      splitMethod: 'Held out by load condition (3 HP)',
+      notes: 'Seeded fault experiments on a single test rig. Held-out evaluation on 3 HP motor load condition. Not validated for industrial gearboxes.'
     },
     featureImportance: [
-      { feature: 'vibration_drive_end_kurtosis', importance: 0.312 },
-      { feature: 'vibration_drive_end_crest_factor', importance: 0.276 },
-      { feature: 'vibration_drive_end_impulse_factor', importance: 0.221 },
-      { feature: 'vibration_fan_end_rms', importance: 0.191 }
+      { feature: 'spectral_centroid', importance: 0.28 },
+      { feature: 'vib_peak_to_peak', importance: 0.22 },
+      { feature: 'vib_rms', importance: 0.19 },
+      { feature: 'band_power_high', importance: 0.15 },
+      { feature: 'vib_kurtosis', importance: 0.10 }
     ],
     shapSummary: {
-      explainerType: 'TreeSHAP (Exact TreeExplainer)',
+      explainerType: 'TreeSHAP (TreeExplainer with tree_path_dependent conditional expectations)',
       additivityVerified: true,
       maxAdditivityDiscrepancy: 0.000001,
       baselineExpectedValue: [0.25, 0.25, 0.25, 0.25],
       topContributingFeatures: [
-        { feature: 'vibration_drive_end_kurtosis', importance: 0.312, attribution: 0.312, value: 6.42 },
-        { feature: 'vibration_drive_end_crest_factor', importance: 0.276, attribution: 0.276, value: 5.10 },
-        { feature: 'vibration_drive_end_impulse_factor', importance: 0.221, attribution: 0.221, value: 4.88 }
+        { feature: 'spectral_centroid', importance: 0.28, attribution: 0.28, value: 2410.5 },
+        { feature: 'vib_peak_to_peak', importance: 0.22, attribution: 0.22, value: 4.82 },
+        { feature: 'vib_rms', importance: 0.19, attribution: 0.19, value: 0.76 }
       ]
     },
     datasetSummary: {
       datasetTitle: 'Case Western Reserve University (CWRU) 12k Bearing Fault Benchmark',
       datasetType: DATASET_TYPES.REFERENCE,
-      totalRawRows: 160,
+      totalRawRows: 3064,
       mappedSignals: ['vibration_drive_end', 'vibration_fan_end', 'rotational_speed'],
-      windowSize: 256,
+      windowSize: 2048,
       overlapRatio: 0.5,
-      totalExtractedWindows: 480,
-      featureCount: 4
+      totalExtractedWindows: 3064,
+      featureCount: 11
+    }
+  });
+
+  // Model 4: Isolation Forest Bearing Anomaly Detector (NASA IMS Benchmark - IF-Bearing-Anomaly v1.0)
+  const ifBearingModel = await ModelArtifact.create({
+    name: 'IF-Bearing-Anomaly v1.0',
+    modelType: MODEL_TYPES.ISOLATION_FOREST,
+    version: '1.0.0',
+    status: MODEL_STATUS.READY,
+    factoryId: factoryDetroit._id,
+    datasetId: datasetNasa._id,
+    createdById: managerUser._id,
+    createdByName: managerUser.fullName,
+    targetDomain: FAULT_DOMAINS.BEARING_FAULTS,
+    componentType: 'bearing',
+    parameters: {
+      n_estimators: 100,
+      contamination: 0.01,
+      baseline_pct: 0.20,
+      random_state: 42,
+      training_version: 'train-ims-2025-02-20',
+      eval_version: 'eval-ims-2025-02-24'
+    },
+    featureNames: [
+      'b1_rms',
+      'b1_peak_to_peak',
+      'b1_crest_factor',
+      'b1_kurtosis',
+      'b1_skewness',
+      'b1_shape_factor',
+      'b1_impulse_factor',
+      'b1_spectral_centroid'
+    ],
+    metrics: {
+      accuracy: null,
+      macroF1: null,
+      calibratedThreshold: 0.5236,
+      trainSamples: 196,
+      testSamples: 788,
+      splitMethod: 'Chronological Baseline Partition (First 20% healthy)',
+      notes: 'First sustained flag: ~2.5 days (60.0 hours) before end of run. Accuracy not reported — no ground truth anomaly labels exist for run-to-failure natural progression. Lab run-to-failure data under constant load. Not evidence for gearboxes or factory bearings.'
+    },
+    featureImportance: [
+      { feature: 'b1_rms', importance: 0.34 },
+      { feature: 'b1_kurtosis', importance: 0.28 },
+      { feature: 'b1_spectral_centroid', importance: 0.21 },
+      { feature: 'b1_crest_factor', importance: 0.17 }
+    ],
+    shapSummary: {
+      explainerType: 'TreeSHAP (TreeExplainer with tree_path_dependent conditional expectations)',
+      additivityVerified: true,
+      baselineExpectedValue: 0.5236,
+      topContributingFeatures: [
+        { feature: 'b1_rms', importance: 0.34, attribution: 0.34, value: 0.142 },
+        { feature: 'b1_kurtosis', importance: 0.28, attribution: 0.28, value: 3.84 }
+      ]
+    },
+    datasetSummary: {
+      datasetTitle: 'NASA IMS Bearing Run-to-Failure Benchmark (Test 2)',
+      datasetType: DATASET_TYPES.REFERENCE,
+      totalRawRows: 984,
+      mappedSignals: ['Ch1 Radial Accel', 'Ch2 Radial Accel', 'Ch3 Radial Accel', 'Ch4 Radial Accel'],
+      windowSize: 20480,
+      overlapRatio: 0.0,
+      totalExtractedWindows: 984,
+      featureCount: 8
     }
   });
 

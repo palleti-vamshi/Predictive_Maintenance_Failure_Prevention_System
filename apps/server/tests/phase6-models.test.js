@@ -93,7 +93,7 @@ test('ML Model Listing & Retrieval: Isolation Forest Anomaly Detector has calibr
   const { models } = await listRes.json();
   assert.ok(models.length > 0, 'Must have seeded Isolation Forest model');
 
-  const iso = models[0];
+  const iso = models.find((m) => m.name.includes('GB-104')) || models[0];
   assert.equal(iso.modelType, MODEL_TYPES.ISOLATION_FOREST);
   assert.ok(iso.metrics.rocAuc > 0.9, 'ROC-AUC must be > 0.9');
   assert.ok(iso.metrics.calibratedThreshold !== null, 'Calibrated threshold must be recorded');

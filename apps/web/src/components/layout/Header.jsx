@@ -54,7 +54,7 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
             <Icon name="brandMark" size={22} color="#ffffff" />
           </div>
           <div>
-            <div className="brand-title">Presight</div>
+            <div className="brand-title">MechGuard AI</div>
             <div className="brand-subtitle">Predictive Maintenance & Failure Prevention</div>
           </div>
         </div>

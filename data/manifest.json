@@ -1,0 +1,167 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-11-04T17:36:20.853015+00:00",
+  "product": "MechGuard AI",
+  "datasets": {
+    "cwru_bearing_data_center": {
+      "name": "Case Western Reserve University (CWRU) Bearing Data Center Benchmark",
+      "official_url": "https://engineering.case.edu/bearingdatacenter/download-data-file",
+      "machine_domain": "bearing",
+      "machine_type": "Deep Groove Ball Bearing (SKF 6205-2RS JEM drive end, SKF 6203-2RS JEM fan end)",
+      "test_rig": "2 HP Reliance Electric motor, dynamometer and torque transducer",
+      "sampling_frequency_hz": 12000,
+      "operating_conditions": [
+        {
+          "load_hp": 0,
+          "speed_rpm": 1797
+        },
+        {
+          "load_hp": 1,
+          "speed_rpm": 1772
+        },
+        {
+          "load_hp": 2,
+          "speed_rpm": 1750
+        },
+        {
+          "load_hp": 3,
+          "speed_rpm": 1730
+        }
+      ],
+      "fault_types": [
+        "normal",
+        "inner_race_fault",
+        "ball_fault",
+        "outer_race_fault"
+      ],
+      "signals": [
+        "DE_time (Drive End accelerometer, radial, 12 kHz)",
+        "FE_time (Fan End accelerometer, radial, 12 kHz)",
+        "BA_time (Base accelerometer)"
+      ],
+      "license_and_terms": "Public Domain / Open Academic Research (Case Western Reserve University Bearing Data Center)",
+      "access_status": "Downloaded and verified from official server",
+      "leakage_prevention_split": "Stratified split by motor load: Train on 0, 1, and 2 HP loads; Evaluate on held-out 3 HP load. Windows from identical operating conditions do not leak across splits.",
+      "files": {
+        "ball_0hp_118.mat": {
+          "relative_path": "cwru/ball_0hp_118.mat",
+          "size_bytes": 2942112,
+          "sha256": "b00628f8dd8d1d930af77fa465d1e5cdb385fe259489053f91f3680bda7f640e"
+        },
+        "ball_1hp_119.mat": {
+          "relative_path": "cwru/ball_1hp_119.mat",
+          "size_bytes": 2914248,
+          "sha256": "bc72d9df7668219e004a0f711232b23ec0aed393eb9bd8f9f5483426f6b51330"
+        },
+        "ball_2hp_120.mat": {
+          "relative_path": "cwru/ball_2hp_120.mat",
+          "size_bytes": 2917752,
+          "sha256": "e0b7a584c49af52335ff0904a97d4afcf02d045625c582de63a7c85ce10b489c"
+        },
+        "ball_3hp_121.mat": {
+          "relative_path": "cwru/ball_3hp_121.mat",
+          "size_bytes": 2917752,
+          "sha256": "52f686e984ba8e9b04a047a57416271cdb322cee57ee105dce58926a24b966cb"
+        },
+        "inner_race_0hp_105.mat": {
+          "relative_path": "cwru/inner_race_0hp_105.mat",
+          "size_bytes": 2910768,
+          "sha256": "f80b0ea04fd06b372a0eaec7c056543ea37e4bb4727a5b173d2a5bacd2aa9cab"
+        },
+        "inner_race_1hp_106.mat": {
+          "relative_path": "cwru/inner_race_1hp_106.mat",
+          "size_bytes": 2928192,
+          "sha256": "e5cec7cdd138e6cd1deb9ed8634e5aaa9bc1bd7094ddc075bff606580eb6e883"
+        },
+        "inner_race_2hp_107.mat": {
+          "relative_path": "cwru/inner_race_2hp_107.mat",
+          "size_bytes": 2931672,
+          "sha256": "111ba8996a115684661a13c913bd74d8029a59294492f88aec7b03e175fdd388"
+        },
+        "inner_race_3hp_108.mat": {
+          "relative_path": "cwru/inner_race_3hp_108.mat",
+          "size_bytes": 2950416,
+          "sha256": "d415f0e65128bfa0b118c2051c988fb0dc6ce3e4c8aa45fdc5ad1d0967462e7d"
+        },
+        "normal_0hp_97.mat": {
+          "relative_path": "cwru/normal_0hp_97.mat",
+          "size_bytes": 3903344,
+          "sha256": "16bf48babcf1c7ac224bc1a81cd9eafdb27e42d5cf559761907e067e8eeadf3c"
+        },
+        "normal_1hp_98.mat": {
+          "relative_path": "cwru/normal_1hp_98.mat",
+          "size_bytes": 7742720,
+          "sha256": "37e6612c05e65c415dcfa2ab27a3fda648a5863160fa898b884a14743044e045"
+        },
+        "normal_2hp_99.mat": {
+          "relative_path": "cwru/normal_2hp_99.mat",
+          "size_bytes": 15503928,
+          "sha256": "4b97e6b5361f45efb6951dc3b1aebcdb3b89cb69d0f96d6f5c297dd9f45eee75"
+        },
+        "normal_3hp_100.mat": {
+          "relative_path": "cwru/normal_3hp_100.mat",
+          "size_bytes": 7770624,
+          "sha256": "88a5990cb541320e91505a1d72139e1993500ffe6e292a451011667f4138ca78"
+        },
+        "outer_race_0hp_130.mat": {
+          "relative_path": "cwru/outer_race_0hp_130.mat",
+          "size_bytes": 2928192,
+          "sha256": "35a095307d0971477049b343a1b5981dde465a58fb7f233ad89b035068c1717d"
+        },
+        "outer_race_1hp_131.mat": {
+          "relative_path": "cwru/outer_race_1hp_131.mat",
+          "size_bytes": 2938632,
+          "sha256": "7883f7b83beadc54b2f301767f9145ce07055707182fb0278fdf0a6bb53ce3cb"
+        },
+        "outer_race_2hp_132.mat": {
+          "relative_path": "cwru/outer_race_2hp_132.mat",
+          "size_bytes": 2914248,
+          "sha256": "17a69ed5d2270b42532e678e35bbe2fa04a2cc413cf2bf9e88c7692de8662d18"
+        },
+        "outer_race_3hp_133.mat": {
+          "relative_path": "cwru/outer_race_3hp_133.mat",
+          "size_bytes": 2942112,
+          "sha256": "53f076cb0d905cf46bffaee7736abce8224ffed777deed03c0c863d762a90c71"
+        }
+      }
+    },
+    "nasa_ims_bearings": {
+      "name": "NASA IMS Bearing Run-to-Failure Benchmark",
+      "official_url": "https://data.nasa.gov/dataset/ims-bearings",
+      "direct_data_url": "https://data.nasa.gov/docs/legacy/IMS.zip",
+      "machine_domain": "bearing",
+      "machine_type": "Double Row Rolling Element Bearing (Rexnord ZA-2115)",
+      "test_rig": "4 bearings on a shaft, AC motor coupled via rub belts, 6000 lbs radial load by spring mechanism, force lubricated",
+      "sampling_frequency_hz": 20000,
+      "operating_conditions": [
+        {
+          "speed_rpm": 2000,
+          "radial_load_lbs": 6000
+        }
+      ],
+      "test_set": "Test 2 (Feb 12 2004 10:32:39 to Feb 19 2004 06:22:39, 984 1-sec ASCII snapshots, 4 channels)",
+      "failure_mode": "Natural outer race failure occurred in Bearing 1 after 160+ continuous hours",
+      "signals": [
+        "Bearing 1 (Ch 1 - PCB 353B33 quartz ICP accelerometer, radial)",
+        "Bearing 2 (Ch 2 - PCB 353B33 quartz ICP accelerometer, radial)",
+        "Bearing 3 (Ch 3 - PCB 353B33 quartz ICP accelerometer, radial)",
+        "Bearing 4 (Ch 4 - PCB 353B33 quartz ICP accelerometer, radial)"
+      ],
+      "license_and_terms": "NASA Open Data / Public Domain (NSF I/UCR Center for Intelligent Maintenance Systems & Rexnord Corp)",
+      "access_status": "Downloaded and verified from official NASA Open Data portal",
+      "evaluation_strategy": "Unsupervised Isolation Forest trained on early healthy operation (first 20% of run). Tracks anomaly score trajectory over time to measure detection lead time before catastrophic outer race failure. No false accuracy claims without ground truth anomaly labels.",
+      "files": {
+        "2nd_test.rar": {
+          "relative_path": "nasa_ims/2nd_test.rar",
+          "size_bytes": 85581092,
+          "sha256": "b154d5ba1ae5f7f01cdd4f1bde5b08cfdc2f3134d51ad2f6614b1270a86ab632"
+        },
+        "Readme Document for IMS Bearing Data.pdf": {
+          "relative_path": "nasa_ims/Readme Document for IMS Bearing Data.pdf",
+          "size_bytes": 400443,
+          "sha256": "cf46d37c21f7f292c11bbbdd4695d876c417ed1d6425e3d87c962ae2182ae6ed"
+        }
+      }
+    }
+  }
+}

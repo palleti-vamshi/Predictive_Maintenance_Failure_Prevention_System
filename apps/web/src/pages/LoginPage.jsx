@@ -161,7 +161,7 @@ export default function LoginPage() {
               <Icon name="brandMark" size={28} color="#ffffff" />
             </div>
             <div>
-              <span className="login-brand-logo-text">Presight</span>
+              <span className="login-brand-logo-text">MechGuard AI</span>
               <span className="login-brand-pill">Mechanical Intelligence</span>
             </div>
           </div>
