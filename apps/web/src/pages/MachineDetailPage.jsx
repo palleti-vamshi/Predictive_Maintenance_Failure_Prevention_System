@@ -356,7 +356,7 @@ export default function MachineDetailPage() {
     ? [...machineDatasets].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
     : null;
   const telemetryFreshness = latestDataset
-    ? `Latest Ingestion: ${new Date(latestDataset.createdAt).toLocaleString('en-IN')}`
+    ? `Latest Ingestion: ${new Date(latestDataset.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
     : 'No Telemetry Uploaded Yet';
 
   return (
@@ -467,7 +467,17 @@ export default function MachineDetailPage() {
           severity={machineAlert.severity}
           title={`Active Warning: ${machineAlert.title}`}
           description={machineAlert.description}
-          timestamp={new Date(machineAlert.timestamp).toLocaleTimeString()}
+          timestamp={
+            machineAlert.createdAt || machineAlert.timestamp
+              ? new Date(machineAlert.createdAt || machineAlert.timestamp).toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : undefined
+          }
           contributingSignals={machineAlert.contributingSignals}
           action={
             <Button
@@ -838,45 +848,91 @@ export default function MachineDetailPage() {
         </div>
       )}
 
-      {/* ================= TAB 3: Sensor Channels ================= */}
+      {/* ================= TAB 3: Sensor Channels & Model Compatibility ================= */}
       {activeTab === 'sensors' && (
-        <Card
-          title="Decoupled Sensor Channel Topology"
-          subtitle="Physical transducers mapped to vibration, thermal, and operating regime pipelines"
-        >
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th scope="col">Signal Label</th>
-                  <th scope="col">Category</th>
-                  <th scope="col">Standard Unit</th>
-                  <th scope="col">Transducer Channel Key</th>
-                  <th scope="col">Analysis Pathway</th>
-                </tr>
-              </thead>
-              <tbody>
-                {signals.map((sig) => (
-                  <tr key={sig.key}>
-                    <td className="table-primary-text">{sig.label}</td>
-                    <td>
-                      <span className={`category-tag category-${sig.category}`}>
-                        {sig.category?.toUpperCase()}
-                      </span>
-                    </td>
-                    <td><span className="mono-code">{sig.unit}</span></td>
-                    <td><span className="mono-code">{sig.key}</span></td>
-                    <td>
-                      {sig.category === 'vibration' && 'Spectral FFT & Envelope Anomaly'}
-                      {sig.category === 'thermal' && 'Thermal Baseline & Heat Dissipation'}
-                      {sig.category === 'operating_regime' && 'Speed/Load Regime Normalization'}
-                    </td>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card
+            title="Supported Transducer Signals"
+            subtitle="Configured physical channels, sampling intervals, and model feature pipelines"
+          >
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Signal Name</th>
+                    <th scope="col">Standard Unit</th>
+                    <th scope="col">Sampling Interval</th>
+                    <th scope="col">Transducer Channel Key</th>
+                    <th scope="col">Used By Models</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody>
+                  {signals.map((sig) => {
+                    const interval = sig.category === 'vibration' ? '100 ms (10 Hz)' : sig.category === 'thermal' ? '1 s (1 Hz)' : '10 s';
+                    const usedBy = sig.category === 'vibration' ? 'Random Forest (GB-104) & Isolation Forest' : sig.category === 'thermal' ? 'Thermal Anomaly Detector & Multi-Signal Fusion' : 'Regime Normalization';
+                    return (
+                      <tr key={sig.key}>
+                        <td className="table-primary-text">{sig.label}</td>
+                        <td><span className="mono-code">{sig.unit}</span></td>
+                        <td><span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{interval}</span></td>
+                        <td><span className="mono-code">{sig.key}</span></td>
+                        <td>
+                          <span className={`category-tag category-${sig.category}`}>
+                            {usedBy}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Compatible Models & Domain Separation Notice (UX Pilot Page 1) */}
+          <Card
+            title="Compatible Predictive Models"
+            subtitle="Validated AI model artifacts compatible with this machine type"
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+              <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>GB-104 Supervised Classifier</strong>
+                  <span className="badge badge-healthy" style={{ fontSize: '0.68rem' }}>COMPATIBLE</span>
+                </div>
+                <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  Random Forest ensemble (100 estimators) trained on helical-planetary simulator telemetry. Predicts healthy vs tooth wear/chipping vs crack.
+                </p>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                  Held-out Test Macro F1: 0.985 • Explainer: Exact TreeSHAP
+                </div>
+              </div>
+
+              <div style={{ background: '#ffffff', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '0.9rem' }}>Unsupervised Isolation Forest</strong>
+                  <span className="badge badge-healthy" style={{ fontSize: '0.68rem' }}>COMPATIBLE</span>
+                </div>
+                <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  Unsupervised outlier scoring across vibration RMS, crest factor, and kurtosis. Calibrated threshold: 0.55.
+                </p>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                  Outlier Contamination: 0.05 • Non-diagnostic statistical scoring
+                </div>
+              </div>
+            </div>
+
+            <div className="hero-limitation-box">
+              <Icon name="shield" size={16} color="#7c3aed" />
+              <div>
+                <strong>Machine Domain Separation Notice:</strong>
+                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem' }}>
+                  CWRU Bearing Classifier (3 HP load split) and NASA IMS Bearing Degradation models are bearing-specific reference models. They are restricted to bearing experiments and <strong>cannot</strong> be run against gearbox assets.
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* ================= TAB 4: Field Notes & History ================= */}

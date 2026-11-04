@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Button from '../components/common/Button.jsx';
@@ -279,6 +279,16 @@ export default function MachinesPage() {
     }
   };
 
+  // Quick counts by type for UX Pilot Page 1 chips
+  const typeCounts = useMemo(() => {
+    const counts = { all: machines.length };
+    machines.forEach((m) => {
+      const t = m.type || MACHINE_TYPES.GEARBOX;
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    return counts;
+  }, [machines]);
+
   // Filtering
   const filteredMachines = machines.filter((m) => {
     if (statusFilter !== 'all' && m.status !== statusFilter) return false;
@@ -329,6 +339,52 @@ export default function MachinesPage() {
             </Button>
           </div>
         )}
+      </div>
+
+      {/* UX Pilot Page 1: Machine Type Filter Chips */}
+      <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+        <button
+          type="button"
+          className={`filter-pill-btn ${typeFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setTypeFilter('all')}
+        >
+          All Assets ({typeCounts.all || 0})
+        </button>
+        <button
+          type="button"
+          className={`filter-pill-btn ${typeFilter === MACHINE_TYPES.GEARBOX ? 'active' : ''}`}
+          onClick={() => setTypeFilter(MACHINE_TYPES.GEARBOX)}
+        >
+          Gearboxes ({typeCounts[MACHINE_TYPES.GEARBOX] || 0})
+        </button>
+        <button
+          type="button"
+          className={`filter-pill-btn ${typeFilter === MACHINE_TYPES.BEARING ? 'active' : ''}`}
+          onClick={() => setTypeFilter(MACHINE_TYPES.BEARING)}
+        >
+          Bearings ({typeCounts[MACHINE_TYPES.BEARING] || 0})
+        </button>
+        <button
+          type="button"
+          className={`filter-pill-btn ${typeFilter === MACHINE_TYPES.PUMP ? 'active' : ''}`}
+          onClick={() => setTypeFilter(MACHINE_TYPES.PUMP)}
+        >
+          Pumps ({typeCounts[MACHINE_TYPES.PUMP] || 0})
+        </button>
+        <button
+          type="button"
+          className={`filter-pill-btn ${typeFilter === MACHINE_TYPES.MOTOR ? 'active' : ''}`}
+          onClick={() => setTypeFilter(MACHINE_TYPES.MOTOR)}
+        >
+          Motors ({typeCounts[MACHINE_TYPES.MOTOR] || 0})
+        </button>
+        <button
+          type="button"
+          className={`filter-pill-btn ${typeFilter === MACHINE_TYPES.COMPRESSOR ? 'active' : ''}`}
+          onClick={() => setTypeFilter(MACHINE_TYPES.COMPRESSOR)}
+        >
+          Compressors ({typeCounts[MACHINE_TYPES.COMPRESSOR] || 0})
+        </button>
       </div>
 
       {/* Filter and Control Bar */}

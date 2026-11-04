@@ -140,6 +140,7 @@ router.get('/', async (req, res) => {
       .populate('assignedTechnicianId', 'fullName email role')
       .populate('createdById', 'fullName role')
       .populate('reviewedById', 'fullName role')
+      .populate('sourceAlertId', 'title severity status type triggerValue message notes')
       .sort({ dueDate: 1, createdAt: -1 });
 
     return res.status(200).json({
@@ -166,7 +167,8 @@ router.get('/:orderId', async (req, res) => {
       .populate('machineId', 'code name status operationalStatus arrangement stages bearingPositions lubrication')
       .populate('assignedTechnicianId', 'fullName email role')
       .populate('createdById', 'fullName role')
-      .populate('reviewedById', 'fullName role');
+      .populate('reviewedById', 'fullName role')
+      .populate('sourceAlertId', 'title severity status type triggerValue message notes');
 
     if (!workOrder || workOrder.factoryId.toString() !== factoryId) {
       return res.status(404).json({

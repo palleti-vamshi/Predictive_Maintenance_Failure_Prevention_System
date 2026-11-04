@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Header from './Header.jsx';
 import Sidebar from './Sidebar.jsx';
+import MobileBottomNav from './MobileBottomNav.jsx';
 
 /**
  * Shell: Master responsive application container.
@@ -37,6 +38,9 @@ export default function Shell({ children, apiStatus }) {
           </footer>
         </main>
       </div>
+
+      {/* Touch-Optimized Mobile Bottom Navigation */}
+      <MobileBottomNav />
     </div>
   );
 }

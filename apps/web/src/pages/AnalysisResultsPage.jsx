@@ -793,7 +793,7 @@ export default function AnalysisResultsPage() {
 
                   {/* Detected Anomaly Intervals List */}
                   <div>
-                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.75rem' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
                       Detected Anomaly Intervals & Scientific Evidence ({selectedRun.intervals?.length || 0})
                     </h2>
 
@@ -1001,18 +1001,18 @@ export default function AnalysisResultsPage() {
                                         <Icon name="thermometer" size={14} color="#ea580c" />
                                         <span>Thermal Path Detector</span>
                                       </div>
-                                      <div style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
-                                        Status: <strong style={{ color: interval.detector_breakdown.thermal?.is_anomalous ? '#f87171' : '#34d399' }}>
+                                      <div style={{ fontSize: '0.75rem', color: '#475569' }}>
+                                        Status: <strong style={{ color: interval.detector_breakdown.thermal?.is_anomalous ? '#dc2626' : '#16a34a' }}>
                                           {interval.detector_breakdown.thermal?.is_anomalous ? 'THERMAL ANOMALY' : 'NORMAL RANGE'}
                                         </strong>
                                       </div>
                                       {interval.detector_breakdown.thermal?.temperature_mean !== undefined && (
-                                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                                           Mean Temp: {interval.detector_breakdown.thermal.temperature_mean} °C • Drift: {interval.detector_breakdown.thermal.drift_rate_c_per_min > 0 ? '+' : ''}{interval.detector_breakdown.thermal.drift_rate_c_per_min} °C/min
                                         </div>
                                       )}
                                       {interval.detector_breakdown.thermal?.findings && (
-                                        <div style={{ fontSize: '0.7rem', color: '#fb923c', marginTop: '0.25rem' }}>
+                                        <div style={{ fontSize: '0.7rem', color: '#c2410c', marginTop: '0.25rem' }}>
                                           {interval.detector_breakdown.thermal.findings}
                                         </div>
                                       )}
@@ -1025,15 +1025,15 @@ export default function AnalysisResultsPage() {
                                   style={{
                                     padding: '0.75rem 1rem',
                                     borderRadius: '6px',
-                                    background: 'rgba(2, 132, 199, 0.08)',
-                                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                                    background: 'rgba(2, 132, 199, 0.06)',
+                                    border: '1px solid rgba(2, 132, 199, 0.25)',
                                     fontSize: '0.78rem',
-                                    color: '#cbd5e1',
+                                    color: '#334155',
                                     lineHeight: 1.4
                                   }}
                                 >
-                                  <strong>Scientific Disclaimers & Physical Inspection Requirement:</strong>
-                                  <ul style={{ margin: '0.35rem 0 0 1.25rem', padding: 0 }}>
+                                  <strong style={{ color: '#0369a1' }}>Scientific Disclaimers & Physical Inspection Requirement:</strong>
+                                  <ul style={{ margin: '0.35rem 0 0 1.25rem', padding: 0, color: '#475569' }}>
                                     <li>This statistical anomaly interval reflects signal deviation beyond the calibrated 5% false-alarm threshold.</li>
                                     <li>It does <strong>not</strong> assert physical gear tooth breakage or fatigue failure without visual borescope or secondary acoustic inspection.</li>
                                     <li>Anomaly scores must not be interpreted as uncalibrated probabilities or Remaining Useful Life (RUL) projections.</li>

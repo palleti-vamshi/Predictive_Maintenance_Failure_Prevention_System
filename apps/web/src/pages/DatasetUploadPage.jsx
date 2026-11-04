@@ -312,16 +312,60 @@ export default function DatasetUploadPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Dataset Ingestion & Validation</h1>
+          <div className="specimen-tag-row">
+            <span className="badge badge-demo">DEMO DATA</span>
+            <span className="badge badge-operational">DATASET INGESTION</span>
+          </div>
+          <h1 className="page-title">Datasets</h1>
           <p className="page-subtitle">
-            Upload raw mechanical datasets, inspect CSV headers, map engineering signals, verify data quality, and assess model task compatibility.
+            Upload CSV exports for a registered machine, map them to its signals, and check them before analysis.
           </p>
         </div>
         {confirmedDataset && (
-          <Button variant="secondary" onClick={handleReset}>
-            Upload Another Dataset
+          <Button variant="secondary" onClick={handleReset} icon="upload">
+            New upload
           </Button>
         )}
+      </div>
+
+      {/* Step Wizard Progress Bar (UX Pilot Page 8) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          background: '#ffffff',
+          padding: '0.85rem 1.25rem',
+          borderRadius: '8px',
+          border: '1px solid var(--border-subtle)',
+          fontSize: '0.85rem',
+          flexWrap: 'wrap'
+        }}
+      >
+        <span style={{ fontWeight: !selectedFile ? 700 : 500, color: !selectedFile ? 'var(--primary)' : 'var(--text-muted)' }}>
+          <strong style={{ display: 'inline-flex', width: 20, height: 20, borderRadius: '50%', background: !selectedFile ? 'var(--primary)' : 'var(--border-subtle)', color: !selectedFile ? '#fff' : 'var(--text-secondary)', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', marginRight: 6 }}>1</strong>
+          Machine
+        </span>
+        <span style={{ color: 'var(--border-subtle)' }}>→</span>
+        <span style={{ fontWeight: selectedFile && !uploadedSession ? 700 : 500, color: selectedFile && !uploadedSession ? 'var(--primary)' : 'var(--text-muted)' }}>
+          <strong style={{ display: 'inline-flex', width: 20, height: 20, borderRadius: '50%', background: selectedFile && !uploadedSession ? 'var(--primary)' : 'var(--border-subtle)', color: selectedFile && !uploadedSession ? '#fff' : 'var(--text-secondary)', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', marginRight: 6 }}>2</strong>
+          File
+        </span>
+        <span style={{ color: 'var(--border-subtle)' }}>→</span>
+        <span style={{ fontWeight: uploadedSession && !validationResult ? 700 : 500, color: uploadedSession && !validationResult ? 'var(--primary)' : 'var(--text-muted)' }}>
+          <strong style={{ display: 'inline-flex', width: 20, height: 20, borderRadius: '50%', background: uploadedSession && !validationResult ? 'var(--primary)' : 'var(--border-subtle)', color: uploadedSession && !validationResult ? '#fff' : 'var(--text-secondary)', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', marginRight: 6 }}>3</strong>
+          Map columns
+        </span>
+        <span style={{ color: 'var(--border-subtle)' }}>→</span>
+        <span style={{ fontWeight: validationResult && !confirmedDataset ? 700 : 500, color: validationResult && !confirmedDataset ? 'var(--primary)' : 'var(--text-muted)' }}>
+          <strong style={{ display: 'inline-flex', width: 20, height: 20, borderRadius: '50%', background: validationResult && !confirmedDataset ? 'var(--primary)' : 'var(--border-subtle)', color: validationResult && !confirmedDataset ? '#fff' : 'var(--text-secondary)', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', marginRight: 6 }}>4</strong>
+          Checks
+        </span>
+        <span style={{ color: 'var(--border-subtle)' }}>→</span>
+        <span style={{ fontWeight: confirmedDataset ? 700 : 500, color: confirmedDataset ? 'var(--status-healthy)' : 'var(--text-muted)' }}>
+          <strong style={{ display: 'inline-flex', width: 20, height: 20, borderRadius: '50%', background: confirmedDataset ? 'var(--status-healthy)' : 'var(--border-subtle)', color: confirmedDataset ? '#fff' : 'var(--text-secondary)', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', marginRight: 6 }}>5</strong>
+          Run analysis
+        </span>
       </div>
 
       {confirmedDataset ? (

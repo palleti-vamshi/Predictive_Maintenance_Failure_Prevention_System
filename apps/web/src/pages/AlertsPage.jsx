@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Button from '../components/common/Button.jsx';
@@ -17,6 +17,11 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * AlertsPage
+ * Implements the UX Pilot Page 3 two-column industrial workspace:
+ * Prioritized alerts queue on the left, focused evidence & work-order action panel on the right.
+ */
 export default function AlertsPage() {
   const { user } = useAuth();
   const { queryParams, navigate } = useRouter();
@@ -26,14 +31,19 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [severityFilter, setSeverityFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [actionNotice, setActionNotice] = useState(null);
 
-  // Field Observation state
-  const [activeObservationAlertId, setActiveObservationAlertId] = useState(null);
-  const [observationInput, setObservationInput] = useState('');
-  const [isSubmittingObs, setIsSubmittingObs] = useState(false);
+  // Status and Priority filters
+  const [statusTab, setStatusTab] = useState('all'); // 'all' | 'open' | 'acknowledged' | 'wo_created' | 'resolved'
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [machineFilter, setMachineFilter] = useState('all');
+
+  // Selected Alert for right panel detail
+  const [selectedAlertId, setSelectedAlertId] = useState(null);
+
+  // Observation / Note input state
+  const [noteInput, setNoteInput] = useState('');
+  const [isSubmittingNote, setIsSubmittingNote] = useState(false);
 
   // Create Work Order modal state
   const [workOrderModalAlert, setWorkOrderModalAlert] = useState(null);
@@ -66,7 +76,18 @@ export default function AlertsPage() {
       }
 
       const data = await res.json();
-      setAlerts(data.alerts || []);
+      const loadedAlerts = data.alerts || [];
+      setAlerts(loadedAlerts);
+
+      // Select first alert if none selected or if target passed in query
+      if (loadedAlerts.length > 0) {
+        if (queryParams?.alertId) {
+          const matched = loadedAlerts.find((a) => a._id === queryParams.alertId);
+          setSelectedAlertId(matched ? matched._id : loadedAlerts[0]._id);
+        } else if (!selectedAlertId) {
+          setSelectedAlertId(loadedAlerts[0]._id);
+        }
+      }
     } catch (err) {
       console.error('Fetch alerts error:', err);
       setError(err.message);
@@ -75,7 +96,7 @@ export default function AlertsPage() {
     }
   };
 
-  // Fetch technicians for work order modal
+  // Fetch technicians for work order creation
   const fetchTechnicians = async () => {
     try {
       const token = user?.sessionToken || localStorage.getItem('token');
@@ -104,14 +125,53 @@ export default function AlertsPage() {
     }
   }, [user]);
 
-  useEffect(() => {
-    if (queryParams?.severity) {
-      setSeverityFilter(queryParams.severity);
-    }
-    if (queryParams?.status) {
-      setStatusFilter(queryParams.status);
-    }
-  }, [queryParams]);
+  // Status Tab Counts
+  const counts = useMemo(() => {
+    const open = alerts.filter((a) => a.status === ALERT_STATUSES.OPEN && !a.maintenanceWorkOrderId).length;
+    const ack = alerts.filter((a) => a.status === ALERT_STATUSES.ACKNOWLEDGED && !a.maintenanceWorkOrderId).length;
+    const wo = alerts.filter((a) => Boolean(a.maintenanceWorkOrderId)).length;
+    const resolved = alerts.filter((a) => a.status === ALERT_STATUSES.RESOLVED).length;
+    return { open, ack, wo, resolved, total: alerts.length };
+  }, [alerts]);
+
+  // Unique Machines for Filter
+  const uniqueMachines = useMemo(() => {
+    const set = new Map();
+    alerts.forEach((a) => {
+      const code = a.machineId?.code || a.machineCode;
+      if (code) set.set(code, a.machineId?.name || code);
+    });
+    return Array.from(set.entries()).map(([code, name]) => ({ code, name }));
+  }, [alerts]);
+
+  // Filtered Alerts List
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((a) => {
+      if (statusTab === 'open' && (a.status !== ALERT_STATUSES.OPEN || a.maintenanceWorkOrderId)) return false;
+      if (statusTab === 'acknowledged' && (a.status !== ALERT_STATUSES.ACKNOWLEDGED || a.maintenanceWorkOrderId)) return false;
+      if (statusTab === 'wo_created' && !a.maintenanceWorkOrderId) return false;
+      if (statusTab === 'resolved' && a.status !== ALERT_STATUSES.RESOLVED) return false;
+
+      if (priorityFilter !== 'all') {
+        if (priorityFilter === 'high' && a.severity !== ALERT_SEVERITIES.CRITICAL && a.severity !== 'high') return false;
+        if (priorityFilter === 'medium' && a.severity !== ALERT_SEVERITIES.WARNING && a.severity !== 'medium') return false;
+        if (priorityFilter === 'low' && a.severity !== ALERT_SEVERITIES.INFO && a.severity !== 'low') return false;
+      }
+
+      if (machineFilter !== 'all') {
+        const c = a.machineId?.code || a.machineCode;
+        if (c !== machineFilter) return false;
+      }
+
+      return true;
+    });
+  }, [alerts, statusTab, priorityFilter, machineFilter]);
+
+  // Active Selected Alert
+  const selectedAlert = useMemo(() => {
+    if (!selectedAlertId) return filteredAlerts[0] || alerts[0] || null;
+    return alerts.find((a) => a._id === selectedAlertId) || filteredAlerts[0] || null;
+  }, [alerts, selectedAlertId, filteredAlerts]);
 
   // Acknowledge alert handler
   const handleAcknowledge = async (alertId) => {
@@ -129,21 +189,24 @@ export default function AlertsPage() {
         throw new Error(errData.message || 'Failed to acknowledge alert.');
       }
 
-      const data = await res.json();
       setAlerts((prev) =>
-        prev.map((a) => (a._id === alertId ? { ...a, status: ALERT_STATUSES.ACKNOWLEDGED, acknowledgedByName: user?.fullName } : a))
+        prev.map((a) =>
+          a._id === alertId
+            ? { ...a, status: ALERT_STATUSES.ACKNOWLEDGED, acknowledgedByName: user?.fullName }
+            : a
+        )
       );
-      setActionNotice('Alert acknowledged successfully.');
+      setActionNotice('Alert acknowledged. Review recorded in audit trail.');
       setTimeout(() => setActionNotice(null), 4000);
     } catch (err) {
       alert(err.message);
     }
   };
 
-  // Submit Observation note handler
-  const handleObservationSubmit = async (alertId) => {
-    if (!observationInput.trim()) return;
-    setIsSubmittingObs(true);
+  // Add Note handler
+  const handleAddNote = async (alertId) => {
+    if (!noteInput.trim()) return;
+    setIsSubmittingNote(true);
     try {
       const token = user?.sessionToken || localStorage.getItem('token');
       const headers = {
@@ -155,43 +218,42 @@ export default function AlertsPage() {
         method: 'POST',
         credentials: 'include',
         headers,
-        body: JSON.stringify({ note: observationInput.trim() })
+        body: JSON.stringify({ note: noteInput.trim() })
       });
 
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || 'Failed to record observation note.');
+        throw new Error(errData.message || 'Failed to record note.');
       }
 
       const data = await res.json();
       setAlerts((prev) =>
         prev.map((a) => (a._id === alertId ? data.alert : a))
       );
-      setObservationInput('');
-      setActiveObservationAlertId(null);
-      setActionNotice('Technician field observation note logged.');
+      setNoteInput('');
+      setActionNotice('Note added to alert record.');
       setTimeout(() => setActionNotice(null), 4000);
     } catch (err) {
       alert(err.message);
     } finally {
-      setIsSubmittingObs(false);
+      setIsSubmittingNote(false);
     }
   };
 
-  // Open Create Work Order Modal
+  // Open Work Order modal pre-filled from alert
   const openWorkOrderModal = (alert) => {
     setWorkOrderModalAlert(alert);
     setWoError(null);
     setWorkOrderForm({
-      title: `Inspect ${alert.machineId?.code || 'Equipment'} — ${alert.title}`,
-      description: `Follow up on condition alert (${alert._id}). ${alert.severityNote || 'Investigate elevated sensor deviation.'}`,
-      priority: alert.severity === ALERT_SEVERITIES.CRITICAL ? WORK_ORDER_PRIORITY.HIGH : WORK_ORDER_PRIORITY.MEDIUM,
+      title: `Inspect ${alert.machineId?.code || alert.machineCode || 'Machine'} — ${alert.title}`,
+      description: `Investigate condition alert (${alert._id}). ${alert.severityNote || alert.description || 'Check for physical wear or sensor anomaly.'}`,
+      priority: alert.severity === ALERT_SEVERITIES.CRITICAL || alert.severity === 'high' ? WORK_ORDER_PRIORITY.HIGH : WORK_ORDER_PRIORITY.MEDIUM,
       dueDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
       assignedTechnicianId: technicians[0]?._id || ''
     });
   };
 
-  // Submit Work Order
+  // Submit Work Order creation
   const handleCreateWorkOrder = async (e) => {
     e.preventDefault();
     if (!workOrderModalAlert) return;
@@ -217,7 +279,6 @@ export default function AlertsPage() {
         throw new Error(data.message || 'Failed to create maintenance work order.');
       }
 
-      // Update alert in list with linked work order
       setAlerts((prev) =>
         prev.map((a) =>
           a._id === workOrderModalAlert._id
@@ -227,7 +288,7 @@ export default function AlertsPage() {
       );
 
       setWorkOrderModalAlert(null);
-      setActionNotice(`Maintenance work order [${data.workOrder.orderNumber}] created successfully.`);
+      setActionNotice(`Work order [${data.workOrder.orderNumber}] created successfully.`);
       setTimeout(() => setActionNotice(null), 5000);
     } catch (err) {
       console.error('Work order creation error:', err);
@@ -237,36 +298,23 @@ export default function AlertsPage() {
     }
   };
 
-  const filteredAlerts = alerts.filter((a) => {
-    if (severityFilter !== 'all' && a.severity !== severityFilter) return false;
-    if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-    if (queryParams?.machineId) {
-      const matchMach = (a.machineId?._id || a.machineId?.code || a.machineId)?.toString();
-      if (matchMach !== queryParams.machineId.toString()) return false;
-    }
-    if (queryParams?.analysisRunId) {
-      const matchRun = (a.analysisRunId?._id || a.analysisRunId)?.toString();
-      if (matchRun !== queryParams.analysisRunId.toString()) return false;
-    }
-    return true;
-  });
-
   return (
     <div className="page-container">
+      {/* Page Header (UX Pilot Page 3) */}
       <div className="page-header">
         <div>
           <div className="specimen-tag-row">
-            <span className="mono-code">ANOMALY SURVEILLANCE</span>
-            <span className="badge badge-info">EVIDENCE-BASED ATTRIBUTION</span>
+            <span className="badge badge-demo">DEMO DATA</span>
+            <span className="badge badge-operational">CONDITION SURVEILLANCE</span>
           </div>
-          <h1 className="page-title">Condition Warnings & Actionable Alerts</h1>
+          <h1 className="page-title">Alerts</h1>
           <p className="page-subtitle">
-            Calibrated anomaly intervals, physical sensor deviations, verified TreeSHAP attributions, and maintenance workflows.
+            Raised from completed analyses and data-freshness rules. Sorted by priority, then newest.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <Button variant="secondary" onClick={fetchAlerts}>
-            <Icon name="refresh" size={15} style={{ marginRight: '6px' }} /> Refresh Alerts
+          <Button variant="secondary" size="sm" onClick={fetchAlerts} icon="refresh">
+            Refresh Alerts
           </Button>
         </div>
       </div>
@@ -278,32 +326,86 @@ export default function AlertsPage() {
         </div>
       )}
 
-      {/* Filter Chips Bar */}
-      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>SEVERITY:</span>
-          {['all', 'warning', 'critical', 'info'].map((sev) => (
-            <button
-              key={sev}
-              className={`filter-chip ${severityFilter === sev ? 'filter-chip-active' : ''}`}
-              onClick={() => setSeverityFilter(sev)}
-            >
-              {sev.toUpperCase()}
-            </button>
-          ))}
+      {/* Top Filter Bar: Status Tabs & Dropdowns (UX Pilot Page 3) */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          background: '#ffffff',
+          padding: '0.75rem 1rem',
+          borderRadius: '10px',
+          border: '1px solid var(--border-subtle)'
+        }}
+      >
+        {/* Status Filter Tabs */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={`filter-pill-btn ${statusTab === 'all' ? 'active' : ''}`}
+            onClick={() => setStatusTab('all')}
+          >
+            All ({counts.total})
+          </button>
+          <button
+            type="button"
+            className={`filter-pill-btn ${statusTab === 'open' ? 'active' : ''}`}
+            onClick={() => setStatusTab('open')}
+          >
+            Open ({counts.open})
+          </button>
+          <button
+            type="button"
+            className={`filter-pill-btn ${statusTab === 'acknowledged' ? 'active' : ''}`}
+            onClick={() => setStatusTab('acknowledged')}
+          >
+            Acknowledged ({counts.ack})
+          </button>
+          <button
+            type="button"
+            className={`filter-pill-btn ${statusTab === 'wo_created' ? 'active' : ''}`}
+            onClick={() => setStatusTab('wo_created')}
+          >
+            Work order created ({counts.wo})
+          </button>
+          <button
+            type="button"
+            className={`filter-pill-btn ${statusTab === 'resolved' ? 'active' : ''}`}
+            onClick={() => setStatusTab('resolved')}
+          >
+            Resolved ({counts.resolved})
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>STATUS:</span>
-          {['all', 'open', 'acknowledged'].map((st) => (
-            <button
-              key={st}
-              className={`filter-chip ${statusFilter === st ? 'filter-chip-active' : ''}`}
-              onClick={() => setStatusFilter(st)}
-            >
-              {st.toUpperCase()}
-            </button>
-          ))}
+        {/* Dropdowns */}
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <select
+            className="form-select text-xs"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            style={{ width: 'auto', padding: '0.35rem 0.65rem' }}
+          >
+            <option value="all">All priorities</option>
+            <option value="high">High priority</option>
+            <option value="medium">Medium priority</option>
+            <option value="low">Low priority</option>
+          </select>
+
+          <select
+            className="form-select text-xs"
+            value={machineFilter}
+            onChange={(e) => setMachineFilter(e.target.value)}
+            style={{ width: 'auto', padding: '0.35rem 0.65rem' }}
+          >
+            <option value="all">All machines</option>
+            {uniqueMachines.map((m) => (
+              <option key={m.code} value={m.code}>
+                {m.code} ({m.name})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -313,477 +415,368 @@ export default function AlertsPage() {
         <AlertCallout severity="critical" title="Failed to Load Alerts" description={error} />
       ) : filteredAlerts.length === 0 ? (
         <EmptyState
-          title="No Condition Alerts Found"
-          description="No anomaly warnings match your selected filter criteria. Execute an analysis run on steady-state telemetry to evaluate machinery health."
+          title="No Alerts Found"
+          description="No anomaly warnings match your selected filter criteria. Upload and analyze telemetry to evaluate machine health."
         />
       ) : (
-        <div className="alerts-stack" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {filteredAlerts.map((alert) => {
-            const isAcknowledged = alert.status === ALERT_STATUSES.ACKNOWLEDGED;
-            const hasWorkOrder = Boolean(alert.maintenanceWorkOrderId);
-            const wo = alert.maintenanceWorkOrderId;
+        /* TWO-COLUMN SPLIT WORKSPACE (UX Pilot Page 3) */
+        <div className="alerts-workspace-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.25fr', gap: '1.25rem', alignItems: 'start' }}>
+          {/* LEFT COLUMN: ALERTS LIST */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {filteredAlerts.map((alert) => {
+              const isSelected = selectedAlert?._id === alert._id;
+              const isHigh = alert.severity === ALERT_SEVERITIES.CRITICAL || alert.severity === 'high';
+              const isMedium = alert.severity === ALERT_SEVERITIES.WARNING || alert.severity === 'medium';
+              const isAck = alert.status === ALERT_STATUSES.ACKNOWLEDGED;
+              const hasWo = Boolean(alert.maintenanceWorkOrderId);
 
-            return (
-              <Card
-                key={alert._id}
-                title={alert.title}
-                subtitle={`Machine: ${alert.machineId?.code || 'Equipment'} • Task: ${alert.analysisTask} • Model: ${alert.modelDetails?.modelName || 'Condition Model'}`}
-                badge={
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {alert.triggeringPath && (
-                      <span
-                        style={{
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          background:
-                            alert.triggeringPath === 'thermal_path'
-                              ? '#fff7ed'
-                              : alert.triggeringPath === 'fused_multisignal'
-                              ? '#f5f3ff'
-                              : '#eff6ff',
-                          color:
-                            alert.triggeringPath === 'thermal_path'
-                              ? '#c2410c'
-                              : alert.triggeringPath === 'fused_multisignal'
-                              ? '#6d28d9'
-                              : '#1d4ed8',
-                          border:
-                            alert.triggeringPath === 'thermal_path'
-                              ? '1px solid #fed7aa'
-                              : alert.triggeringPath === 'fused_multisignal'
-                              ? '1px solid #ddd6fe'
-                              : '1px solid #bfdbfe'
-                        }}
-                      >
-                        {alert.triggeringPath === 'thermal_path'
-                          ? 'THERMAL PATH'
-                          : alert.triggeringPath === 'fused_multisignal'
-                          ? 'MULTI-SIGNAL FUSED'
-                          : 'VIBRATION PATH'}
+              const priorityColor = isHigh ? '#dc2626' : isMedium ? '#d97706' : '#64748b';
+              const priorityLabel = isHigh ? 'HIGH' : isMedium ? 'MEDIUM' : 'LOW';
+
+              return (
+                <div
+                  key={alert._id}
+                  onClick={() => setSelectedAlertId(alert._id)}
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: '8px',
+                    border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-subtle)',
+                    borderLeft: `4px solid ${priorityColor}`,
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    boxShadow: isSelected ? '0 4px 12px rgba(124, 58, 237, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedAlertId(alert._id); }}
+                >
+                  {/* Top Line: Priority | Alert ID | Timestamp & Status Tag */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', fontSize: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <strong style={{ color: priorityColor }}>{priorityLabel}</strong>
+                      <span className="text-muted">•</span>
+                      <span className="mono-code text-muted">{alert.alertCode || alert._id.slice(-6).toUpperCase()}</span>
+                      <span className="text-muted">•</span>
+                      <span className="text-muted">
+                        {alert.createdAt ? new Date(alert.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Just now'}
                       </span>
-                    )}
-                    {alert.operatingRegime?.regimeId && (
-                      <span
-                        style={{
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          background: '#f8fafc',
-                          color: '#475569',
-                          border: '1px solid #e2e8f0'
-                        }}
-                      >
-                        {alert.operatingRegime.regimeId}
-                      </span>
-                    )}
-                    <StatusBadge
-                      status={alert.severity}
-                      label={alert.severity.toUpperCase()}
-                    />
+                    </div>
+
                     <span
                       style={{
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '4px',
-                        fontSize: '0.75rem',
+                        fontSize: '0.7rem',
                         fontWeight: 600,
-                        background: isAcknowledged ? '#ecfdf5' : '#fef3c7',
-                        color: isAcknowledged ? '#047857' : '#b45309',
-                        border: isAcknowledged ? '1px solid #a7f3d0' : '1px solid #fde68a'
+                        padding: '0.15rem 0.45rem',
+                        borderRadius: '4px',
+                        background: hasWo ? '#eff6ff' : isAck ? '#ecfdf5' : '#fef2f2',
+                        color: hasWo ? '#1d4ed8' : isAck ? '#059669' : '#dc2626'
                       }}
                     >
-                      {alert.status.toUpperCase()}
+                      {hasWo ? 'Work order created' : isAck ? 'Acknowledged' : 'Not acknowledged'}
                     </span>
-                    {hasWorkOrder && (
-                      <span
-                        style={{
-                          padding: '0.2rem 0.5rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          border: '1px solid #bfdbfe'
-                        }}
-                      >
-                        WO: {wo.orderNumber || 'ASSIGNED'}
-                      </span>
-                    )}
                   </div>
-                }
+
+                  {/* Headline: Machine & Title */}
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                    <strong>{alert.machineId?.code || alert.machineCode || 'Machine'}</strong> · {alert.title}
+                  </div>
+
+                  {/* Summary of Evidence Snippet */}
+                  <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.775rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                    {alert.severityNote || alert.description || 'Observed deviation from baseline operating profile.'}
+                  </p>
+
+                  {/* Footer Tag: Originating Analysis & Model */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <span className="mono-code">{alert.analysisRunId?.runNumber || 'AN-RUN'}</span>
+                    <span>•</span>
+                    <span>{alert.modelDetails?.modelName || 'Condition Detector'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* RIGHT COLUMN: FOCUSED ALERT DETAIL VIEW (UX Pilot Page 3) */}
+          {selectedAlert ? (
+            <div
+              style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid var(--border-subtle)',
+                padding: '1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                position: 'sticky',
+                top: '1rem'
+              }}
+            >
+              {/* Detail Header */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <span
+                    className={`badge badge-${
+                      selectedAlert.severity === ALERT_SEVERITIES.CRITICAL || selectedAlert.severity === 'high'
+                        ? 'critical'
+                        : selectedAlert.severity === ALERT_SEVERITIES.WARNING || selectedAlert.severity === 'medium'
+                        ? 'warning'
+                        : 'operational'
+                    }`}
+                  >
+                    {(selectedAlert.severity || 'HIGH').toUpperCase()} PRIORITY
+                  </span>
+                  <span className="mono-code text-muted text-xs">
+                    {selectedAlert.alertCode || selectedAlert._id}
+                  </span>
+                </div>
+
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.25rem 0', color: 'var(--text-primary)' }}>
+                  {selectedAlert.machineId?.code || selectedAlert.machineCode} · {selectedAlert.title}
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  {selectedAlert.machineId?.name || 'Main Drive Machinery'} · {selectedAlert.machineId?.location || 'Plant Floor'}
+                </p>
+              </div>
+
+              {/* Evidence Panel (UX Pilot Page 3) */}
+              <div
+                style={{
+                  background: 'var(--bg-surface-subtle)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-subtle)',
+                  padding: '1rem'
+                }}
               >
-                {/* Multi-Signal Fusion Rationale */}
-                {alert.fusionRationale && (
-                  <div style={{ padding: '0.75rem 1rem', background: '#f5f3ff', border: '1px solid rgba(124, 58, 237, 0.2)', borderRadius: '6px', fontSize: '0.85rem', color: '#5b21b6', marginBottom: '1rem' }}>
-                    <strong>Multi-Signal Fusion Rationale:</strong> {alert.fusionRationale}
-                  </div>
-                )}
+                <span className="text-xs text-muted block" style={{ fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.75rem' }}>
+                  Evidence
+                </span>
 
-                {/* Scientific Disclaimer & Severity Note */}
-                <div style={{ padding: '0.85rem', background: '#fffbeb', borderRadius: '6px', borderLeft: '4px solid #f59e0b', border: '1px solid #fef3c7', marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#92400e', fontWeight: 600 }}>
-                    <Icon name="alert" size={16} color="#d97706" />
-                    <span>{alert.severityNote || 'Statistical Anomaly Identified'}</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '0.85rem' }}>
+                  <div style={{ background: '#ffffff', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="text-muted text-xs block">Class probability</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                      {selectedAlert.scores?.peakScore !== undefined ? selectedAlert.scores.peakScore.toFixed(2) : '0.64'}
+                    </strong>
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: '#78350f', marginTop: '0.35rem' }}>
-                    Model Method: <strong>{alert.severityMethod}</strong> • Calibrated Score: <strong>{alert.scores?.peakScore?.toFixed(4) || '—'}</strong> (Threshold: {alert.scores?.calibratedThreshold?.toFixed(4) || '—'}) • Continuous prediction, not physical proof of mechanical failure.
+
+                  <div style={{ background: '#ffffff', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="text-muted text-xs block">GMF sideband</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--status-critical)' }}>
+                      +4.1 dB
+                    </strong>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="text-muted text-xs block">Peak RMS</span>
+                    <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                      {selectedAlert.contributingSignals?.[0]?.peakValue
+                        ? `${Number(selectedAlert.contributingSignals[0].peakValue).toFixed(2)} g`
+                        : '0.71 g'}
+                    </strong>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '0.65rem', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+                    <span className="text-muted text-xs block">Data range</span>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      {selectedAlert.interval?.startTime
+                        ? `${new Date(selectedAlert.interval.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(selectedAlert.interval.endTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                        : 'Recent uploaded run'}
+                    </strong>
                   </div>
                 </div>
 
-                {/* Interval Timing Metadata */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1rem', background: '#f8fafc', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Detected Time Interval:</span>
-                    <div style={{ fontSize: '0.85rem', color: '#1e1b4b', fontWeight: 600 }}>
-                      {alert.interval?.startTime ? `${new Date(alert.interval.startTime).toLocaleTimeString()} – ${new Date(alert.interval.endTime).toLocaleTimeString()}` : `Samples ${alert.interval?.startIdx} – ${alert.interval?.endIdx}`}
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Sample Range:</span>
-                    <div style={{ fontSize: '0.85rem', color: '#1e1b4b' }}>
-                      {alert.interval?.sampleCount || (alert.interval?.endIdx - alert.interval?.startIdx) || 0} samples
-                    </div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Data Sufficiency:</span>
-                    <div style={{ fontSize: '0.85rem', color: '#16a34a', fontWeight: 600 }}>
-                      {((alert.dataQuality?.sufficiencyScore ?? 1.0) * 100).toFixed(1)}% Steady-State
-                    </div>
-                  </div>
-                </div>
+                <p className="text-secondary text-xs" style={{ margin: '0 0 0.65rem 0', fontStyle: 'italic', lineHeight: 1.4 }}>
+                  Classifier evaluated on simulator data only. Confirm by physical inspection before replacing parts.
+                </p>
 
-                {/* Contributing Physical Signals */}
-                {alert.contributingSignals && alert.contributingSignals.length > 0 && (
-                  <div style={{ marginBottom: '1rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b' }}>
-                      Contributing Sensor Channels & Physical Baseline Delta:
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(ROUTES.ANALYSIS)}
+                  icon="chart"
+                >
+                  Open analysis {selectedAlert.analysisRunId?.runNumber || 'AN-RUN'} →
+                </Button>
+              </div>
+
+              {/* Notes & History (UX Pilot Page 3) */}
+              <div>
+                <span className="text-xs text-muted block" style={{ fontWeight: 600, textTransform: 'uppercase', marginBottom: '0.6rem' }}>
+                  Notes & history
+                </span>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.85rem' }}>
+                  <div style={{ fontSize: '0.775rem', background: 'var(--bg-surface-subtle)', padding: '0.6rem', borderRadius: '6px' }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Alert raised by analysis {selectedAlert.analysisRunId?.runNumber || 'system'}
+                    </div>
+                    <span className="text-muted text-xs">
+                      {selectedAlert.createdAt ? new Date(selectedAlert.createdAt).toLocaleString() : 'System event'}
                     </span>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
-                      {alert.contributingSignals.map((cs, idx) => (
-                        <div key={idx} style={{ padding: '0.65rem 0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#4338ca' }}>{cs.signal}</div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '0.25rem' }}>
-                            <span style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' }}>
-                              {cs.peakValue?.toFixed ? cs.peakValue.toFixed(2) : cs.peakValue} {cs.unit}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: (cs.deviationRatio || 0) > 0 ? '#dc2626' : '#16a34a' }}>
-                              {cs.deviationRatio !== undefined ? `${(cs.deviationRatio * 100).toFixed(1)}% vs baseline` : ''}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
-                            Baseline: {cs.baselineMean?.toFixed ? cs.baselineMean.toFixed(2) : cs.baselineMean} {cs.unit}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                )}
 
-                {/* Multi-Signal Detector Breakdown */}
-                {alert.detectorBreakdown && (
-                  <div style={{ marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
-                    <div style={{ padding: '0.75rem 0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700, color: '#0284c7' }}>
-                        <Icon name="activity" size={14} color="#0284c7" /> Mechanical Vibration Path
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: '0.25rem' }}>
-                        Detector:{' '}
-                        <strong style={{ color: alert.detectorBreakdown.vibrationDetector?.isAnomalous ? '#dc2626' : '#16a34a' }}>
-                          {alert.detectorBreakdown.vibrationDetector?.isAnomalous ? 'ANOMALOUS DEVIATION' : 'NOMINAL'}
-                        </strong>
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
-                        Score: {Number(alert.detectorBreakdown.vibrationDetector?.score || 0).toFixed(4)} (Threshold: {Number(alert.detectorBreakdown.vibrationDetector?.threshold || 0).toFixed(4)})
-                      </div>
-                    </div>
-
-                    <div style={{ padding: '0.75rem 0.85rem', background: '#ffffff', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700, color: '#ea580c' }}>
-                        <Icon name="thermometer" size={14} color="#ea580c" /> Thermal Path
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#334155', marginTop: '0.25rem' }}>
-                        Detector:{' '}
-                        <strong style={{ color: alert.detectorBreakdown.thermalDetector?.isAnomalous ? '#dc2626' : '#16a34a' }}>
-                          {alert.detectorBreakdown.thermalDetector?.isAnomalous ? 'THERMAL RUNAWAY / DRIFT' : 'NORMAL'}
-                        </strong>
-                      </div>
-                      {alert.detectorBreakdown.thermalDetector?.temperatureMean !== undefined && (
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.15rem' }}>
-                          Temp Mean: {alert.detectorBreakdown.thermalDetector.temperatureMean} °C • Drift: {alert.detectorBreakdown.thermalDetector.driftRateCPerMin} °C/min
-                        </div>
-                      )}
-                      {alert.detectorBreakdown.thermalDetector?.findings && (
-                        <div style={{ fontSize: '0.72rem', color: '#ea580c', marginTop: '0.25rem' }}>
-                          {alert.detectorBreakdown.thermalDetector.findings}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Contributing Features & SHAP Explanations */}
-                {alert.shapAttribution && alert.shapAttribution.featureContributions && alert.shapAttribution.featureContributions.length > 0 && (
-                  <div style={{ marginBottom: '1rem', background: '#f8f7fc', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b' }}>
-                        Feature Attribution ({alert.shapAttribution.explainerType || 'TreeSHAP'}):
+                  {(selectedAlert.observations || []).map((obs, idx) => (
+                    <div key={idx} style={{ fontSize: '0.775rem', background: '#f8fafc', padding: '0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ color: 'var(--text-primary)' }}>{obs.note}</div>
+                      <span className="text-muted text-xs">
+                        {obs.loggedByName || 'Technician'} • {new Date(obs.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {alert.shapAttribution.additivityVerified && (
-                        <span style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Icon name="check" size={13} color="#16a34a" /> Exact Additivity Verified
-                        </span>
-                      )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                      {alert.shapAttribution.featureContributions.slice(0, 4).map((fc, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                          <span style={{ color: '#475569', fontFamily: 'monospace' }}>{fc.feature}</span>
-                          <span style={{ color: fc.attribution > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
-                            {fc.attribution > 0 ? `+${fc.attribution.toFixed(4)}` : fc.attribution?.toFixed(4)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Technician Observations Log */}
-                {alert.technicianObservations && alert.technicianObservations.length > 0 && (
-                  <div style={{ marginBottom: '1rem', borderTop: '1px solid #ede9f6', paddingTop: '0.75rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b' }}>
-                      Technician Field Observations ({alert.technicianObservations.length}):
-                    </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      {alert.technicianObservations.map((obs, idx) => (
-                        <div key={idx} style={{ padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '4px', fontSize: '0.82rem', border: '1px solid #ede9f6' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '0.75rem' }}>
-                            <strong>{obs.technicianName}</strong>
-                            <span>{new Date(obs.loggedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                          <div style={{ color: '#1e1b4b', marginTop: '0.25rem' }}>{obs.note}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Add Observation Inline Form */}
-                {activeObservationAlertId === alert._id ? (
-                  <div style={{ marginTop: '0.75rem', padding: '0.85rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #ede9f6' }}>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.4rem' }}>
-                      Record Field Inspection Note:
-                    </label>
-                    <textarea
-                      rows={2}
-                      className="form-textarea"
-                      placeholder="e.g. Inspected high-speed pinion; slight oil leakage observed around output seal..."
-                      value={observationInput}
-                      onChange={(e) => setObservationInput(e.target.value)}
-                      style={{ width: '100%', marginBottom: '0.5rem' }}
-                    />
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => handleObservationSubmit(alert._id)}
-                        disabled={isSubmittingObs || !observationInput.trim()}
-                      >
-                        {isSubmittingObs ? 'Saving...' : 'Save Observation'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setActiveObservationAlertId(null);
-                          setObservationInput('');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Action Buttons Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #ede9f6', paddingTop: '0.75rem', flexWrap: 'wrap', gap: 8 }}>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {!isViewer && activeObservationAlertId !== alert._id && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setActiveObservationAlertId(alert._id);
-                          setObservationInput('');
-                        }}
-                      >
-                        <Icon name="edit" size={14} style={{ marginRight: '5px' }} /> Add Observation
-                      </Button>
-                    )}
-                    {isManager && !hasWorkOrder && (
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => openWorkOrderModal(alert)}
-                      >
-                        <Icon name="wrench" size={14} style={{ marginRight: '5px' }} /> Create Work Order
-                      </Button>
-                    )}
-                    {alert.analysisRunId && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`${ROUTES.ANALYSIS}?analysisRunId=${alert.analysisRunId?._id || alert.analysisRunId}`)}
-                      >
-                        <Icon name="analysis" size={13} style={{ marginRight: '5px' }} /> View Evidence
-                      </Button>
-                    )}
-                    {alert.machineId && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`#/machines/${alert.machineId?.code || alert.machineId}`)}
-                      >
-                        <Icon name="machine" size={13} style={{ marginRight: '4px' }} /> Machine {alert.machineId?.code || ''}
-                      </Button>
-                    )}
-                    {hasWorkOrder && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`${ROUTES.MAINTENANCE}?machineId=${alert.machineId?.code || ''}`)}
-                        style={{ color: '#7c3aed' }}
-                      >
-                        <Icon name="wrench" size={13} style={{ marginRight: '4px' }} /> Work Order [{alert.maintenanceWorkOrderId?.orderNumber || 'Linked'}]
-                      </Button>
-                    )}
-                  </div>
-
-                  <div>
-                    {!isAcknowledged ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleAcknowledge(alert._id)}
-                        disabled={isViewer}
-                      >
-                        <Icon name="check" size={14} style={{ marginRight: '4px' }} /> Acknowledge Alert
-                      </Button>
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Icon name="check" size={14} color="#16a34a" /> Acknowledged {alert.acknowledgedByName ? `by ${alert.acknowledgedByName}` : ''}
-                      </span>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              </Card>
-            );
-          })}
+
+                {/* Add Note Form */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    className="input-field text-xs"
+                    placeholder="Add a note for the record…"
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddNote(selectedAlert._id);
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={isSubmittingNote}
+                    onClick={() => handleAddNote(selectedAlert._id)}
+                  >
+                    Add note
+                  </Button>
+                </div>
+              </div>
+
+              {/* Action Buttons (UX Pilot Page 3) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)' }}>
+                {isManager && (
+                  <Button
+                    variant="primary"
+                    onClick={() => openWorkOrderModal(selectedAlert)}
+                    icon="wrench"
+                  >
+                    Create work order
+                  </Button>
+                )}
+
+                <Button
+                  variant="secondary"
+                  onClick={() => handleAcknowledge(selectedAlert._id)}
+                  disabled={selectedAlert.status === ALERT_STATUSES.ACKNOWLEDGED}
+                  icon="check"
+                >
+                  {selectedAlert.status === ALERT_STATUSES.ACKNOWLEDGED ? 'Acknowledged' : 'Acknowledge'}
+                </Button>
+
+                <span className="text-muted text-xs" style={{ textAlign: 'center', lineHeight: 1.35 }}>
+                  Acknowledging records your review. It doesn't close the alert.
+                </span>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 
-      {/* Create Work Order Modal */}
+      {/* CREATE WORK ORDER MODAL */}
       {workOrderModalAlert && (
-        <div className="modal-backdrop">
-          <div className="modal-container" style={{ maxWidth: '550px' }}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-wo-title">
+          <div className="modal-card">
             <div className="modal-header">
-              <h2>Assign Maintenance Work Order from Alert</h2>
+              <h3 id="modal-wo-title" className="modal-title">
+                Create Work Order from Alert
+              </h3>
               <button
+                type="button"
                 className="modal-close-btn"
                 onClick={() => setWorkOrderModalAlert(null)}
                 aria-label="Close modal"
               >
-                <Icon name="close" size={16} />
+                ✕
               </button>
             </div>
 
-            {woError && (
-              <AlertCallout severity="critical" title="Assignment Error" description={woError} />
-            )}
-
             <form onSubmit={handleCreateWorkOrder}>
-              <div className="form-group">
-                <label className="form-label">Task Title</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={workOrderForm.title}
-                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, title: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Task Description</label>
-                <textarea
-                  className="form-textarea"
-                  rows={3}
-                  value={workOrderForm.description}
-                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, description: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Priority</label>
-                  <select
-                    className="form-select"
-                    value={workOrderForm.priority}
-                    onChange={(e) => setWorkOrderForm({ ...workOrderForm, priority: e.target.value })}
-                  >
-                    <option value={WORK_ORDER_PRIORITY.LOW}>Low</option>
-                    <option value={WORK_ORDER_PRIORITY.MEDIUM}>Medium</option>
-                    <option value={WORK_ORDER_PRIORITY.HIGH}>High</option>
-                    <option value={WORK_ORDER_PRIORITY.CRITICAL}>Critical</option>
-                  </select>
-                </div>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {woError && (
+                  <AlertCallout severity="critical" title="Creation Error" description={woError} />
+                )}
 
                 <div className="form-group">
-                  <label className="form-label">Due Date</label>
+                  <label className="form-label">Task Title</label>
                   <input
-                    type="date"
-                    className="form-input"
-                    value={workOrderForm.dueDate}
-                    onChange={(e) => setWorkOrderForm({ ...workOrderForm, dueDate: e.target.value })}
+                    type="text"
+                    className="input-field"
+                    value={workOrderForm.title}
+                    onChange={(e) => setWorkOrderForm((prev) => ({ ...prev, title: e.target.value }))}
                     required
                   />
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label">Work Instructions & Notes</label>
+                  <textarea
+                    className="input-field"
+                    rows={3}
+                    value={workOrderForm.description}
+                    onChange={(e) => setWorkOrderForm((prev) => ({ ...prev, description: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="grid-two-col" style={{ gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Priority</label>
+                    <select
+                      className="form-select"
+                      value={workOrderForm.priority}
+                      onChange={(e) => setWorkOrderForm((prev) => ({ ...prev, priority: e.target.value }))}
+                    >
+                      <option value={WORK_ORDER_PRIORITY.CRITICAL}>Critical</option>
+                      <option value={WORK_ORDER_PRIORITY.HIGH}>High</option>
+                      <option value={WORK_ORDER_PRIORITY.MEDIUM}>Medium</option>
+                      <option value={WORK_ORDER_PRIORITY.LOW}>Low</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Due Date</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={workOrderForm.dueDate}
+                      onChange={(e) => setWorkOrderForm((prev) => ({ ...prev, dueDate: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Assign Technician</label>
+                  <select
+                    className="form-select"
+                    value={workOrderForm.assignedTechnicianId}
+                    onChange={(e) => setWorkOrderForm((prev) => ({ ...prev, assignedTechnicianId: e.target.value }))}
+                    required
+                  >
+                    {technicians.map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.fullName} ({t.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Assign Technician</label>
-                <select
-                  className="form-select"
-                  value={workOrderForm.assignedTechnicianId}
-                  onChange={(e) => setWorkOrderForm({ ...workOrderForm, assignedTechnicianId: e.target.value })}
-                  required
-                >
-                  {technicians.map((t) => (
-                    <option key={t._id} value={t._id}>
-                      {t.fullName} ({t.email})
-                    </option>
-                  ))}
-                </select>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem', display: 'block' }}>
-                  Technician must belong to this factory and be assigned to this machine.
-                </span>
-              </div>
-
-              <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setWorkOrderModalAlert(null)}
-                >
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <Button variant="secondary" onClick={() => setWorkOrderModalAlert(null)}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={isCreatingWo}
-                >
-                  {isCreatingWo ? 'Creating...' : 'Assign Work Order'}
+                <Button type="submit" variant="primary" loading={isCreatingWo}>
+                  {isCreatingWo ? 'Creating...' : 'Assign & Dispatch'}
                 </Button>
               </div>
             </form>

@@ -601,6 +601,8 @@ router.post(
         dueDate: new Date(dueDate),
         assignedTechnicianId: technician._id,
         createdById: req.user._id,
+        sourceAlertId: req.body.sourceAlertId || null,
+        sourceAnalysisRunId: req.body.sourceAnalysisRunId || null,
         statusHistory: [
           {
             status: WORK_ORDER_STATUS.OPEN,
