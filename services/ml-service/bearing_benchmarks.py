@@ -106,11 +106,11 @@ def extract_features_cwru(window: np.ndarray, fs: float = 12000.0) -> Dict[str, 
     return time_feats
 
 
-def prepare_cwru_dataset(window_size: int = 2048, stride: int = 1024):
-    """Segment CWRU files into standardized feature windows with metadata."""
+def extract_windows_for_cwru_files(file_items: List[Dict[str, Any]], window_size: int = 2048, stride: int = 1024) -> pd.DataFrame:
+    """Segment specific CWRU recording files into standardized feature windows with metadata."""
     rows = []
     
-    for item in CWRU_FILES_MAP:
+    for item in file_items:
         mat_path = os.path.join(RAW_CWRU_DIR, item["file"])
         if not os.path.exists(mat_path):
             raise FileNotFoundError(f"Missing required CWRU file: {mat_path}")
@@ -139,17 +139,39 @@ def prepare_cwru_dataset(window_size: int = 2048, stride: int = 1024):
             })
             rows.append(feats)
 
-    df = pd.DataFrame(rows)
-    return df
+    return pd.DataFrame(rows)
+
+
+def prepare_cwru_dataset(window_size: int = 2048, stride: int = 1024) -> pd.DataFrame:
+    """Convenience helper to extract windows across all mapped CWRU files."""
+    return extract_windows_for_cwru_files(CWRU_FILES_MAP, window_size=window_size, stride=stride)
 
 
 def run_cwru_benchmark():
     """Train Random Forest classifier on CWRU with held-out motor load test partition."""
-    print("Preparing CWRU benchmark dataset...")
-    df = prepare_cwru_dataset(window_size=2048, stride=1024)
-    print(f"Total extracted windows: {len(df)}")
-    print("Class distribution:\n", df["fault_class"].value_counts())
-    print("Load distribution:\n", df["load_hp"].value_counts())
+    print("Preparing CWRU benchmark dataset with strict pre-windowing recording separation...")
+    # 1. PHYSICAL RECORDING-LEVEL SEPARATION BEFORE WINDOW CREATION:
+    # Separate source recordings into train (0, 1, 2 HP) and test (3 HP) BEFORE window extraction.
+    # Because slicing operates on distinct physical .mat files, adjacent/overlapping windows
+    # from a recording CANNOT appear in both sets.
+    train_file_items = [item for item in CWRU_FILES_MAP if item["load_hp"] in [0, 1, 2]]
+    test_file_items = [item for item in CWRU_FILES_MAP if item["load_hp"] == 3]
+
+    print(f"Separated physical source recordings: {len(train_file_items)} train files, {len(test_file_items)} test files.")
+    df_train = extract_windows_for_cwru_files(train_file_items, window_size=2048, stride=1024)
+    df_test = extract_windows_for_cwru_files(test_file_items, window_size=2048, stride=1024)
+
+    # Verification: Confirm zero overlap of source files or run IDs between train and test
+    train_source_files = set(df_train["source_file"].unique())
+    test_source_files = set(df_test["source_file"].unique())
+    assert train_source_files.isdisjoint(test_source_files), "Window leakage detected between train and test recordings!"
+
+    total_windows = len(df_train) + len(df_test)
+    print(f"Total extracted windows: {total_windows}")
+    print(f"Training windows (0, 1, 2 HP across {len(train_file_items)} files): {len(df_train)}")
+    print(f"Held-out test windows (3 HP across {len(test_file_items)} files): {len(df_test)}")
+    print("Train class distribution:\n", df_train["fault_class"].value_counts())
+    print("Test class distribution:\n", df_test["fault_class"].value_counts())
 
     feature_cols = [
         "vib_rms", "vib_peak_to_peak", "vib_crest_factor", "vib_kurtosis",
@@ -157,21 +179,10 @@ def run_cwru_benchmark():
         "spectral_centroid", "band_power_low", "band_power_mid", "band_power_high"
     ]
 
-    # LEAKAGE-SAFE SPLIT:
-    # Train on 0, 1, 2 HP loads; Test strictly on 3 HP held-out load
-    train_mask = df["load_hp"].isin([0, 1, 2])
-    test_mask = df["load_hp"] == 3
-
-    df_train = df[train_mask].copy()
-    df_test = df[test_mask].copy()
-
     X_train_raw = df_train[feature_cols].values
     y_train = df_train["fault_class"].values
     X_test_raw = df_test[feature_cols].values
     y_test = df_test["fault_class"].values
-
-    print(f"Training windows (0, 1, 2 HP): {len(X_train_raw)}")
-    print(f"Held-out test windows (3 HP): {len(X_test_raw)}")
 
     # Preprocessing: Fit scaler on training partition ONLY
     scaler = StandardScaler()
@@ -285,7 +296,7 @@ def run_cwru_benchmark():
         "evaluation_version": "eval-cwru-2025-03-12",
         "split_strategy": "Held out by motor load condition: Train on 0, 1, 2 HP (1750-1797 RPM); Test strictly on 3 HP (1730 RPM). Leakage-free across operational loads.",
         "sample_counts": {
-            "total_windows": len(df),
+            "total_windows": len(df_train) + len(df_test),
             "train_windows": len(df_train),
             "test_windows": len(df_test)
         },

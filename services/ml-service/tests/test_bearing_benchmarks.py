@@ -19,7 +19,7 @@ SERVICE_DIR = os.path.dirname(CURRENT_DIR)
 if SERVICE_DIR not in sys.path:
     sys.path.insert(0, SERVICE_DIR)
 
-from bearing_benchmarks import extract_features_cwru, CWRU_FILES_MAP
+from bearing_benchmarks import extract_features_cwru, extract_windows_for_cwru_files, CWRU_FILES_MAP
 
 BENCHMARKS_DIR = os.path.join(SERVICE_DIR, "artifacts", "benchmarks")
 MODELS_DIR = os.path.join(SERVICE_DIR, "artifacts", "models")
@@ -170,3 +170,34 @@ def test_bearing_model_artifacts_loadable():
     assert if_artifact["version"] == "IF-Bearing-Anomaly v1.0"
     assert if_artifact["target_domain"] == "bearing"
     assert if_artifact["calibrated_threshold_normalized"] > 0.0
+
+
+def test_cwru_window_leakage_safe_separation():
+    """Verify train and test source recordings are partitioned prior to windowing with 0 leakage."""
+    train_items = [f for f in CWRU_FILES_MAP if f["load_hp"] in [0, 1, 2]]
+    test_items = [f for f in CWRU_FILES_MAP if f["load_hp"] == 3]
+
+    # Verify physical file disjointness
+    train_files = {item["file"] for item in train_items}
+    test_files = {item["file"] for item in test_items}
+    assert train_files.isdisjoint(test_files)
+
+    # Verify window slicing keeps partitions strictly separate
+    df_train = extract_windows_for_cwru_files(train_items, window_size=2048, stride=1024)
+    df_test = extract_windows_for_cwru_files(test_items, window_size=2048, stride=1024)
+
+    assert set(df_train["source_file"].unique()).isdisjoint(set(df_test["source_file"].unique()))
+    assert set(df_train["run_id"].unique()).isdisjoint(set(df_test["run_id"].unique()))
+
+    # Verify sample counts
+    assert len(df_train) == 2237
+    assert len(df_test) == 827
+    assert len(df_train) + len(df_test) == 3064
+
+    # Verify all classes exist in test set
+    test_counts = df_test["fault_class"].value_counts().to_dict()
+    assert test_counts["normal"] == 473
+    assert test_counts["inner_race"] == 119
+    assert test_counts["ball"] == 117
+    assert test_counts["outer_race"] == 118
+
