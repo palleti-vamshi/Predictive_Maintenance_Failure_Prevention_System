@@ -38,8 +38,8 @@ export function AuthProvider({ children }) {
     checkCurrentSession();
   }, [checkCurrentSession]);
 
-  // Login action
-  const login = async (emailOrUsername, password) => {
+  // Login action with optional expectedRole verification
+  const login = async (emailOrUsername, password, expectedRole = null) => {
     setLoading(true);
     setAuthError(null);
     try {
@@ -60,6 +60,45 @@ export function AuthProvider({ children }) {
         const msg = data.message || 'Login failed. Please check your credentials.';
         setAuthError(msg);
         return { success: false, message: msg };
+      }
+
+      // Role boundary check: Ensure server-verified role matches expected sign-in context
+      if (expectedRole) {
+        const userRole = data.user.role;
+        const matchesManager = expectedRole === 'manager' && userRole === 'factory_manager';
+        const matchesTech = expectedRole === 'technician' && userRole === 'technician';
+
+        if (!matchesManager && !matchesTech) {
+          // Immediately revoke session cookie on server
+          try {
+            await fetch(`${API_BASE}/auth/logout`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { Accept: 'application/json' }
+            });
+          } catch {
+            // ignore logout failure on mismatch cleanup
+          }
+
+          const actualLabel =
+            userRole === 'factory_manager'
+              ? 'Factory Manager'
+              : userRole === 'technician'
+              ? 'Field Technician'
+              : 'Factory Viewer';
+          const expectedLabel = expectedRole === 'manager' ? 'Manager' : 'Technician';
+
+          const mismatchMsg = `Role mismatch: This account is authenticated as ${actualLabel}, which does not match your selected ${expectedLabel} sign-in context. Please switch the role choice or sign in with an authorized account.`;
+          setAuthError(mismatchMsg);
+          return { success: false, message: mismatchMsg };
+        }
+      }
+
+      // Direct user to role-specific landing page
+      if (data.user.role === 'technician') {
+        window.location.hash = '#/maintenance';
+      } else {
+        window.location.hash = '#/';
       }
 
       setUser(data.user);
@@ -139,7 +178,8 @@ export function AuthProvider({ children }) {
     };
 
     const target = creds[roleType] || creds.technician;
-    return login(target.user, target.pass);
+    const expected = roleType === 'viewer' ? null : roleType;
+    return login(target.user, target.pass, expected);
   };
 
   return (
