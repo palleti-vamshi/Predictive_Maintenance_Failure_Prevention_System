@@ -14,7 +14,7 @@ import {
   INDUSTRIES,
   INDUSTRY_LABELS
 } from '@predictive-maintenance/shared';
-import { useRouter } from '../router/Router.jsx';
+import { useRouter, ROUTES } from '../router/Router.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -466,14 +466,27 @@ export default function MachinesPage() {
                     <span className="footer-meta">
                       Site: {machine.siteId?.name || machine.site || 'Factory Floor'}
                     </span>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => navigate(`#/machines/${machineId}`)}
-                    >
-                      <span>View Machine Profile</span>
-                      <Icon name="arrowRight" size={13} style={{ marginLeft: 6 }} />
-                    </Button>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      {!isDecomm && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`${ROUTES.DATASETS_UPLOAD}?machineId=${machine._id || machineId}`)}
+                          title="Upload telemetry dataset for this machine"
+                        >
+                          <Icon name="upload" size={12} style={{ marginRight: 4 }} />
+                          <span>Upload</span>
+                        </Button>
+                      )}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => navigate(`#/machines/${machineId}`)}
+                      >
+                        <span>Profile</span>
+                        <Icon name="arrowRight" size={13} style={{ marginLeft: 6 }} />
+                      </Button>
+                    </div>
                   </div>
                 }
               >

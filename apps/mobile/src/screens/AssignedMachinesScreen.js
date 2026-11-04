@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
-import { DEMO_MACHINES, DEMO_USER } from '@predictive-maintenance/shared';
 import { useAuth } from '../context/AuthContext.js';
 import { API_BASE } from '../services/apiConfig.js';
 
@@ -20,7 +19,7 @@ export default function AssignedMachinesScreen({ onSelectMachine, onNavigateUplo
     setFetchError(null);
 
     if (!token) {
-      setMachines(DEMO_MACHINES);
+      setMachines([]);
       setIsLiveApi(false);
       setIsLoading(false);
       return;
@@ -73,13 +72,13 @@ export default function AssignedMachinesScreen({ onSelectMachine, onNavigateUplo
         setMachines(mapped);
         setIsLiveApi(true);
       } else {
-        setMachines(DEMO_MACHINES);
+        setMachines([]);
         setIsLiveApi(false);
       }
     } catch (err) {
-      console.warn('[AssignedMachinesScreen] Live fetch failed, using fallback:', err.message);
+      console.warn('[AssignedMachinesScreen] Live fetch failed:', err.message);
       setFetchError(err.message);
-      setMachines(DEMO_MACHINES);
+      setMachines([]);
       setIsLiveApi(false);
     } finally {
       setIsLoading(false);
@@ -90,9 +89,9 @@ export default function AssignedMachinesScreen({ onSelectMachine, onNavigateUplo
     fetchScopedMachines();
   }, [fetchScopedMachines]);
 
-  const displayName = user?.fullName || DEMO_USER.name;
+  const displayName = user?.fullName || 'Technician';
   const userRole = (user?.role || 'technician').toUpperCase();
-  const factoryName = user?.factory?.name || user?.factoryId?.name || 'Pune Precision Powertrains Plant #2';
+  const factoryName = user?.factory?.name || user?.factoryId?.name || 'Assigned Factory';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

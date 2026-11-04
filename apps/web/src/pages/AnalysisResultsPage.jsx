@@ -8,6 +8,7 @@ import EmptyState from '../components/common/EmptyState.jsx';
 import LoadingSkeleton from '../components/common/LoadingSkeleton.jsx';
 import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRouter, ROUTES } from '../router/Router.jsx';
 import {
   MODEL_TYPES,
   MODEL_STATUS,
@@ -20,6 +21,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export default function AnalysisResultsPage() {
   const { user } = useAuth();
+  const { queryParams, navigate } = useRouter();
   const isManager = user?.role === USER_ROLES.FACTORY_MANAGER;
   const isTechnician = user?.role === USER_ROLES.TECHNICIAN;
 
@@ -89,8 +91,13 @@ export default function AnalysisResultsPage() {
       const data = await res.json();
       const loadedRuns = data.runs || [];
       setRuns(loadedRuns);
-      if (loadedRuns.length > 0 && !selectedRunId) {
-        setSelectedRunId(loadedRuns[0]._id || loadedRuns[0].id);
+      if (loadedRuns.length > 0) {
+        if (queryParams?.analysisRunId) {
+          const match = loadedRuns.find((r) => (r._id || r.id) === queryParams.analysisRunId);
+          setSelectedRunId(match ? (match._id || match.id) : (loadedRuns[0]._id || loadedRuns[0].id));
+        } else if (!selectedRunId) {
+          setSelectedRunId(loadedRuns[0]._id || loadedRuns[0].id);
+        }
       }
     } catch (err) {
       console.error('Fetch analysis runs error:', err);
@@ -176,6 +183,27 @@ export default function AnalysisResultsPage() {
     fetchModels();
     fetchAuxiliaryData();
   }, [user]);
+
+  useEffect(() => {
+    if (queryParams?.analysisRunId) {
+      setSelectedRunId(queryParams.analysisRunId);
+    } else if (queryParams?.datasetId && availableDatasets.length > 0) {
+      const matchingRun = runs.find((r) => (r.datasetId?._id || r.datasetId) === queryParams.datasetId);
+      if (matchingRun) {
+        setSelectedRunId(matchingRun._id || matchingRun.id);
+      } else {
+        setIsRunModalOpen(true);
+        setRunForm((prev) => {
+          const ds = availableDatasets.find((d) => (d._id || d.id) === queryParams.datasetId);
+          return {
+            ...prev,
+            datasetId: queryParams.datasetId,
+            machineId: ds?.machineId?._id || ds?.machineId || prev.machineId
+          };
+        });
+      }
+    }
+  }, [queryParams, runs, availableDatasets]);
 
   useEffect(() => {
     if (activeTab === 'research' && !researchData) {
@@ -410,6 +438,40 @@ export default function AnalysisResultsPage() {
           >
             <Icon name="refresh" size={14} style={{ marginRight: 6 }} /> Refresh
           </Button>
+        </div>
+      </div>
+
+      {/* Pipeline Workflow Guide */}
+      <div style={{
+        background: '#ffffff',
+        border: '1px solid #ede9f6',
+        borderRadius: 8,
+        padding: '10px 16px',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+        fontSize: '0.82rem'
+      }}>
+        <span style={{ fontWeight: 600, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="activity" size={14} color="#7c3aed" /> End-to-End Pipeline:
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ color: '#64748b' }}>1. Specimen Registered</span>
+          <span style={{ color: '#cbd5e1' }}>&rarr;</span>
+          <span style={{ color: '#64748b' }}>2. Telemetry Ingested</span>
+          <span style={{ color: '#cbd5e1' }}>&rarr;</span>
+          <span style={{ color: '#64748b' }}>3. Signals Mapped</span>
+          <span style={{ color: '#cbd5e1' }}>&rarr;</span>
+          <span style={{ color: '#64748b' }}>4. Pre-Flight Verified</span>
+          <span style={{ color: '#cbd5e1' }}>&rarr;</span>
+          <span style={{ color: '#7c3aed', fontWeight: 700, background: '#f5f3ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #ddd6fe' }}>
+            5. Multi-Signal Inference & SHAP
+          </span>
+          <span style={{ color: '#cbd5e1' }}>&rarr;</span>
+          <span style={{ color: '#64748b' }}>6. Actionable Maintenance</span>
         </div>
       </div>
 
@@ -654,6 +716,35 @@ export default function AnalysisResultsPage() {
                           {((selectedRun.sensorCoverage?.coverageScore ?? selectedRun.sensorCoverage?.coverage_score ?? 1.0) * 100).toFixed(0)}% Coverage • {(selectedRun.sensorCoverage?.uncertaintyLevel || selectedRun.sensorCoverage?.uncertainty_level || 'low').toUpperCase()} Uncertainty
                         </span>
                       </div>
+                    </div>
+
+                    {/* Operational Action Hand-off Row */}
+                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #ede9f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => navigate(`${ROUTES.MAINTENANCE}?action=create&machineId=${selectedRun.machineId?._id || selectedRun.machineId?.code || selectedRun.machineId}&analysisRunId=${selectedRun._id || selectedRun.id}`)}
+                        >
+                          <Icon name="wrench" size={13} style={{ marginRight: 6 }} /> Create Maintenance Work Order
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`${ROUTES.ALERTS}?analysisRunId=${selectedRun._id || selectedRun.id}`)}
+                        >
+                          <Icon name="alert" size={13} style={{ marginRight: 6 }} /> View Correlated Alerts
+                        </Button>
+                      </div>
+                      {selectedRun.machineId && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`#/machines/${selectedRun.machineId?.code || selectedRun.machineId}`)}
+                        >
+                          <Icon name="machine" size={13} style={{ marginRight: 6 }} /> View Machine Ledger
+                        </Button>
+                      )}
                     </div>
                   </Card>
 
@@ -947,6 +1038,16 @@ export default function AnalysisResultsPage() {
                                     <li>It does <strong>not</strong> assert physical gear tooth breakage or fatigue failure without visual borescope or secondary acoustic inspection.</li>
                                     <li>Anomaly scores must not be interpreted as uncalibrated probabilities or Remaining Useful Life (RUL) projections.</li>
                                   </ul>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => navigate(`${ROUTES.MAINTENANCE}?action=create&machineId=${selectedRun.machineId?._id || selectedRun.machineId?.code || selectedRun.machineId}&analysisRunId=${selectedRun._id || selectedRun.id}&interval=${idx + 1}`)}
+                                  >
+                                    <Icon name="wrench" size={13} style={{ marginRight: 6 }} /> Dispatch Work Order for Interval #{idx + 1}
+                                  </Button>
                                 </div>
                               </div>
                             </Card>

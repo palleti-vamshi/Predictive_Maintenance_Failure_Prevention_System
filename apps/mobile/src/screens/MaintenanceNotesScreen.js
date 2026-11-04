@@ -11,14 +11,15 @@ import {
 import { Feather } from '@expo/vector-icons';
 import Card from '../components/Card.js';
 import Button from '../components/Button.js';
-import { DEMO_MAINTENANCE_NOTES, DEMO_MACHINES, WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
+import { WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
 import { useAuth } from '../context/AuthContext.js';
 import { API_BASE } from '../services/apiConfig.js';
 
 export default function MaintenanceNotesScreen() {
   const { token, user } = useAuth();
-  const [notes, setNotes] = useState(DEMO_MAINTENANCE_NOTES);
-  const [selectedMachine, setSelectedMachine] = useState('GB-104');
+  const [notes, setNotes] = useState([]);
+  const [machines, setMachines] = useState([]);
+  const [selectedMachine, setSelectedMachine] = useState('');
   const [category, setCategory] = useState('Field Inspection');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -27,6 +28,48 @@ export default function MaintenanceNotesScreen() {
   // Assigned Work Orders
   const [myTasks, setMyTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+
+  // Load machines
+  useEffect(() => {
+    async function loadMachines() {
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/machines`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const machs = data.machines || [];
+          setMachines(machs);
+          if (machs.length > 0 && !selectedMachine) {
+            setSelectedMachine(machs[0].code);
+          }
+        }
+      } catch (err) {
+        console.warn('[MaintenanceNotesScreen] Error loading machines:', err.message);
+      }
+    }
+    loadMachines();
+  }, [token]);
+
+  // Load notes for selected machine
+  useEffect(() => {
+    async function loadNotes() {
+      if (!token || !selectedMachine) return;
+      try {
+        const res = await fetch(`${API_BASE}/machines/${selectedMachine}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setNotes(data.machine?.notes || []);
+        }
+      } catch (err) {
+        console.warn('[MaintenanceNotesScreen] Error loading notes:', err.message);
+      }
+    }
+    loadNotes();
+  }, [selectedMachine, token]);
 
   const loadTasks = useCallback(async () => {
     if (!token) return;
@@ -243,15 +286,18 @@ export default function MaintenanceNotesScreen() {
         <View style={styles.formGroup}>
           <Text style={styles.label}>Target Machine:</Text>
           <View style={styles.chipRow}>
-            {DEMO_MACHINES.map((m) => (
-              <Button
-                key={m.id}
-                title={m.id}
-                variant={selectedMachine === m.id ? 'primary' : 'secondary'}
-                onPress={() => setSelectedMachine(m.id)}
-                style={styles.chipBtn}
-              />
-            ))}
+            {machines.map((m) => {
+              const code = m.code || m.id;
+              return (
+                <Button
+                  key={m._id || code}
+                  title={code}
+                  variant={selectedMachine === code ? 'primary' : 'secondary'}
+                  onPress={() => setSelectedMachine(code)}
+                  style={styles.chipBtn}
+                />
+              );
+            })}
           </View>
         </View>
 

@@ -6,6 +6,7 @@ import MetricSummary from '../components/common/MetricSummary.jsx';
 import Button from '../components/common/Button.jsx';
 import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRouter, ROUTES } from '../router/Router.jsx';
 import {
   WORK_ORDER_STATUS,
   WORK_ORDER_PRIORITY,
@@ -16,6 +17,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export default function MaintenancePage() {
   const { user } = useAuth();
+  const { queryParams, navigate } = useRouter();
   const isManager = user?.role === USER_ROLES.FACTORY_MANAGER;
   const isTech = user?.role === USER_ROLES.TECHNICIAN;
 
@@ -106,6 +108,37 @@ export default function MaintenancePage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Deep linking and navigation hand-offs
+  useEffect(() => {
+    if (queryParams?.status) {
+      setActiveTab(queryParams.status);
+    }
+    if (queryParams?.action === 'create' && isManager) {
+      setShowCreateModal(true);
+      if (queryParams.machineId && machines.length > 0) {
+        const target = machines.find((m) => m._id === queryParams.machineId || m.code === queryParams.machineId);
+        if (target) {
+          setNewOrder((prev) => ({
+            ...prev,
+            machineCode: target.code,
+            title: queryParams.analysisRunId
+              ? `Remediation: Anomaly Detected on ${target.code}`
+              : queryParams.alertId
+              ? `Action: Warning Alert on ${target.code}`
+              : prev.title,
+            description: queryParams.analysisRunId
+              ? `Triggered by analysis run ${queryParams.analysisRunId}${queryParams.interval ? ` (Interval #${queryParams.interval})` : ''}. Inspect equipment components, verify transducer calibration, and execute physical maintenance.`
+              : queryParams.alertId
+              ? `Direct remediation task for active alert ${queryParams.alertId}. Inspect physical components, log observations, and report findings.`
+              : prev.description
+          }));
+        }
+      }
+    } else if (queryParams?.machineId) {
+      setSearchQuery(queryParams.machineId);
+    }
+  }, [queryParams, machines, isManager]);
 
   // Tab Filtering & Counts
   const filteredOrders = useMemo(() => {

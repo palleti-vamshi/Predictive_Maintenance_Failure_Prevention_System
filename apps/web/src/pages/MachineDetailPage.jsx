@@ -5,12 +5,12 @@ import Button from '../components/common/Button.jsx';
 import AlertCallout from '../components/common/AlertCallout.jsx';
 import Icon from '../components/common/Icon.jsx';
 import {
-  DEMO_MACHINES,
-  DEMO_ALERTS,
   USER_ROLES,
   WORK_ORDER_STATUS,
   WORK_ORDER_PRIORITY,
-  OPERATIONAL_STATUS
+  OPERATIONAL_STATUS,
+  MACHINE_TYPES,
+  MACHINE_TYPE_LABELS
 } from '@predictive-maintenance/shared';
 import { useRouter, ROUTES } from '../router/Router.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -27,6 +27,7 @@ export default function MachineDetailPage() {
   const [machine, setMachine] = useState(null);
   const [workOrders, setWorkOrders] = useState([]);
   const [machineDatasets, setMachineDatasets] = useState([]);
+  const [machineAlerts, setMachineAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -116,10 +117,19 @@ export default function MachineDetailPage() {
         const dsData = await dsRes.json();
         setMachineDatasets(dsData.datasets || []);
       }
-    } catch {
-      // Offline fallback
-      const fallback = DEMO_MACHINES.find((m) => m.id === machineCode) || DEMO_MACHINES[0];
-      setMachine(fallback);
+
+      // 4. Fetch evidence alerts for this machine
+      const alertRes = await fetch(`${API_BASE}/alerts?machineId=${mData.machine._id}`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (alertRes.ok) {
+        const alertData = await alertRes.json();
+        setMachineAlerts(alertData.alerts || []);
+      }
+    } catch (err) {
+      setErrorStatus(500);
+      setErrorMessage(err.message || 'Failed to connect to machine ledger API');
     } finally {
       setLoading(false);
     }
@@ -273,8 +283,11 @@ export default function MachineDetailPage() {
     );
   }
 
-  // Scoped error display (403 Forbidden or 404 Not Found)
+  // Scoped error display (403 Forbidden, 404 Not Found, or 500 Connection Failure)
   if (errorStatus) {
+    const isNotFound = errorStatus === 404;
+    const isForbidden = errorStatus === 403;
+
     return (
       <div className="page-container">
         <nav className="breadcrumbs" aria-label="Breadcrumbs">
@@ -286,21 +299,42 @@ export default function MachineDetailPage() {
         </nav>
 
         <Card
-          title={errorStatus === 404 ? 'Machine Not Found in Factory Scope' : 'Access Denied to Machine'}
-          badge={<StatusBadge status={errorStatus === 404 ? 'critical' : 'warning'} label={`HTTP ${errorStatus}`} />}
+          title={
+            isNotFound
+              ? 'Machine Not Found in Factory Scope'
+              : isForbidden
+              ? 'Access Denied to Machine'
+              : 'Machine Ledger Service Unavailable'
+          }
+          badge={<StatusBadge status={isNotFound ? 'critical' : 'warning'} label={`HTTP ${errorStatus}`} />}
         >
           <AlertCallout
-            severity={errorStatus === 404 ? 'critical' : 'warning'}
-            title={errorStatus === 404 ? '404 Scoped Boundary Isolation' : '403 Unauthorized Equipment Assignment'}
+            severity={isNotFound ? 'critical' : 'warning'}
+            title={
+              isNotFound
+                ? '404 Scoped Boundary Isolation'
+                : isForbidden
+                ? '403 Unauthorized Equipment Assignment'
+                : 'Connection or API Execution Failure'
+            }
             description={
-              errorStatus === 404
+              isNotFound
                 ? `Equipment "${machineCode}" does not exist within your factory scope (${user?.factoryId?.name || 'Factory'}). To prevent data leakage, cross-factory machine existence is never disclosed.`
-                : `Your account (${user?.fullName}, ${user?.role}) is not assigned to equipment "${machineCode}". Access is denied by backend middleware.`
+                : isForbidden
+                ? `Your account (${user?.fullName}, ${user?.role}) is not assigned to equipment "${machineCode}". Access is denied by backend middleware.`
+                : (errorMessage || `Failed to retrieve equipment "${machineCode}" from the plant database. Please verify API server connectivity.`)
             }
             action={
-              <Button variant="secondary" onClick={() => navigate(ROUTES.MACHINES)}>
-                ← Return to Your Accessible Machines
-              </Button>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button variant="secondary" onClick={() => navigate(ROUTES.MACHINES)}>
+                  ← Return to Accessible Machines
+                </Button>
+                {!isNotFound && !isForbidden && (
+                  <Button variant="primary" onClick={fetchMachineAndOrders}>
+                    Retry Connection
+                  </Button>
+                )}
+              </div>
             }
           />
         </Card>
@@ -312,11 +346,18 @@ export default function MachineDetailPage() {
 
   const machineId = machine.code || machine.id;
   const isDecomm = machine.isDecommissioned || machine.operationalStatus === OPERATIONAL_STATUS.DECOMMISSIONED;
-  const machineAlert = DEMO_ALERTS.find((a) => a.machineId === machineId);
+  const machineAlert = machineAlerts.find((a) => a.status === 'active' || a.status === 'acknowledged') || machineAlerts[0];
   const stages = machine.stages || [];
   const signals = machine.monitoredSignals || [];
   const notes = machine.notes || [];
   const assignedTechs = machine.assignedTechnicians || [];
+
+  const latestDataset = machineDatasets.length > 0
+    ? [...machineDatasets].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
+    : null;
+  const telemetryFreshness = latestDataset
+    ? `Latest Ingestion: ${new Date(latestDataset.createdAt).toLocaleString('en-IN')}`
+    : 'No Telemetry Uploaded Yet';
 
   return (
     <div className="page-container">
@@ -334,6 +375,9 @@ export default function MachineDetailPage() {
         <div>
           <div className="specimen-tag-row">
             <span className="mono-code" style={{ fontSize: '1rem' }}>{machineId}</span>
+            <span className="badge badge-site">
+              {MACHINE_TYPE_LABELS[machine.type] || machine.type || 'Equipment'}
+            </span>
             <span className={`badge ${isDecomm ? 'badge-critical' : 'badge-info'}`}>
               {machine.operationalStatus?.toUpperCase() || 'OPERATIONAL'}
             </span>
@@ -342,6 +386,13 @@ export default function MachineDetailPage() {
               label={machine.status === 'healthy' ? 'NOMINAL' : 'ATTENTION'}
               isSimulated={!machine._id}
             />
+            <span
+              className={`badge ${latestDataset ? 'badge-info' : 'badge-neutral'}`}
+              title={latestDataset ? `Filename: ${latestDataset.originalFilename}` : undefined}
+            >
+              <Icon name="clock" size={11} style={{ marginRight: 4 }} />
+              {telemetryFreshness}
+            </span>
           </div>
           <h1 className="page-title">{machine.name}</h1>
           <p className="page-subtitle">
@@ -376,11 +427,11 @@ export default function MachineDetailPage() {
 
           <Button
             variant="primary"
-            onClick={() => navigate(ROUTES.DATASETS_UPLOAD)}
+            onClick={() => navigate(`${ROUTES.DATASETS_UPLOAD}?machineId=${machine._id || machineId}`)}
             disabled={isDecomm}
             title={isDecomm ? 'Cannot upload data for decommissioned machine' : 'Upload dataset'}
           >
-            <Icon name="upload" size={14} style={{ marginRight: 6 }} /> Upload Gearbox Run
+            <Icon name="upload" size={14} style={{ marginRight: 6 }} /> Upload Telemetry
           </Button>
         </div>
       </div>

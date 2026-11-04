@@ -11,6 +11,7 @@ export const ROUTES = Object.freeze({
   ANALYSIS: '#/analysis',
   ALERTS: '#/alerts',
   RESEARCH: '#/research',
+  AUDIT: '#/audit',
   SETTINGS: '#/settings'
 });
 
@@ -27,7 +28,7 @@ export const NAV_ITEMS = Object.freeze([
     label: 'Machines',
     hash: ROUTES.MACHINES,
     icon: 'machine',
-    description: 'Transmission registry & kinematics'
+    description: 'Multi-industry asset profiles'
   },
   {
     key: 'maintenance',
@@ -45,24 +46,31 @@ export const NAV_ITEMS = Object.freeze([
   },
   {
     key: 'datasets',
-    label: 'Dataset Ingestion',
+    label: 'Upload & Analyze',
     hash: ROUTES.DATASETS_UPLOAD,
     icon: 'dataset',
     description: 'Signal validation & profiling'
   },
   {
     key: 'analysis',
-    label: 'Analysis & Trends',
+    label: 'Analysis Reports',
     hash: ROUTES.ANALYSIS,
     icon: 'analysis',
     description: 'Multi-signal regime trends'
   },
   {
     key: 'research',
-    label: 'Research Benchmark',
+    label: 'Models & Datasets',
     hash: ROUTES.RESEARCH,
     icon: 'research',
-    description: 'Reference datasets & evaluation'
+    description: 'Reference catalog & evaluation'
+  },
+  {
+    key: 'audit',
+    label: 'Audit Trail',
+    hash: ROUTES.AUDIT,
+    icon: 'book',
+    description: 'Operational governance logs'
   },
   {
     key: 'settings',
@@ -126,6 +134,7 @@ export function RouterProvider({ children }) {
     if (pathPart === ROUTES.ANALYSIS) return { routeKey: 'analysis', baseRoute: ROUTES.ANALYSIS, params: {}, queryParams };
     if (pathPart === ROUTES.ALERTS) return { routeKey: 'alerts', baseRoute: ROUTES.ALERTS, params: {}, queryParams };
     if (pathPart === ROUTES.RESEARCH) return { routeKey: 'research', baseRoute: ROUTES.RESEARCH, params: {}, queryParams };
+    if (pathPart === ROUTES.AUDIT) return { routeKey: 'audit', baseRoute: ROUTES.AUDIT, params: {}, queryParams };
     if (pathPart === ROUTES.SETTINGS) return { routeKey: 'settings', baseRoute: ROUTES.SETTINGS, params: {}, queryParams };
 
     // Default to Overview

@@ -14,9 +14,7 @@ import {
   WORK_ORDER_STATUS,
   WORK_ORDER_PRIORITY,
   ALERT_SEVERITIES,
-  ALERT_STATUSES,
-  DEMO_MACHINES,
-  DEMO_ALERTS
+  ALERT_STATUSES
 } from '@predictive-maintenance/shared';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -114,25 +112,13 @@ export default function FactoryOverviewPage() {
         throw new Error('Session expired or unauthorized. Please re-authenticate.');
       }
 
-      // Process Machines
+      // Process Machines (Strict MongoDB Source of Truth)
       let loadedMachines = [];
       if (machinesRes.status === 'fulfilled' && machinesRes.value.ok) {
         const data = await machinesRes.value.json();
         loadedMachines = data.machines || [];
       } else {
-        loadedMachines = DEMO_MACHINES.map((m) => ({
-          _id: m.id,
-          code: m.id,
-          name: m.name,
-          site: m.site,
-          arrangement: m.model,
-          gearRatio: m.gearRatio,
-          ratedSpeedRpm: '1780',
-          ratedTorqueNm: '480',
-          operationalStatus: m.status === 'healthy' ? OPERATIONAL_STATUS.OPERATIONAL : OPERATIONAL_STATUS.DEGRADED,
-          stages: m.stages,
-          isSimulated: true
-        }));
+        loadedMachines = [];
       }
       setMachines(loadedMachines);
 
@@ -140,33 +126,17 @@ export default function FactoryOverviewPage() {
       if (sitesRes.status === 'fulfilled' && sitesRes.value.ok) {
         const data = await sitesRes.value.json();
         setSites(data.sites || []);
+      } else {
+        setSites([]);
       }
 
-      // Process Alerts
+      // Process Alerts (Strict MongoDB Source of Truth)
       let loadedAlerts = [];
       if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
         const data = await alertsRes.value.json();
         loadedAlerts = data.alerts || [];
       } else {
-        loadedAlerts = DEMO_ALERTS.map((a) => ({
-          _id: a.id,
-          machineId: { code: a.machineId, name: 'Heavy Pinion Extruder' },
-          title: a.title,
-          severity: a.severity,
-          status: ALERT_STATUSES.OPEN,
-          triggeringPath: 'fused_multisignal',
-          operatingRegime: {
-            regimeId: 'REGIME_2_STEADY',
-            regimeLabel: 'Regime 2 (1780 RPM • 480 Nm)',
-            stability: 'steady_state',
-            speedRpm: 1780,
-            loadNm: 480
-          },
-          scores: { peakScore: 0.84, calibratedThreshold: 0.65, isCalibrated: true },
-          contributingSignals: a.contributingSignals || [],
-          timestamp: a.timestamp,
-          isSimulated: true
-        }));
+        loadedAlerts = [];
       }
       setAlerts(loadedAlerts);
 

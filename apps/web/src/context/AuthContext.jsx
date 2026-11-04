@@ -165,15 +165,15 @@ export function AuthProvider({ children }) {
     const creds = {
       manager: {
         user: 'manager@pune.bharatdynamics.demo',
-        pass: import.meta.env.VITE_DEMO_MANAGER_PASSWORD || 'Manager123!'
+        pass: import.meta.env.VITE_DEMO_MANAGER_PASSWORD || ''
       },
       technician: {
         user: 'tech@pune.bharatdynamics.demo',
-        pass: import.meta.env.VITE_DEMO_TECH_PASSWORD || 'Tech123!'
+        pass: import.meta.env.VITE_DEMO_TECH_PASSWORD || ''
       },
       viewer: {
         user: 'viewer@pune.bharatdynamics.demo',
-        pass: import.meta.env.VITE_DEMO_VIEWER_PASSWORD || 'Viewer123!'
+        pass: import.meta.env.VITE_DEMO_VIEWER_PASSWORD || ''
       }
     };
 

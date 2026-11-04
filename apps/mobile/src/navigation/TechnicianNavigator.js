@@ -7,7 +7,6 @@ import UploadDatasetScreen from '../screens/UploadDatasetScreen.js';
 import ActiveAlertsScreen from '../screens/ActiveAlertsScreen.js';
 import AlertDetailScreen from '../screens/AlertDetailScreen.js';
 import MaintenanceNotesScreen from '../screens/MaintenanceNotesScreen.js';
-import { DEMO_FACTORY, DEMO_ALERTS } from '@predictive-maintenance/shared';
 import { useAuth } from '../context/AuthContext.js';
 
 export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
@@ -36,7 +35,7 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
     setSelectedAlert(null);
   };
 
-  const factoryName = user?.factory?.name || user?.factoryId?.name || DEMO_FACTORY.name;
+  const factoryName = user?.factory?.name || user?.factoryId?.name || 'Assigned Factory';
   const userRole = user?.role || 'technician';
   const userName = user?.fullName || 'Technician';
 
@@ -89,7 +88,7 @@ export default function TechnicianNavigator({ apiStatus, onRefreshApi }) {
   const tabs = [
     { key: 'machines', label: 'Machines', iconName: 'cpu' },
     { key: 'upload', label: 'Check-In', iconName: 'upload-cloud' },
-    { key: 'alerts', label: 'Warnings', iconName: 'alert-triangle', badge: DEMO_ALERTS.length },
+    { key: 'alerts', label: 'Warnings', iconName: 'alert-triangle' },
     { key: 'notes', label: 'Field Tasks', iconName: 'clipboard' }
   ];
 

@@ -18,7 +18,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export default function DatasetUploadPage() {
   const { user } = useAuth();
-  const { navigate } = useRouter();
+  const { navigate, queryParams } = useRouter();
 
   // Wizard state
   const [datasetType, setDatasetType] = useState(DATASET_TYPES.OPERATIONAL);
@@ -79,8 +79,9 @@ export default function DatasetUploadPage() {
         if (mRes.ok) {
           const mData = await mRes.json();
           setMachines(mData.machines || []);
-          if (mData.machines?.length > 0 && !selectedMachineId) {
-            setSelectedMachineId(mData.machines[0]._id);
+          if (mData.machines?.length > 0) {
+            const target = queryParams?.machineId && mData.machines.find((m) => m._id === queryParams.machineId || m.code === queryParams.machineId);
+            setSelectedMachineId(target ? target._id : (selectedMachineId || mData.machines[0]._id));
           }
         }
 
@@ -360,9 +361,15 @@ export default function DatasetUploadPage() {
             </div>
           </div>
 
-          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <Button
               variant="primary"
+              onClick={() => navigate(`${ROUTES.ANALYSIS}?datasetId=${confirmedDataset._id}`)}
+            >
+              <Icon name="play" size={13} style={{ marginRight: 6 }} /> Run Compatible Model Analysis
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => {
                 if (confirmedDataset.datasetType === DATASET_TYPES.OPERATIONAL && confirmedDataset.machineId) {
                   navigate(`#/machines/${confirmedDataset.machineId}`);
@@ -373,7 +380,7 @@ export default function DatasetUploadPage() {
             >
               {confirmedDataset.datasetType === DATASET_TYPES.OPERATIONAL ? 'View Machine Profile' : 'View Reference Catalog'}
             </Button>
-            <Button variant="secondary" onClick={handleReset}>
+            <Button variant="ghost" onClick={handleReset}>
               Upload New Dataset
             </Button>
           </div>
@@ -1009,15 +1016,26 @@ export default function DatasetUploadPage() {
                           />
                         </td>
                         <td>
-                          <a
-                            href={`${API_BASE}/datasets/${d._id}/download`}
-                            download
-                            className="btn btn-secondary btn-sm"
-                            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                          >
-                            <Icon name="download" size={13} />
-                            <span>Download CSV</span>
-                          </a>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            {d.status === 'ready' && (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => navigate(`${ROUTES.ANALYSIS}?datasetId=${d._id}`)}
+                              >
+                                <Icon name="play" size={12} style={{ marginRight: 4 }} /> Analyze
+                              </Button>
+                            )}
+                            <a
+                              href={`${API_BASE}/datasets/${d._id}/download`}
+                              download
+                              className="btn btn-secondary btn-sm"
+                              style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <Icon name="download" size={13} />
+                              <span>CSV</span>
+                            </a>
+                          </div>
                         </td>
                       </tr>
                     ))}

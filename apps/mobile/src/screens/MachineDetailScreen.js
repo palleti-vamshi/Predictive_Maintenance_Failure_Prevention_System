@@ -14,7 +14,7 @@ import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
 import AlertCallout from '../components/AlertCallout.js';
-import { DEMO_ALERTS, WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
+import { WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
 import { useAuth } from '../context/AuthContext.js';
 import { API_BASE } from '../services/apiConfig.js';
 
@@ -29,6 +29,7 @@ export default function MachineDetailScreen({
 
   const [machine, setMachine] = useState(initialMachine);
   const [workOrders, setWorkOrders] = useState([]);
+  const [machineAlerts, setMachineAlerts] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
 
   // Field note state
@@ -62,9 +63,30 @@ export default function MachineDetailScreen({
     }
   }, [machineId, token]);
 
+  const loadMachineAlerts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const dbId = machine?.dbId || machine?._id;
+      const url = dbId ? `${API_BASE}/alerts?machineId=${dbId}` : `${API_BASE}/alerts`;
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json'
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMachineAlerts(data.alerts || []);
+      }
+    } catch (err) {
+      console.warn('[MachineDetailScreen] Error loading alerts:', err.message);
+    }
+  }, [machine?.dbId, machine?._id, token]);
+
   useEffect(() => {
     loadWorkOrders();
-  }, [loadWorkOrders]);
+    loadMachineAlerts();
+  }, [loadWorkOrders, loadMachineAlerts]);
 
   // Submit field note
   const handleSubmitNote = async () => {
@@ -137,7 +159,7 @@ export default function MachineDetailScreen({
   if (!machine) return null;
 
   const isDecomm = machine.isDecommissioned || machine.operationalStatus === 'decommissioned';
-  const machineAlert = DEMO_ALERTS.find((a) => a.machineId === machineId);
+  const machineAlert = machineAlerts.find((a) => a.status === 'active' || a.status === 'open' || a.status === 'acknowledged') || machineAlerts[0];
   const stages = machine.stages || [];
   const signals = machine.monitoredSignals || [];
 

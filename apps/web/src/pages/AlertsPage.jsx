@@ -7,6 +7,7 @@ import EmptyState from '../components/common/EmptyState.jsx';
 import LoadingSkeleton from '../components/common/LoadingSkeleton.jsx';
 import Icon from '../components/common/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRouter, ROUTES } from '../router/Router.jsx';
 import {
   ALERT_SEVERITIES,
   ALERT_STATUSES,
@@ -18,6 +19,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export default function AlertsPage() {
   const { user } = useAuth();
+  const { queryParams, navigate } = useRouter();
   const isManager = user?.role === USER_ROLES.FACTORY_MANAGER;
   const isViewer = user?.role === USER_ROLES.VIEWER;
 
@@ -101,6 +103,15 @@ export default function AlertsPage() {
       fetchTechnicians();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (queryParams?.severity) {
+      setSeverityFilter(queryParams.severity);
+    }
+    if (queryParams?.status) {
+      setStatusFilter(queryParams.status);
+    }
+  }, [queryParams]);
 
   // Acknowledge alert handler
   const handleAcknowledge = async (alertId) => {
@@ -229,6 +240,14 @@ export default function AlertsPage() {
   const filteredAlerts = alerts.filter((a) => {
     if (severityFilter !== 'all' && a.severity !== severityFilter) return false;
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+    if (queryParams?.machineId) {
+      const matchMach = (a.machineId?._id || a.machineId?.code || a.machineId)?.toString();
+      if (matchMach !== queryParams.machineId.toString()) return false;
+    }
+    if (queryParams?.analysisRunId) {
+      const matchRun = (a.analysisRunId?._id || a.analysisRunId)?.toString();
+      if (matchRun !== queryParams.analysisRunId.toString()) return false;
+    }
     return true;
   });
 
@@ -587,8 +606,8 @@ export default function AlertsPage() {
                 ) : null}
 
                 {/* Action Buttons Row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #ede9f6', paddingTop: '0.75rem' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #ede9f6', paddingTop: '0.75rem', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {!isViewer && activeObservationAlertId !== alert._id && (
                       <Button
                         size="sm"
@@ -608,6 +627,34 @@ export default function AlertsPage() {
                         onClick={() => openWorkOrderModal(alert)}
                       >
                         <Icon name="wrench" size={14} style={{ marginRight: '5px' }} /> Create Work Order
+                      </Button>
+                    )}
+                    {alert.analysisRunId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`${ROUTES.ANALYSIS}?analysisRunId=${alert.analysisRunId?._id || alert.analysisRunId}`)}
+                      >
+                        <Icon name="analysis" size={13} style={{ marginRight: '5px' }} /> View Evidence
+                      </Button>
+                    )}
+                    {alert.machineId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`#/machines/${alert.machineId?.code || alert.machineId}`)}
+                      >
+                        <Icon name="machine" size={13} style={{ marginRight: '4px' }} /> Machine {alert.machineId?.code || ''}
+                      </Button>
+                    )}
+                    {hasWorkOrder && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`${ROUTES.MAINTENANCE}?machineId=${alert.machineId?.code || ''}`)}
+                        style={{ color: '#7c3aed' }}
+                      >
+                        <Icon name="wrench" size={13} style={{ marginRight: '4px' }} /> Work Order [{alert.maintenanceWorkOrderId?.orderNumber || 'Linked'}]
                       </Button>
                     )}
                   </div>

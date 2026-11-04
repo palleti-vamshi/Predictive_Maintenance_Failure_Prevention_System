@@ -11,6 +11,7 @@ import DatasetUploadPage from './pages/DatasetUploadPage.jsx';
 import AnalysisResultsPage from './pages/AnalysisResultsPage.jsx';
 import AlertsPage from './pages/AlertsPage.jsx';
 import ResearchBenchmarkPage from './pages/ResearchBenchmarkPage.jsx';
+import AuditTrailPage from './pages/AuditTrailPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import Icon from './components/common/Icon.jsx';
 
@@ -36,6 +37,8 @@ function RouteSwitch({ apiStatus, onRefreshApi }) {
       return <AlertsPage />;
     case 'research':
       return <ResearchBenchmarkPage />;
+    case 'audit':
+      return <AuditTrailPage />;
     case 'settings':
       return <SettingsPage apiStatus={apiStatus} onRefreshApi={onRefreshApi} />;
     default:

@@ -151,9 +151,9 @@ export function AuthProvider({ children }) {
 
   const quickDemoLogin = async (roleType) => {
     const creds = {
-      technician: { user: 'tech@pune.bharatdynamics.demo', pass: 'Tech123!' },
-      manager: { user: 'manager@pune.bharatdynamics.demo', pass: 'Manager123!' },
-      viewer: { user: 'viewer@pune.bharatdynamics.demo', pass: 'Viewer123!' }
+      technician: { user: 'tech@pune.bharatdynamics.demo', pass: process.env.EXPO_PUBLIC_DEMO_TECH_PASSWORD || '' },
+      manager: { user: 'manager@pune.bharatdynamics.demo', pass: process.env.EXPO_PUBLIC_DEMO_MANAGER_PASSWORD || '' },
+      viewer: { user: 'viewer@pune.bharatdynamics.demo', pass: process.env.EXPO_PUBLIC_DEMO_VIEWER_PASSWORD || '' }
     };
     const target = creds[roleType] || creds.technician;
     return login(target.user, target.pass);

@@ -1,37 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import Card from '../components/Card.js';
 import StatusBadge from '../components/StatusBadge.js';
 import Button from '../components/Button.js';
-import { DEMO_ALERTS } from '@predictive-maintenance/shared';
 import { useAuth } from '../context/AuthContext.js';
 import { API_BASE } from '../services/apiConfig.js';
 
 export default function ActiveAlertsScreen({ onSelectAlert }) {
   const { token } = useAuth();
-  const [alerts, setAlerts] = useState(DEMO_ALERTS);
-  const [isLive, setIsLive] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
 
   const fetchAlerts = useCallback(async () => {
     try {
+      setError(null);
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${API_BASE}/alerts`, { headers });
       if (res.ok) {
         const data = await res.json();
-        if (data.alerts && data.alerts.length > 0) {
-          setAlerts(data.alerts);
-          setIsLive(true);
-          return;
-        }
+        setAlerts(data.alerts || []);
+      } else {
+        setError(`Server returned status ${res.status}`);
       }
-      // Fallback to DEMO_ALERTS if no live alerts or offline
-      setAlerts(DEMO_ALERTS);
-      setIsLive(false);
-    } catch {
-      setAlerts(DEMO_ALERTS);
-      setIsLive(false);
+    } catch (err) {
+      setError(err.message || 'Unable to connect to alert service.');
+    } finally {
+      setLoading(false);
     }
   }, [token]);
 
@@ -63,10 +60,8 @@ export default function ActiveAlertsScreen({ onSelectAlert }) {
       <View style={styles.headerBox}>
         <View style={styles.badgeRow}>
           <Text style={styles.headerLabel}>ACTIVE WARNINGS FEED</Text>
-          <View style={isLive ? styles.liveBadge : styles.demoBadge}>
-            <Text style={isLive ? styles.liveBadgeText : styles.demoBadgeText}>
-              {isLive ? 'LIVE' : 'DEMO'}
-            </Text>
+          <View style={styles.liveBadge}>
+            <Text style={styles.liveBadgeText}>OPERATIONAL</Text>
           </View>
         </View>
         <Text style={styles.title}>Condition Alerts</Text>
@@ -75,41 +70,56 @@ export default function ActiveAlertsScreen({ onSelectAlert }) {
         </Text>
       </View>
 
-      {/* Filter Tabs */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
-            All ({alerts.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterChip, filter === 'warning' && styles.filterChipActive]}
-          onPress={() => setFilter('warning')}
-        >
-          <Text style={[styles.filterText, filter === 'warning' && styles.filterTextActive]}>
-            Warning ({warningCount})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterChip, filter === 'critical' && styles.filterChipActive]}
-          onPress={() => setFilter('critical')}
-        >
-          <Text style={[styles.filterText, filter === 'critical' && styles.filterTextActive]}>
-            Critical ({criticalCount})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Alerts List */}
-      {filteredAlerts.length === 0 ? (
+      {loading ? (
+        <View style={{ padding: 32, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color="#7c3aed" />
+          <Text style={{ marginTop: 8, color: '#64748b', fontSize: 13 }}>Loading assigned machine alerts...</Text>
+        </View>
+      ) : error ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No Alerts Found</Text>
-          <Text style={styles.emptySub}>No active condition alerts matching "{filter.toUpperCase()}".</Text>
+          <Text style={[styles.emptyTitle, { color: '#ef4444' }]}>Unable to Load Alerts</Text>
+          <Text style={styles.emptySub}>{error}</Text>
+          <TouchableOpacity onPress={fetchAlerts} style={{ marginTop: 12, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: '#7c3aed', borderRadius: 6 }}>
+            <Text style={{ color: '#ffffff', fontWeight: '600', fontSize: 12 }}>Retry Connection</Text>
+          </TouchableOpacity>
         </View>
       ) : (
+        <>
+          {/* Filter Tabs */}
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.filterChip, filter === 'all' && styles.filterChipActive]}
+              onPress={() => setFilter('all')}
+            >
+              <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
+                All ({alerts.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, filter === 'warning' && styles.filterChipActive]}
+              onPress={() => setFilter('warning')}
+            >
+              <Text style={[styles.filterText, filter === 'warning' && styles.filterTextActive]}>
+                Warning ({warningCount})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.filterChip, filter === 'critical' && styles.filterChipActive]}
+              onPress={() => setFilter('critical')}
+            >
+              <Text style={[styles.filterText, filter === 'critical' && styles.filterTextActive]}>
+                Critical ({criticalCount})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Alerts List */}
+          {filteredAlerts.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No Alerts Found</Text>
+              <Text style={styles.emptySub}>No active condition alerts matching &quot;{filter.toUpperCase()}&quot;.</Text>
+            </View>
+          ) : (
         filteredAlerts.map((alert) => {
           const alertId = alert._id || alert.id;
           const machineCode = alert.machineId?.code || alert.machineCode || alert.machineId || 'Machine';
@@ -203,12 +213,14 @@ export default function ActiveAlertsScreen({ onSelectAlert }) {
                   Logged: {new Date(alert.createdAt || alert.timestamp).toLocaleTimeString()}
                 </Text>
                 <Text style={styles.statusText}>
-                  Status: {alert.status.toUpperCase()} [{isLive ? 'VERIFIED' : 'DEMO'}]
+                  Status: {alert.status.toUpperCase()}
                 </Text>
               </View>
             </Card>
           );
         })
+      )}
+      </>
       )}
     </ScrollView>
   );
