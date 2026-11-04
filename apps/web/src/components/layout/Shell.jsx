@@ -5,26 +5,29 @@ import MobileBottomNav from './MobileBottomNav.jsx';
 
 /**
  * Shell: Master responsive application container.
+ * Features dark navy sidebar on desktop and full-bleed main workspace.
  */
 export default function Shell({ children, apiStatus }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
     <div className="app-shell-root">
-      {/* Main App Header */}
-      <Header
-        onToggleMobileNav={() => setMobileNavOpen((prev) => !prev)}
+      {/* Dark Navy Sidebar on Left */}
+      <Sidebar
         mobileNavOpen={mobileNavOpen}
-        apiStatus={apiStatus}
+        onCloseMobileNav={() => setMobileNavOpen(false)}
       />
 
-      {/* App Body with Sidebar & Content */}
-      <div className="app-body-container">
-        <Sidebar
+      {/* Main Container on Right */}
+      <div className="app-main-container">
+        {/* Slim Top Bar */}
+        <Header
+          onToggleMobileNav={() => setMobileNavOpen((prev) => !prev)}
           mobileNavOpen={mobileNavOpen}
-          onCloseMobileNav={() => setMobileNavOpen(false)}
+          apiStatus={apiStatus}
         />
 
+        {/* Scrollable Main Content */}
         <main className="app-main-content" id="main-content" tabIndex="-1">
           {children}
 
@@ -44,4 +47,3 @@ export default function Shell({ children, apiStatus }) {
     </div>
   );
 }
-

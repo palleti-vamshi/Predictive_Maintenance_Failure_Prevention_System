@@ -54,7 +54,7 @@ function AuthenticatedApp({ apiStatus, onRefreshApi }) {
       <div className="session-loading-screen">
         <div className="session-loading-box">
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-            <Icon name="brandMark" size={44} color="#7c3aed" />
+            <Icon name="brandMark" size={44} color="var(--primary)" />
           </div>
           <div className="session-loading-title">Verifying Factory Authentication...</div>
           <p className="session-loading-sub">Querying secure server session credentials</p>

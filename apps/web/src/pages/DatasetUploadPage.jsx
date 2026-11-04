@@ -631,7 +631,7 @@ export default function DatasetUploadPage() {
                 style={{ cursor: 'pointer' }}
               >
                 <div className="dropzone-icon" aria-hidden="true">
-                  <Icon name="upload" size={36} color="#7c3aed" />
+                  <Icon name="upload" size={36} color="var(--primary)" />
                 </div>
                 <div className="dropzone-title">
                   {selectedFile ? selectedFile.name : 'Click or drag & drop CSV file here'}

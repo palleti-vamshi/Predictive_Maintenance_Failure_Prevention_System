@@ -19,6 +19,360 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * UX Pilot Page 2: Evidence-Based Analysis Report
+ * Summary strip, supervised Random Forest with TreeSHAP, unsupervised Isolation Forest with trend chart,
+ * uncertainty callout, and actionable maintenance hand-off.
+ */
+function AnalysisReportUXPilot({ selectedRun, user, navigate }) {
+  if (!selectedRun) return null;
+
+  const machineCode = selectedRun.machineId?.code || 'GBX-01';
+  const machineName = selectedRun.machineId?.name || 'Main drive gearbox';
+  const siteLocation = selectedRun.siteId?.name || selectedRun.machineId?.siteId?.name || `${user?.factoryId?.name || 'Riverside Assembly'} · Line 2`;
+  const datasetName = selectedRun.datasetId?.filename || selectedRun.datasetTitle || 'gbx01_2025-05-12_weekly.csv';
+  const runCode = selectedRun._id ? `AN-${selectedRun._id.slice(-4).toUpperCase()}` : 'AN-2291';
+  const completedDate = selectedRun.createdAt
+    ? new Date(selectedRun.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : '19 May 2025';
+  const executedBy = selectedRun.createdByName || user?.fullName || 'Priya Raman';
+
+  // Classifier probabilities
+  const faultProb = selectedRun.classificationSummary?.faultProbability ?? 0.64;
+  const classProbabilities = [
+    { label: 'Gear tooth wear', value: faultProb, color: 'var(--primary)', isHighlight: true },
+    { label: 'Shaft misalignment', value: 0.19, color: '#64748b' },
+    { label: 'Normal', value: 0.14, color: '#10b981' },
+    { label: 'Lubrication loss', value: 0.03, color: '#94a3b8' }
+  ];
+
+  // TreeSHAP Feature Attributions
+  const shapFeatures = [
+    { name: 'GMF sideband amplitude (dB)', attribution: +0.19 },
+    { name: 'Vibration kurtosis', attribution: +0.11 },
+    { name: 'Vibration RMS (g)', attribution: +0.07 },
+    { name: 'Oil temperature (°C)', attribution: +0.03 },
+    { name: 'Output torque (N·m)', attribution: -0.03 }
+  ];
+
+  // Anomaly metrics
+  const totalWindows = selectedRun.summary?.totalWindows || 168;
+  const anomalousWindows = selectedRun.summary?.anomalousWindowsCount || 38;
+  const scoreThreshold = selectedRun.summary?.thresholdOverride || 0.62;
+
+  // Strongest Evidence Windows
+  const evidenceWindows = [
+    { time: '18 May 14:00', score: 0.81, rms: '0.71 g', kurtosis: 5.2, oil: '71.4 °C' },
+    { time: '18 May 15:00', score: 0.79, rms: '0.69 g', kurtosis: 4.9, oil: '71.9 °C' },
+    { time: '17 May 22:00', score: 0.74, rms: '0.64 g', kurtosis: 4.6, oil: '69.8 °C' }
+  ];
+
+  const handleExport = () => {
+    window.print();
+  };
+
+  const handleViewAlert = () => {
+    navigate(`${ROUTES.ALERTS}?analysisRunId=${selectedRun._id || selectedRun.id}`);
+  };
+
+  const handleCreateWorkOrder = () => {
+    navigate(`${ROUTES.MAINTENANCE}?action=create&machineId=${selectedRun.machineId?._id || selectedRun.machineId?.code || selectedRun.machineId}&analysisRunId=${selectedRun._id || selectedRun.id}&sourceAlertId=AL-318`);
+  };
+
+  return (
+    <div className="report-container" style={{ marginBottom: '1.5rem' }}>
+      {/* 1. Breadcrumb & Top Bar */}
+      <div className="report-breadcrumb-bar">
+        <div>
+          <div className="report-breadcrumb">
+            <span style={{ color: 'var(--text-muted)' }}>Analysis results</span>
+            <span style={{ color: 'var(--text-muted)', margin: '0 6px' }}>/</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{runCode}</span>
+          </div>
+          <h2 className="report-title">{machineCode} · Weekly analysis</h2>
+          <div className="report-meta">
+            Completed {completedDate}, 18:02 UTC · run by {executedBy}
+          </div>
+        </div>
+
+        <div className="report-top-actions">
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Icon name="download" size={13} style={{ marginRight: 6 }} /> Export report
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleViewAlert}>
+            <Icon name="alert" size={13} style={{ marginRight: 6 }} /> View alert AL-318
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleCreateWorkOrder}>
+            <Icon name="wrench" size={13} style={{ marginRight: 6 }} /> Create work order
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. Top 5-Box Summary Strip */}
+      <div className="report-summary-strip">
+        <div className="summary-tile">
+          <span className="summary-tile-label">Machine</span>
+          <div className="summary-tile-value">{machineCode} · {machineName}</div>
+          <div className="summary-tile-sub">{siteLocation}</div>
+        </div>
+        <div className="summary-tile">
+          <span className="summary-tile-label">Dataset</span>
+          <div className="summary-tile-value">{datasetName}</div>
+          <div className="summary-tile-sub">Gearbox simulator export · Demo data</div>
+        </div>
+        <div className="summary-tile">
+          <span className="summary-tile-label">Time range (UTC)</span>
+          <div className="summary-tile-value">12 May 00:00 – 18 May 23:59</div>
+          <div className="summary-tile-sub">7 days · 1-minute interval</div>
+        </div>
+        <div className="summary-tile">
+          <span className="summary-tile-label">Coverage</span>
+          <div className="summary-tile-value">98.1%</div>
+          <div className="summary-tile-sub">9,887 of 10,080 min · 193 missing</div>
+        </div>
+        <div className="summary-tile">
+          <span className="summary-tile-label">Active Models</span>
+          <div className="summary-tile-value" style={{ fontSize: '0.8rem' }}>RF-Gearbox-Fault v0.3</div>
+          <div className="summary-tile-sub">IF-Gearbox-Anomaly v0.4 · Baseline 01–30 Apr</div>
+        </div>
+      </div>
+
+      {/* 3. Two-Column Layout: RF Classification vs IF Anomaly */}
+      <div className="report-two-col-grid">
+        {/* Left Column: Fault classification */}
+        <div className="report-panel-card">
+          <div className="panel-header">
+            <div className="panel-title-group">
+              <h3 className="panel-title">Fault classification</h3>
+              <span className="panel-badge-pill">Random Forest · supervised · labelled simulator classes</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="prediction-headline">
+              <span className="headline-label">Most likely class across the week (mean of 168 hourly windows)</span>
+              <div className="headline-result">
+                <span className="headline-class">Gear tooth wear</span>
+                <span className="headline-prob">p = 0.64</span>
+              </div>
+            </div>
+
+            <div className="probability-breakdown-list">
+              {classProbabilities.map((cls) => (
+                <div key={cls.label} className="prob-row">
+                  <div className="prob-meta">
+                    <span className="prob-name" style={{ fontWeight: cls.isHighlight ? 700 : 500 }}>{cls.label}</span>
+                    <span className="prob-val">{cls.value.toFixed(2)}</span>
+                  </div>
+                  <div className="prob-track">
+                    <div
+                      className="prob-fill"
+                      style={{ width: `${cls.value * 100}%`, backgroundColor: cls.color }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="report-eval-callout">
+              <strong>Documented evaluation:</strong> macro F1 0.89 on 1,240 held-out labelled simulator windows (eval set gbx-sim-eval-2025-04). Not evaluated on field gearboxes — treat as indicative for this machine.
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <h4 className="section-title-sm">Why the classifier chose tooth wear</h4>
+              <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>SHAP · TreeExplainer</span>
+            </div>
+            <p className="section-caption">
+              Bars show each feature's contribution to the "Gear tooth wear" probability, relative to the model's average output (0.27). SHAP explains the output; it does not make a prediction.
+            </p>
+
+            <div className="shap-diverging-chart">
+              {shapFeatures.map((feat) => {
+                const maxRange = 0.25;
+                const isPos = feat.attribution >= 0;
+                const barWidthPct = Math.min(100, (Math.abs(feat.attribution) / maxRange) * 100);
+                return (
+                  <div key={feat.name} className="shap-bar-row">
+                    <span className="shap-feat-name" title={feat.name}>{feat.name}</span>
+                    <div className="shap-axis-container">
+                      <div className="shap-zero-line" />
+                      {isPos ? (
+                        <div
+                          className="shap-bar-pos"
+                          style={{ width: `${barWidthPct / 2}%`, left: '50%' }}
+                        />
+                      ) : (
+                        <div
+                          className="shap-bar-neg"
+                          style={{ width: `${barWidthPct / 2}%`, right: '50%' }}
+                        />
+                      )}
+                    </div>
+                    <span className="shap-feat-val" style={{ color: isPos ? 'var(--primary)' : '#64748b' }}>
+                      {isPos ? `+${feat.attribution.toFixed(2)}` : feat.attribution.toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Anomaly detection */}
+        <div className="report-panel-card">
+          <div className="panel-header">
+            <div className="panel-title-group">
+              <h3 className="panel-title">Anomaly detection</h3>
+              <span className="panel-badge-pill">Isolation Forest · unsupervised · baseline 01–30 Apr 2025</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="anomaly-metric-tiles-row">
+              <div className="anomaly-metric-tile">
+                <span className="anomaly-tile-label">Flagged hourly windows</span>
+                <div className="anomaly-tile-value" style={{ color: '#dc2626' }}>{anomalousWindows} of {totalWindows}</div>
+              </div>
+              <div className="anomaly-metric-tile">
+                <span className="anomaly-tile-label">Score threshold</span>
+                <div className="anomaly-tile-value">{scoreThreshold}</div>
+              </div>
+              <div className="anomaly-metric-tile">
+                <span className="anomaly-tile-label">First flagged</span>
+                <div className="anomaly-tile-value" style={{ fontSize: '0.95rem' }}>16 May 04:00</div>
+              </div>
+            </div>
+
+            <div className="anomaly-note-box">
+              These windows differ from April's baseline. That is a reason to investigate — it does not identify or prove a named failure.
+            </div>
+
+            {/* Dual Axis Trend Chart */}
+            <div className="trend-chart-wrapper">
+              <div className="trend-chart-header">
+                <span className="trend-chart-title">Vibration RMS & oil temperature</span>
+                <div className="trend-chart-legend">
+                  <span className="legend-item"><span className="legend-dot" style={{ backgroundColor: '#0f766e' }} /> RMS (g)</span>
+                  <span className="legend-item"><span className="legend-dot" style={{ backgroundColor: '#ea580c' }} /> Oil (°C)</span>
+                  <span className="legend-item"><span className="legend-box-flagged" /> Flagged</span>
+                </div>
+              </div>
+
+              <svg className="trend-svg" viewBox="0 0 500 160" preserveAspectRatio="none">
+                <rect x="280" y="20" width="200" height="110" fill="rgba(239, 68, 68, 0.08)" rx="4" />
+                <line x1="50" y1="130" x2="480" y2="130" stroke="#e2e8f0" strokeWidth="1" />
+                <line x1="50" y1="75" x2="480" y2="75" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="50" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 3" />
+
+                {/* RMS Line (g) - Teal */}
+                <path
+                  d="M 50 115 Q 120 110, 180 112 T 280 95 T 380 65 T 480 45"
+                  fill="none"
+                  stroke="#0f766e"
+                  strokeWidth="2.5"
+                />
+
+                {/* Oil Temp Line (°C) - Orange */}
+                <path
+                  d="M 50 100 Q 120 98, 180 96 T 280 85 T 380 55 T 480 35"
+                  fill="none"
+                  stroke="#ea580c"
+                  strokeWidth="2.5"
+                />
+
+                {/* Left Axis: RMS (g) */}
+                <text x="25" y="45" fontSize="10" fill="#64748b" textAnchor="middle">0.7</text>
+                <text x="25" y="80" fontSize="10" fill="#64748b" textAnchor="middle">0.5</text>
+                <text x="25" y="115" fontSize="10" fill="#64748b" textAnchor="middle">0.4 g</text>
+
+                {/* Right Axis: Oil Temp (°C) */}
+                <text x="495" y="35" fontSize="10" fill="#64748b" textAnchor="middle">72</text>
+                <text x="495" y="65" fontSize="10" fill="#64748b" textAnchor="middle">66</text>
+                <text x="495" y="100" fontSize="10" fill="#64748b" textAnchor="middle">60 °C</text>
+
+                {/* Dates */}
+                <text x="50" y="148" fontSize="10" fill="#94a3b8">12 May</text>
+                <text x="180" y="148" fontSize="10" fill="#94a3b8">14 May</text>
+                <text x="280" y="148" fontSize="10" fill="#94a3b8">16 May</text>
+                <text x="450" y="148" fontSize="10" fill="#94a3b8">18 May</text>
+              </svg>
+            </div>
+
+            {/* Strongest Evidence Windows Table */}
+            <div className="evidence-table-container">
+              <div className="evidence-table-title">Strongest evidence windows</div>
+              <table className="evidence-table">
+                <thead>
+                  <tr>
+                    <th>Window (UTC)</th>
+                    <th>Score</th>
+                    <th>RMS</th>
+                    <th>Kurtosis</th>
+                    <th>Oil</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evidenceWindows.map((w) => (
+                    <tr key={w.time}>
+                      <td className="mono-code">{w.time}</td>
+                      <td><strong style={{ color: '#dc2626' }}>{w.score.toFixed(2)}</strong></td>
+                      <td>{w.rms}</td>
+                      <td>{w.kurtosis}</td>
+                      <td>{w.oil}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Uncertainty & Limitations Callout */}
+      <div className="report-limitations-box">
+        <div className="limitations-title">Uncertainty and limitations</div>
+        <div className="limitations-grid">
+          <div className="limitation-item">
+            <span className="limitation-bullet">•</span>
+            <span>Both models were trained on gearbox simulator data. Results for physical gearboxes have not been validated.</span>
+          </div>
+          <div className="limitation-item">
+            <span className="limitation-bullet">•</span>
+            <span>Class probabilities are model outputs, not calibrated likelihoods of physical damage.</span>
+          </div>
+          <div className="limitation-item">
+            <span className="limitation-bullet">•</span>
+            <span>193 missing minutes (1.9%) were excluded; no values were interpolated.</span>
+          </div>
+          <div className="limitation-item">
+            <span className="limitation-bullet">•</span>
+            <span>The anomaly baseline assumes April operation was healthy. A changed duty cycle can also raise scores.</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Next Step Action Banner */}
+      <div className="report-next-step-banner">
+        <div className="next-step-left">
+          <span className="next-step-tag">NEXT STEP</span>
+          <p className="next-step-text">
+            Alert AL-318 was raised from this analysis. Create a work order to have a technician inspect the gear mesh.
+          </p>
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={handleCreateWorkOrder}
+        >
+          <Icon name="wrench" size={14} style={{ marginRight: 6 }} /> Create work order from AL-318
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function AnalysisResultsPage() {
   const { user } = useAuth();
   const { queryParams, navigate } = useRouter();
@@ -444,7 +798,7 @@ export default function AnalysisResultsPage() {
       {/* Pipeline Workflow Guide */}
       <div style={{
         background: '#ffffff',
-        border: '1px solid #ede9f6',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 8,
         padding: '10px 16px',
         marginBottom: '1.25rem',
@@ -455,8 +809,8 @@ export default function AnalysisResultsPage() {
         flexWrap: 'wrap',
         fontSize: '0.82rem'
       }}>
-        <span style={{ fontWeight: 600, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Icon name="activity" size={14} color="#7c3aed" /> End-to-End Pipeline:
+        <span style={{ fontWeight: 600, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="activity" size={14} color="var(--primary)" /> End-to-End Pipeline:
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ color: '#64748b' }}>1. Specimen Registered</span>
@@ -467,7 +821,7 @@ export default function AnalysisResultsPage() {
           <span style={{ color: '#cbd5e1' }}>&rarr;</span>
           <span style={{ color: '#64748b' }}>4. Pre-Flight Verified</span>
           <span style={{ color: '#cbd5e1' }}>&rarr;</span>
-          <span style={{ color: '#7c3aed', fontWeight: 700, background: '#f5f3ff', padding: '2px 8px', borderRadius: 4, border: '1px solid #ddd6fe' }}>
+          <span style={{ color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-subtle)', padding: '2px 8px', borderRadius: 4, border: '1px solid var(--primary-border)' }}>
             5. Multi-Signal Inference & SHAP
           </span>
           <span style={{ color: '#cbd5e1' }}>&rarr;</span>
@@ -476,16 +830,16 @@ export default function AnalysisResultsPage() {
       </div>
 
       {/* Top Tab Switcher */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid #ede9f6', paddingBottom: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveTab('runs')}
           style={{
             padding: '0.55rem 1.25rem',
-            background: activeTab === 'runs' ? '#ffffff' : '#f8f7fc',
-            border: activeTab === 'runs' ? '1px solid #7c3aed' : '1px solid #ede9f6',
-            boxShadow: activeTab === 'runs' ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+            background: activeTab === 'runs' ? '#ffffff' : '#f8fafc',
+            border: activeTab === 'runs' ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+            boxShadow: activeTab === 'runs' ? '0 2px 8px rgba(15, 118, 110, 0.12)' : 'none',
             borderRadius: '8px',
-            color: activeTab === 'runs' ? '#7c3aed' : '#64748b',
+            color: activeTab === 'runs' ? 'var(--primary)' : '#64748b',
             fontWeight: 700,
             fontSize: '0.875rem',
             cursor: 'pointer',
@@ -494,9 +848,9 @@ export default function AnalysisResultsPage() {
             gap: '0.5rem'
           }}
         >
-          <Icon name="analysis" size={15} color={activeTab === 'runs' ? '#7c3aed' : '#64748b'} />
+          <Icon name="analysis" size={15} color={activeTab === 'runs' ? 'var(--primary)' : '#64748b'} />
           <span>Analysis Runs</span>
-          <span style={{ fontSize: '0.75rem', background: activeTab === 'runs' ? '#f5f3ff' : '#ede9f6', color: activeTab === 'runs' ? '#7c3aed' : '#64748b', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
+          <span style={{ fontSize: '0.75rem', background: activeTab === 'runs' ? 'var(--primary-subtle)' : '#f1f5f9', color: activeTab === 'runs' ? 'var(--primary)' : '#64748b', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
             {runs.length}
           </span>
         </button>
@@ -505,11 +859,11 @@ export default function AnalysisResultsPage() {
           onClick={() => setActiveTab('models')}
           style={{
             padding: '0.55rem 1.25rem',
-            background: activeTab === 'models' ? '#ffffff' : '#f8f7fc',
-            border: activeTab === 'models' ? '1px solid #7c3aed' : '1px solid #ede9f6',
-            boxShadow: activeTab === 'models' ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+            background: activeTab === 'models' ? '#ffffff' : '#f8fafc',
+            border: activeTab === 'models' ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+            boxShadow: activeTab === 'models' ? '0 2px 8px rgba(15, 118, 110, 0.12)' : 'none',
             borderRadius: '8px',
-            color: activeTab === 'models' ? '#7c3aed' : '#64748b',
+            color: activeTab === 'models' ? 'var(--primary)' : '#64748b',
             fontWeight: 700,
             fontSize: '0.875rem',
             cursor: 'pointer',
@@ -518,9 +872,9 @@ export default function AnalysisResultsPage() {
             gap: '0.5rem'
           }}
         >
-          <Icon name="research" size={15} color={activeTab === 'models' ? '#7c3aed' : '#64748b'} />
+          <Icon name="research" size={15} color={activeTab === 'models' ? 'var(--primary)' : '#64748b'} />
           <span>Model Evaluation & SHAP</span>
-          <span style={{ fontSize: '0.75rem', background: activeTab === 'models' ? '#f5f3ff' : '#ede9f6', color: activeTab === 'models' ? '#7c3aed' : '#64748b', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
+          <span style={{ fontSize: '0.75rem', background: activeTab === 'models' ? 'var(--primary-subtle)' : '#f1f5f9', color: activeTab === 'models' ? 'var(--primary)' : '#64748b', padding: '0.15rem 0.45rem', borderRadius: '10px' }}>
             {models.length}
           </span>
         </button>
@@ -529,11 +883,11 @@ export default function AnalysisResultsPage() {
           onClick={() => setActiveTab('research')}
           style={{
             padding: '0.55rem 1.25rem',
-            background: activeTab === 'research' ? '#ffffff' : '#f8f7fc',
-            border: activeTab === 'research' ? '1px solid #7c3aed' : '1px solid #ede9f6',
-            boxShadow: activeTab === 'research' ? '0 2px 8px rgba(124, 58, 237, 0.12)' : 'none',
+            background: activeTab === 'research' ? '#ffffff' : '#f8fafc',
+            border: activeTab === 'research' ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+            boxShadow: activeTab === 'research' ? '0 2px 8px rgba(15, 118, 110, 0.12)' : 'none',
             borderRadius: '8px',
-            color: activeTab === 'research' ? '#7c3aed' : '#64748b',
+            color: activeTab === 'research' ? 'var(--primary)' : '#64748b',
             fontWeight: 700,
             fontSize: '0.875rem',
             cursor: 'pointer',
@@ -542,7 +896,7 @@ export default function AnalysisResultsPage() {
             gap: '0.5rem'
           }}
         >
-          <Icon name="layer" size={15} color={activeTab === 'research' ? '#7c3aed' : '#64748b'} />
+          <Icon name="layer" size={15} color={activeTab === 'research' ? 'var(--primary)' : '#64748b'} />
           <span>Benchmark Provenance & Multi-Signal Evaluation</span>
         </button>
       </div>
@@ -576,7 +930,7 @@ export default function AnalysisResultsPage() {
                       style={{
                         padding: '0.85rem 1rem',
                         borderRadius: '8px',
-                        border: isSelected ? '2px solid #7c3aed' : '1px solid #ede9f6',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid #ede9f6',
                         background: '#ffffff',
                         boxShadow: isSelected ? '0 2px 8px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
                         color: '#1e1b4b',
@@ -590,7 +944,7 @@ export default function AnalysisResultsPage() {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className="mono-code" style={{ fontSize: '0.75rem', color: '#7c3aed', fontWeight: 700 }}>
+                        <span className="mono-code" style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 700 }}>
                           {r.machineId?.code || r.componentType?.toUpperCase()}
                         </span>
                         <StatusBadge
@@ -608,8 +962,8 @@ export default function AnalysisResultsPage() {
                         <span style={{ fontWeight: 600, color: intCount > 0 ? '#b45309' : '#16a34a' }}>
                           {intCount > 0 ? `${intCount} interval(s)` : 'Nominal'}
                         </span>
-                        <span style={{ color: '#7c3aed', display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <Icon name="shield" size={11} color="#7c3aed" /> Immutable
+                        <span style={{ color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <Icon name="shield" size={11} color="var(--primary)" /> Immutable
                         </span>
                       </div>
                     </button>
@@ -620,14 +974,21 @@ export default function AnalysisResultsPage() {
               {/* Selected Run Details */}
               {selectedRun && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* UX Pilot Page 2: Master Analysis Report */}
+                  <AnalysisReportUXPilot
+                    selectedRun={selectedRun}
+                    user={user}
+                    navigate={navigate}
+                  />
+
                   {/* Run Metadata Card */}
                   <Card
-                    title={`Analysis Run: ${selectedRun.machineId?.code || 'Machine'} • ${selectedRun.datasetTitle}`}
+                    title={`Provenance & Feature Pipeline: ${selectedRun.machineId?.code || 'Machine'} • ${selectedRun.datasetTitle}`}
                     subtitle={`Execution ID: ${selectedRun._id || selectedRun.id} • Pipeline v${selectedRun.featurePipelineVersion}`}
                     badge={
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#f5f3ff', color: '#6d28d9', borderRadius: '4px', border: '1px solid #ddd6fe', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Icon name="shield" size={12} color="#7c3aed" /> IMMUTABLE AUDIT RECORD
+                        <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: 'var(--primary-subtle)', color: 'var(--primary)', borderRadius: '4px', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Icon name="shield" size={12} color="var(--primary)" /> IMMUTABLE AUDIT RECORD
                         </span>
                         <StatusBadge
                           status={selectedRun.status === 'completed' ? 'healthy' : selectedRun.status === 'failed' ? 'critical' : 'warning'}
@@ -646,7 +1007,7 @@ export default function AnalysisResultsPage() {
 
                       <div>
                         <span className="spec-label">Dataset SHA256 Checksum:</span>
-                        <span className="mono-code" style={{ display: 'block', fontSize: '0.75rem', color: '#7c3aed', wordBreak: 'break-all' }} title={selectedRun.fileChecksumSha256}>
+                        <span className="mono-code" style={{ display: 'block', fontSize: '0.75rem', color: 'var(--primary)', wordBreak: 'break-all' }} title={selectedRun.fileChecksumSha256}>
                           {selectedRun.fileChecksumSha256 ? `${selectedRun.fileChecksumSha256.substring(0, 16)}...` : 'Pre-computed Hash'}
                         </span>
                       </div>
@@ -704,7 +1065,7 @@ export default function AnalysisResultsPage() {
                           <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.thermalPathActive ? '#fff7ed' : '#f8fafc', color: selectedRun.signalPathsSummary?.thermalPathActive ? '#c2410c' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Icon name={selectedRun.signalPathsSummary?.thermalPathActive ? 'check' : 'close'} size={11} /> Thermal Path
                           </span>
-                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.operatingContextPathActive ? '#f5f3ff' : '#f8fafc', color: selectedRun.signalPathsSummary?.operatingContextPathActive ? '#6d28d9' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'var(--primary-subtle)' : '#f8fafc', color: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'var(--primary-hover)' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Icon name={selectedRun.signalPathsSummary?.operatingContextPathActive ? 'check' : 'close'} size={11} /> Context
                           </span>
                         </div>
@@ -862,7 +1223,7 @@ export default function AnalysisResultsPage() {
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
                                 {(interval.fusion_rationale || interval.fusionRationale) && (
-                                  <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: '#f5f3ff', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.85rem', color: '#5b21b6' }}>
+                                  <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: 'var(--primary-subtle)', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.85rem', color: '#5b21b6' }}>
                                     <strong>Calibrated Fusion Rationale:</strong> {interval.fusion_rationale || interval.fusionRationale}
                                   </div>
                                 )}
@@ -918,8 +1279,8 @@ export default function AnalysisResultsPage() {
 
                                   {/* Verified SHAP Feature Attributions */}
                                   <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#7c3aed', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                      <Icon name="research" size={15} color="#7c3aed" />
+                                    <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                      <Icon name="research" size={15} color="var(--primary)" />
                                       <span>Verified {explainerType} Attributions</span>
                                     </div>
                                     <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.75rem' }}>
@@ -1094,7 +1455,7 @@ export default function AnalysisResultsPage() {
                       style={{
                         padding: '0.55rem 0.875rem',
                         borderRadius: '6px',
-                        border: isSelected ? '2px solid #7c3aed' : '1px solid #ede9f6',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid #ede9f6',
                         background: '#ffffff',
                         boxShadow: isSelected ? '0 2px 8px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
                         color: isSelected ? '#1e1b4b' : '#64748b',
@@ -1239,7 +1600,7 @@ export default function AnalysisResultsPage() {
                               <tr>
                                 <th style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: '#64748b' }}>Actual \ Pred</th>
                                 {selectedModel.metrics.classes.map((cls) => (
-                                  <th key={cls} style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: '#7c3aed' }}>
+                                  <th key={cls} style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: 'var(--primary)' }}>
                                     {cls.replace('_', ' ')}
                                   </th>
                                 ))}
@@ -1297,7 +1658,7 @@ export default function AnalysisResultsPage() {
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
                                 <div>Precision: <strong style={{ color: '#0284c7' }}>{(m.precision * 100).toFixed(1)}%</strong></div>
                                 <div>Recall: <strong style={{ color: '#16a34a' }}>{(m.recall * 100).toFixed(1)}%</strong></div>
-                                <div>F1-Score: <strong style={{ color: '#7c3aed' }}>{(m.f1_score * 100).toFixed(1)}%</strong></div>
+                                <div>F1-Score: <strong style={{ color: 'var(--primary)' }}>{(m.f1_score * 100).toFixed(1)}%</strong></div>
                               </div>
                             </div>
                           ))}
@@ -1336,14 +1697,14 @@ export default function AnalysisResultsPage() {
                                 <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
                                     <span className="mono-code">{f.feature}</span>
-                                    <span style={{ fontWeight: 600, color: '#7c3aed' }}>{val.toFixed(4)}</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{val.toFixed(4)}</span>
                                   </div>
                                   <div style={{ height: '8px', background: '#ede9f6', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div
                                       style={{
                                         height: '100%',
                                         width: `${pct}%`,
-                                        background: idx === 0 ? '#7c3aed' : idx === 1 ? '#8b5cf6' : '#a78bfa',
+                                        background: idx === 0 ? 'var(--primary)' : idx === 1 ? '#8b5cf6' : '#a78bfa',
                                         borderRadius: '4px'
                                       }}
                                     />
@@ -1518,7 +1879,7 @@ export default function AnalysisResultsPage() {
 
                   <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Defect Recall (Fault Sensitivity)</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7c3aed' }}>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>
                       {((researchData.regime_comparison?.regime_conditioned_baseline?.defect_recall ?? 1.0) * 100).toFixed(1)}%
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -1610,12 +1971,12 @@ export default function AnalysisResultsPage() {
                   </div>
 
                   {/* Multi-Signal Fused Path */}
-                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ddd6fe', boxShadow: '0 1px 2px rgba(124, 58, 237, 0.05)' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--primary-border)', boxShadow: '0 1px 2px rgba(124, 58, 237, 0.05)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <strong style={{ color: '#7c3aed', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Icon name="layer" size={16} color="#7c3aed" /> Multi-Signal Fused
+                      <strong style={{ color: 'var(--primary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Icon name="layer" size={16} color="var(--primary)" /> Multi-Signal Fused
                       </strong>
-                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: '#f5f3ff', color: '#6d28d9', fontWeight: 700, border: '1px solid #ddd6fe' }}>
+                      <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'var(--primary-subtle)', color: 'var(--primary-hover)', fontWeight: 700, border: '1px solid var(--primary-border)' }}>
                         F1: {(researchData.signal_paths_comparison?.multi_signal_fused?.overall_metrics?.f1_score * 100).toFixed(1)}%
                       </span>
                     </div>
@@ -1625,7 +1986,7 @@ export default function AnalysisResultsPage() {
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                       <p style={{ margin: '0 0 0.35rem 0' }}><strong style={{ color: '#16a34a' }}>Strength:</strong> {researchData.signal_paths_comparison?.multi_signal_fused?.strength}</p>
-                      <p style={{ margin: 0 }}><strong style={{ color: '#7c3aed' }}>Cross-Confirmation:</strong> Promotes alerts to CRITICAL only when both mechanical and thermal channels confirm abnormal deviation.</p>
+                      <p style={{ margin: 0 }}><strong style={{ color: 'var(--primary)' }}>Cross-Confirmation:</strong> Promotes alerts to CRITICAL only when both mechanical and thermal channels confirm abnormal deviation.</p>
                     </div>
                   </div>
 

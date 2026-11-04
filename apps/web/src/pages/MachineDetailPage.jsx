@@ -645,7 +645,7 @@ export default function MachineDetailPage() {
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                   }}>
                     <div style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Icon name="user" size={13} color="#7c3aed" /> {t.fullName || t.name || 'Technician'}
+                      <Icon name="user" size={13} color="var(--primary)" /> {t.fullName || t.name || 'Technician'}
                     </div>
                     <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
                       {t.email} • {t.role?.toUpperCase()}
@@ -923,7 +923,7 @@ export default function MachineDetailPage() {
             </div>
 
             <div className="hero-limitation-box">
-              <Icon name="shield" size={16} color="#7c3aed" />
+              <Icon name="shield" size={16} color="var(--primary)" />
               <div>
                 <strong>Machine Domain Separation Notice:</strong>
                 <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.78rem' }}>
