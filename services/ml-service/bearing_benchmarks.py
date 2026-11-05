@@ -390,7 +390,9 @@ def run_nasa_ims_benchmark():
     ]
 
     # BASELINE PARTITION:
-    # First 20% of run (first ~196 snapshots, ~32.6 hours when bearing was freshly installed and healthy)
+    # Snapshots are sampled at ~10-minute intervals (984 snapshots over 164.0 hours total).
+    # First 20% of run corresponds to 196 snapshots = 1,960 minutes = 32.67 hours (~32.7 hours)
+    # when the bearing was freshly installed and healthy (2004-02-12 10:32:39 to 2004-02-13 19:02:39 UTC).
     n_baseline = int(len(df) * 0.20)
     df_baseline = df.iloc[:n_baseline].copy()
 
@@ -412,7 +414,12 @@ def run_nasa_ims_benchmark():
 
     # Anomaly scores: convert decision_function (higher=normal) to anomaly score (higher=anomalous, range ~0 to 1)
     baseline_scores_raw = iso.decision_function(X_baseline_scaled)
-    # Calibrate threshold at the 1st percentile of healthy training scores
+    # Calibrate threshold at the 1st percentile of healthy training scores.
+    # Note on threshold orientation:
+    # In scikit-learn raw decision_function space, lower/negative values are anomalous.
+    # Therefore, 1st percentile of baseline healthy scores is the anomaly cutoff.
+    # When inverted into standard normalized anomaly score space [0, 1] (where higher values
+    # are anomalous), this identical boundary corresponds to the 99th percentile cutoff.
     threshold_raw = float(np.percentile(baseline_scores_raw, 1.0))
 
     full_scores_raw = iso.decision_function(X_full_scaled)
@@ -425,7 +432,7 @@ def run_nasa_ims_benchmark():
     df["anomaly_score"] = np.round(anomaly_scores, 4)
     df["is_anomalous"] = full_scores_raw < threshold_raw
 
-    # Find first sustained flag: 6 consecutive snapshots (1 hour) exceeding threshold
+    # Find first sustained flag: 6 consecutive 10-minute snapshots (1 continuous hour) exceeding threshold
     sustained_flags = []
     consecutive = 0
     first_sustained_idx = None
@@ -437,6 +444,7 @@ def run_nasa_ims_benchmark():
         else:
             consecutive = 0
 
+    # Calculate detection lead time strictly from actual ISO timestamps (not row count approximations)
     end_ts = datetime.datetime.fromisoformat(df["timestamp"].iloc[-1])
     first_flag_ts = datetime.datetime.fromisoformat(df["timestamp"].iloc[first_sustained_idx]) if first_sustained_idx else None
     

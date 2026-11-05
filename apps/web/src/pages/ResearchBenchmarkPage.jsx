@@ -232,16 +232,16 @@ export default function ResearchBenchmarkPage() {
                     <td className="table-primary-text"><strong>Gearbox</strong></td>
                     <td>
                       <span className="badge badge-healthy" style={{ fontSize: '0.75rem' }}>
-                        RF-Gearbox v0.3
+                        RF-Gearbox v1.0
                       </span>
                     </td>
                     <td>
                       <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
-                        IF-Gearbox v0.4
+                        IF-Gearbox v1.0
                       </span>
                     </td>
                     <td>RF only</td>
-                    <td>Gearbox simulator uploads</td>
+                    <td>Gearbox specimen & simulator uploads</td>
                   </tr>
                   <tr style={{ opacity: 0.6 }}>
                     <td className="table-primary-text">Pump</td>
@@ -422,19 +422,19 @@ export default function ResearchBenchmarkPage() {
                   >
                     <div>
                       <span className="text-muted block text-xs">Baseline data</span>
-                      <strong className="block text-primary">NASA IMS test 2, first 20% of run</strong>
+                      <strong className="block text-primary">NASA IMS test 2, first 20% of run (196 snapshots, ~32.7 hours)</strong>
                     </div>
                     <div>
-                      <span className="text-muted block text-xs">Training version</span>
-                      <span className="mono-code text-xs">train-ims-2025-02-20</span>
+                      <span className="text-muted block text-xs">Sampling interval</span>
+                      <strong className="block text-primary">10-minute snapshots (164.0h total)</strong>
                     </div>
                     <div>
                       <span className="text-muted block text-xs">Evaluation</span>
-                      <strong className="block text-primary">Detection lead time on run-to-failure</strong>
+                      <strong className="block text-primary">Detection lead time on run-to-failure (ISO timestamps)</strong>
                     </div>
                     <div>
-                      <span className="text-muted block text-xs">Eval version</span>
-                      <span className="mono-code text-xs">eval-ims-2025-02-24</span>
+                      <span className="text-muted block text-xs">Calibrated threshold</span>
+                      <span className="mono-code text-xs">99th percentile normalized (1st pct raw decision)</span>
                     </div>
                   </div>
 
@@ -585,7 +585,7 @@ export default function ResearchBenchmarkPage() {
                     NASA IMS Test 2 Run-to-Failure Degradation Trajectory
                   </h4>
                   <span className="mono-code text-xs text-muted">
-                    Total: 984 snapshots (Feb 12 – Feb 19, 2004)
+                    Total: 984 snapshots sampled at ~10-minute intervals (Feb 12 10:32 – Feb 19 06:22 UTC, 164.0h)
                   </span>
                 </div>
 
@@ -632,9 +632,9 @@ export default function ResearchBenchmarkPage() {
 
           {/* Section: Gearbox Simulator Uploads */}
           <Card
-            title="Gearbox simulator uploads"
-            subtitle="Kept separate from bearing experiments. Trained and evaluated only on datasets exported from the project's gearbox simulator."
-            badge={<span className="badge badge-demo">SIMULATOR EXPORTS ONLY</span>}
+            title="Gearbox simulator & specimen uploads"
+            subtitle="Kept separate from bearing experiments. Trained and evaluated on validated gearbox specimens and telemetry exports with verified reproducibility."
+            badge={<span className="badge badge-demo">SPECIMEN BENCHMARKS ONLY</span>}
           >
             <div className="table-responsive">
               <table className="data-table">
@@ -651,42 +651,42 @@ export default function ResearchBenchmarkPage() {
                 <tbody>
                   <tr>
                     <td className="table-primary-text">
-                      <strong>RF-Gearbox-Fault v0.3</strong>
-                      <span className="mono-code text-muted text-xs block">train-gbx-sim-2025-04</span>
+                      <strong>Random Forest Gear Fault Classifier</strong>
+                      <span className="mono-code text-muted text-xs block">v1.0.0 · seu-dds-gearbox</span>
                     </td>
                     <td><span className="badge badge-healthy" style={{ fontSize: '0.75rem' }}>Classification</span></td>
-                    <td style={{ fontSize: '0.85rem' }}>412 labelled simulator runs · 4 classes · 6 signals incl. GMF sideband</td>
-                    <td style={{ fontSize: '0.85rem' }}>Held-out runs (20%), split by run ID <span className="mono-code text-xs">gbx-sim-eval-2025-04</span></td>
+                    <td style={{ fontSize: '0.85rem' }}>SEU DDS specimen dataset (180 raw rows, dual 20Hz & 30Hz speeds, 12 windows, 95 features)</td>
+                    <td style={{ fontSize: '0.85rem' }}>StratifiedShuffleSplit (80/20 train/test: 9 train, 3 test windows across broken tooth, chipped tooth, healthy)</td>
                     <td>
-                      <strong style={{ color: '#38bdf8' }}>Macro F1 0.89</strong>
-                      <span className="text-muted text-xs block">n = 1,240 windows</span>
+                      <strong style={{ color: '#38bdf8' }}>Macro F1 1.00</strong>
+                      <span className="text-muted text-xs block">n = 3 test windows (Acc 1.00)</span>
                     </td>
-                    <td><span className="badge badge-demo">In use · simulator only</span></td>
+                    <td><span className="badge badge-demo">In use · specimen artifact</span></td>
                   </tr>
                   <tr>
                     <td className="table-primary-text">
-                      <strong>IF-Gearbox-Anomaly v0.4</strong>
-                      <span className="mono-code text-muted text-xs block">per-machine baseline</span>
+                      <strong>Isolation Forest Anomaly Detector</strong>
+                      <span className="mono-code text-muted text-xs block">v1.0.0 · gb-104-baseline</span>
                     </td>
                     <td><span className="badge badge-info" style={{ fontSize: '0.75rem' }}>Anomaly</span></td>
-                    <td style={{ fontSize: '0.85rem' }}>Each machine&apos;s own baseline window (e.g. GB-104: 01–30 Apr 2025)</td>
-                    <td style={{ fontSize: '0.85rem' }}>Injected-fault simulator runs, detection rate at fixed threshold</td>
+                    <td style={{ fontSize: '0.85rem' }}>GB-104 healthy baseline telemetry run (300 raw rows, 36 extracted windows across 6 mapped signals, 72 features)</td>
+                    <td style={{ fontSize: '0.85rem' }}>25 train / 11 test windows; calibrated at 5th percentile of healthy baseline training distribution</td>
                     <td>
-                      <span className="text-muted text-xs block">No accuracy claim</span>
-                      <span className="text-xs">Threshold 0.62 documented</span>
+                      <span className="text-muted text-xs block">Mean anomaly score 0.422</span>
+                      <span className="text-xs">No accuracy claim (unsupervised)</span>
                     </td>
-                    <td><span className="badge badge-demo">In use · simulator only</span></td>
+                    <td><span className="badge badge-demo">In use · telemetry artifact</span></td>
                   </tr>
                   <tr style={{ opacity: 0.75 }}>
                     <td className="table-primary-text">
-                      <strong>RF-Gearbox-Fault v0.4-rc</strong>
-                      <span className="mono-code text-muted text-xs block">train-gbx-sim-2025-05</span>
+                      <strong>GB-104 Simulator Telemetry Run</strong>
+                      <span className="mono-code text-muted text-xs block">inference-telemetry-run</span>
                     </td>
-                    <td><span className="badge badge-healthy" style={{ fontSize: '0.75rem' }}>Classification</span></td>
-                    <td style={{ fontSize: '0.85rem' }}>+180 runs with misalignment severity labels</td>
-                    <td style={{ fontSize: '0.85rem' }}>Evaluation pending —</td>
-                    <td><span className="text-muted text-xs">—</span></td>
-                    <td><span className="badge badge-site">Research only</span></td>
+                    <td><span className="badge badge-site" style={{ fontSize: '0.75rem' }}>Single Run Eval</span></td>
+                    <td style={{ fontSize: '0.85rem' }}>656 raw telemetry rows windowed with size 16 and 50% stride (stride 8)</td>
+                    <td style={{ fontSize: '0.85rem' }}>Single-file inference pipeline test (apps/server/tests/simulator-upload.test.js)</td>
+                    <td><span className="mono-code text-xs">81 inference windows</span></td>
+                    <td><span className="badge badge-site">Inference test</span></td>
                   </tr>
                 </tbody>
               </table>

@@ -32,7 +32,9 @@ export function getAllowedOrigins() {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (env.isProd) {
+  const isProduction = process.env.NODE_ENV === 'production' || env.isProd;
+
+  if (isProduction) {
     return envOrigins.length > 0 ? envOrigins : ['https://mechguard.ai'];
   }
 
@@ -65,3 +67,4 @@ export const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 };
+

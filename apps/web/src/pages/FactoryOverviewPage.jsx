@@ -366,7 +366,7 @@ export default function FactoryOverviewPage() {
       threshold,
       modelType: alert.modelDetails?.modelType || 'Random Forest + TreeSHAP',
       faultClass: alert.interval?.predictedClass || 'statistical_anomaly',
-      confidence: alert.scores?.confidence ? `${(alert.scores.confidence * 100).toFixed(1)}%` : '89.2%',
+      confidence: alert.scores?.confidence ? `${(alert.scores.confidence * 100).toFixed(1)}%` : '—',
       topFeature,
       topFeatureAttribution
     };

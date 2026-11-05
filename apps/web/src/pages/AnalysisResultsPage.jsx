@@ -150,7 +150,7 @@ function AnalysisReportUXPilot({ selectedRun, user, navigate }) {
 
           <div>
             <div className="prediction-headline">
-              <span className="headline-label">Most likely class across the week (mean of 168 hourly windows)</span>
+              <span className="headline-label">Most likely class across telemetry run (mean of {totalWindows} analysis windows)</span>
               <div className="headline-result">
                 <span className="headline-class">Gear tooth wear</span>
                 <span className="headline-prob">p = 0.64</span>
@@ -175,7 +175,7 @@ function AnalysisReportUXPilot({ selectedRun, user, navigate }) {
             </div>
 
             <div className="report-eval-callout">
-              <strong>Documented evaluation:</strong> macro F1 0.89 on 1,240 held-out labelled simulator windows (eval set gbx-sim-eval-2025-04). Not evaluated on field gearboxes — treat as indicative for this machine.
+              <strong>Documented evaluation:</strong> SEU DDS Gearbox specimen evaluation (v1.0.0): macro F1 1.00 on held-out test windows (n = 3, stratified split). Single-run telemetry analysis: 81 windows. Not evaluated on field gearboxes — treat as indicative for this machine.
             </div>
           </div>
 
@@ -232,7 +232,7 @@ function AnalysisReportUXPilot({ selectedRun, user, navigate }) {
           <div>
             <div className="anomaly-metric-tiles-row">
               <div className="anomaly-metric-tile">
-                <span className="anomaly-tile-label">Flagged hourly windows</span>
+                <span className="anomaly-tile-label">Flagged analysis windows</span>
                 <div className="anomaly-tile-value" style={{ color: '#dc2626' }}>{anomalousWindows} of {totalWindows}</div>
               </div>
               <div className="anomaly-metric-tile">
