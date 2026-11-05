@@ -720,11 +720,11 @@ export default function MaintenancePage() {
           {newOrder.sourceAlertId && (
             <div className="job-card-why" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <strong style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#86198f' }}>
-                  <Icon name="alert" size={15} color="#86198f" />
+                <strong style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#b45309' }}>
+                  <Icon name="alert" size={15} color="#b45309" />
                   Originating Alert Evidence: {newOrder.sourceAlertId}
                 </strong>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#701a75' }}>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.8rem', color: '#92400e' }}>
                   3 consecutive windows above anomaly threshold (0.68 vs 0.55). Radial vibration RMS elevated. Pre-filling work order parameters.
                 </p>
               </div>
@@ -1033,11 +1033,11 @@ export default function MaintenancePage() {
                     {/* UX Pilot Page 5: "Why this was raised" alert evidence callout */}
                     {order.sourceAlertId && (
                       <div className="job-card-why" style={{ marginBottom: '0.85rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, marginBottom: '0.2rem' }}>
-                          <Icon name="alert" size={14} color="#86198f" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, marginBottom: '0.2rem', color: '#b45309' }}>
+                          <Icon name="alert" size={14} color="#b45309" />
                           <span>Why this was raised: Originating Alert {order.sourceAlertId?.title ? `(${order.sourceAlertId.title})` : ''}</span>
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: '#701a75' }}>
+                        <div style={{ fontSize: '0.78rem', color: '#92400e' }}>
                           Statistical anomaly cluster detected on radial vibration telemetry exceeding calibrated threshold (0.68 vs 0.55). Physical transducer verification mandated.
                         </div>
                       </div>

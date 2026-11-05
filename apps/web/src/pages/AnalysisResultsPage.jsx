@@ -930,10 +930,10 @@ export default function AnalysisResultsPage() {
                       style={{
                         padding: '0.85rem 1rem',
                         borderRadius: '8px',
-                        border: isSelected ? '2px solid var(--primary)' : '1px solid #ede9f6',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-subtle)',
                         background: '#ffffff',
-                        boxShadow: isSelected ? '0 2px 8px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
-                        color: '#1e1b4b',
+                        boxShadow: isSelected ? '0 2px 8px rgba(15, 118, 110, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)',
+                        color: 'var(--text-primary)',
                         cursor: 'pointer',
                         textAlign: 'left',
                         minWidth: '240px',
@@ -952,7 +952,7 @@ export default function AnalysisResultsPage() {
                           label={r.status.toUpperCase()}
                         />
                       </div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {r.datasetTitle}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -1000,7 +1000,7 @@ export default function AnalysisResultsPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
                       <div>
                         <span className="spec-label">Assigned Machine:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#1e1b4b', fontWeight: 600 }}>
+                        <span className="mono-code" style={{ display: 'block', color: 'var(--text-primary)', fontWeight: 600 }}>
                           {selectedRun.machineId?.code || 'N/A'} ({selectedRun.machineId?.name || selectedRun.componentType})
                         </span>
                       </div>
@@ -1014,7 +1014,7 @@ export default function AnalysisResultsPage() {
 
                       <div>
                         <span className="spec-label">Model Artifact & Version:</span>
-                        <span className="mono-code" style={{ display: 'block', color: '#1e1b4b' }}>
+                        <span className="mono-code" style={{ display: 'block', color: 'var(--text-primary)' }}>
                           {selectedRun.modelName} (v{selectedRun.modelVersion})
                         </span>
                       </div>
@@ -1030,7 +1030,7 @@ export default function AnalysisResultsPage() {
                         <span className="spec-label">Mapped Sensor Signals:</span>
                         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                           {(selectedRun.mappedSignals || []).map((sig) => (
-                            <span key={sig} className="mono-code" style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', background: '#f8fafc', color: '#475569', borderRadius: '4px', border: '1px solid #ede9f6' }}>
+                            <span key={sig} className="mono-code" style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', background: '#f8fafc', color: '#475569', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
                               {sig}
                             </span>
                           ))}
@@ -1050,7 +1050,7 @@ export default function AnalysisResultsPage() {
                           <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#eff6ff', color: '#1d4ed8', borderRadius: '4px', fontWeight: 600, border: '1px solid #bfdbfe' }}>
                             {selectedRun.regimeSummary?.regimeMethod === 'regime_conditioned' ? 'Regime-Conditioned Baseline' : 'Global Baseline'}
                           </span>
-                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#f8fafc', color: '#64748b', borderRadius: '4px', border: '1px solid #ede9f6' }}>
+                          <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', background: '#f8fafc', color: '#64748b', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
                             {selectedRun.regimeSummary?.regimeStability || 'steady_state'}
                           </span>
                         </div>
@@ -1059,13 +1059,13 @@ export default function AnalysisResultsPage() {
                       <div>
                         <span className="spec-label">Active Signal Paths:</span>
                         <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.vibrationPathActive ? '#eff6ff' : '#f8fafc', color: selectedRun.signalPathsSummary?.vibrationPathActive ? '#1d4ed8' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.vibrationPathActive ? '#eff6ff' : '#f8fafc', color: selectedRun.signalPathsSummary?.vibrationPathActive ? '#1d4ed8' : '#94a3b8', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Icon name={selectedRun.signalPathsSummary?.vibrationPathActive ? 'check' : 'close'} size={11} /> Vibration Path
                           </span>
-                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.thermalPathActive ? '#fff7ed' : '#f8fafc', color: selectedRun.signalPathsSummary?.thermalPathActive ? '#c2410c' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.thermalPathActive ? '#fff7ed' : '#f8fafc', color: selectedRun.signalPathsSummary?.thermalPathActive ? '#c2410c' : '#94a3b8', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Icon name={selectedRun.signalPathsSummary?.thermalPathActive ? 'check' : 'close'} size={11} /> Thermal Path
                           </span>
-                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'var(--primary-subtle)' : '#f8fafc', color: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'var(--primary-hover)' : '#94a3b8', border: '1px solid #ede9f6', display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'var(--primary-subtle)' : '#f8fafc', color: selectedRun.signalPathsSummary?.operatingContextPathActive ? 'var(--primary-hover)' : '#94a3b8', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Icon name={selectedRun.signalPathsSummary?.operatingContextPathActive ? 'check' : 'close'} size={11} /> Context
                           </span>
                         </div>
@@ -1080,7 +1080,7 @@ export default function AnalysisResultsPage() {
                     </div>
 
                     {/* Operational Action Hand-off Row */}
-                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #ede9f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         <Button
                           variant="primary"
@@ -1223,14 +1223,14 @@ export default function AnalysisResultsPage() {
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
                                 {(interval.fusion_rationale || interval.fusionRationale) && (
-                                  <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: 'var(--primary-subtle)', border: '1px solid rgba(124, 58, 237, 0.2)', fontSize: '0.85rem', color: '#5b21b6' }}>
+                                  <div style={{ padding: '0.65rem 0.85rem', borderRadius: '6px', background: 'var(--primary-subtle)', border: '1px solid var(--primary-border)', fontSize: '0.85rem', color: 'var(--primary-hover)' }}>
                                     <strong>Calibrated Fusion Rationale:</strong> {interval.fusion_rationale || interval.fusionRationale}
                                   </div>
                                 )}
                                 {/* 2-Col: Signals vs SHAP */}
                                 <div className="grid-two-col">
                                   {/* Physical Transducer Contributing Signals */}
-                                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                                     <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0284c7', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                       <Icon name="activity" size={15} color="#0284c7" />
                                       <span>Contributing Transducer Signals</span>
@@ -1250,7 +1250,7 @@ export default function AnalysisResultsPage() {
                                               padding: '0.6rem 0.75rem',
                                               borderRadius: '6px',
                                               background: '#f8fafc',
-                                              border: '1px solid #ede9f6',
+                                              border: '1px solid var(--border-subtle)',
                                               display: 'flex',
                                               justifyContent: 'space-between',
                                               alignItems: 'center',
@@ -1258,7 +1258,7 @@ export default function AnalysisResultsPage() {
                                             }}
                                           >
                                             <div>
-                                              <strong style={{ color: '#1e1b4b' }}>{sig.signal}</strong>
+                                              <strong style={{ color: 'var(--text-primary)' }}>{sig.signal}</strong>
                                               <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
                                                 Baseline: {sig.baseline_mean || sig.baseline} {sig.unit || 'g'}
                                               </div>
@@ -1278,7 +1278,7 @@ export default function AnalysisResultsPage() {
                                   </div>
 
                                   {/* Verified SHAP Feature Attributions */}
-                                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                                     <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                       <Icon name="research" size={15} color="var(--primary)" />
                                       <span>Verified {explainerType} Attributions</span>
@@ -1301,7 +1301,7 @@ export default function AnalysisResultsPage() {
                                                 padding: '0.6rem 0.75rem',
                                                 borderRadius: '6px',
                                                 background: '#f8fafc',
-                                                border: '1px solid #ede9f6',
+                                                border: '1px solid var(--border-subtle)',
                                                 display: 'flex',
                                                 justifyContent: 'space-between',
                                                 alignItems: 'center',
@@ -1309,7 +1309,7 @@ export default function AnalysisResultsPage() {
                                               }}
                                             >
                                               <div style={{ maxWidth: '65%' }}>
-                                                <div className="mono-code" style={{ color: '#1e1b4b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
+                                                <div className="mono-code" style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>
                                                   {feat.feature}
                                                 </div>
                                                 <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
@@ -1336,7 +1336,7 @@ export default function AnalysisResultsPage() {
                                 {interval.detector_breakdown && (
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
                                     {/* Vibration Detector */}
-                                    <div style={{ background: '#ffffff', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ background: '#ffffff', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0284c7', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                         <Icon name="activity" size={14} color="#0284c7" />
                                         <span>Vibration Path Detector</span>
@@ -1357,7 +1357,7 @@ export default function AnalysisResultsPage() {
                                     </div>
 
                                     {/* Thermal Detector */}
-                                    <div style={{ background: '#ffffff', padding: '0.85rem', borderRadius: '6px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                    <div style={{ background: '#ffffff', padding: '0.85rem', borderRadius: '6px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                                       <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ea580c', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                         <Icon name="thermometer" size={14} color="#ea580c" />
                                         <span>Thermal Path Detector</span>
@@ -1455,10 +1455,10 @@ export default function AnalysisResultsPage() {
                       style={{
                         padding: '0.55rem 0.875rem',
                         borderRadius: '6px',
-                        border: isSelected ? '2px solid var(--primary)' : '1px solid #ede9f6',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border-subtle)',
                         background: '#ffffff',
-                        boxShadow: isSelected ? '0 2px 8px rgba(124, 58, 237, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
-                        color: isSelected ? '#1e1b4b' : '#64748b',
+                        boxShadow: isSelected ? '0 2px 8px rgba(15, 118, 110, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)',
+                        color: isSelected ? 'var(--text-primary)' : '#64748b',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -1598,9 +1598,9 @@ export default function AnalysisResultsPage() {
                           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.85rem' }}>
                             <thead>
                               <tr>
-                                <th style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: '#64748b' }}>Actual \ Pred</th>
+                                <th style={{ padding: '0.6rem', borderBottom: '1px solid var(--border-subtle)', color: '#64748b' }}>Actual \ Pred</th>
                                 {selectedModel.metrics.classes.map((cls) => (
-                                  <th key={cls} style={{ padding: '0.6rem', borderBottom: '1px solid #ede9f6', color: 'var(--primary)' }}>
+                                  <th key={cls} style={{ padding: '0.6rem', borderBottom: '1px solid var(--border-subtle)', color: 'var(--primary)' }}>
                                     {cls.replace('_', ' ')}
                                   </th>
                                 ))}
@@ -1611,7 +1611,7 @@ export default function AnalysisResultsPage() {
                                 const actualLabel = selectedModel.metrics.classes[rIdx];
                                 return (
                                   <tr key={rIdx}>
-                                    <td style={{ padding: '0.6rem', fontWeight: 600, borderBottom: '1px solid #ede9f6', color: '#1e1b4b', textAlign: 'left' }}>
+                                    <td style={{ padding: '0.6rem', fontWeight: 600, borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-primary)', textAlign: 'left' }}>
                                       {actualLabel.replace('_', ' ')}
                                     </td>
                                     {row.map((val, cIdx) => {
@@ -1621,7 +1621,7 @@ export default function AnalysisResultsPage() {
                                           key={cIdx}
                                           style={{
                                             padding: '0.6rem',
-                                            borderBottom: '1px solid #ede9f6',
+                                            borderBottom: '1px solid var(--border-subtle)',
                                             backgroundColor: isDiagonal ? '#ecfdf5' : val > 0 ? '#fef2f2' : 'transparent',
                                             color: isDiagonal ? '#047857' : val > 0 ? '#dc2626' : '#64748b',
                                             fontWeight: isDiagonal ? 700 : 400
@@ -1648,11 +1648,11 @@ export default function AnalysisResultsPage() {
                                 padding: '0.75rem 1rem',
                                 borderRadius: '6px',
                                 background: '#f8fafc',
-                                border: '1px solid #ede9f6'
+                                border: '1px solid var(--border-subtle)'
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                                <strong style={{ color: '#1e1b4b' }}>{className.replace('_', ' ').toUpperCase()}</strong>
+                                <strong style={{ color: 'var(--text-primary)' }}>{className.replace('_', ' ').toUpperCase()}</strong>
                                 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Support: {m.support} windows</span>
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', fontSize: '0.8rem' }}>
@@ -1699,12 +1699,12 @@ export default function AnalysisResultsPage() {
                                     <span className="mono-code">{f.feature}</span>
                                     <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{val.toFixed(4)}</span>
                                   </div>
-                                  <div style={{ height: '8px', background: '#ede9f6', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ height: '8px', background: 'var(--border-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
                                     <div
                                       style={{
                                         height: '100%',
                                         width: `${pct}%`,
-                                        background: idx === 0 ? 'var(--primary)' : idx === 1 ? '#8b5cf6' : '#a78bfa',
+                                        background: idx === 0 ? 'var(--primary)' : idx === 1 ? '#14b8a6' : '#5eead4',
                                         borderRadius: '4px'
                                       }}
                                     />
@@ -1720,7 +1720,7 @@ export default function AnalysisResultsPage() {
                         subtitle="Exact feature contributions for anomalous condition sample"
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-                          <div style={{ fontSize: '0.85rem', color: '#475569', padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #ede9f6' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#475569', padding: '0.6rem 0.85rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
                             Baseline Expected Value (φ₀): <strong>{JSON.stringify(selectedModel.shapSummary?.baselineExpectedValue)}</strong>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1733,13 +1733,13 @@ export default function AnalysisResultsPage() {
                                   alignItems: 'center',
                                   padding: '0.6rem 0.85rem',
                                   background: '#f8fafc',
-                                  border: '1px solid #ede9f6',
+                                  border: '1px solid var(--border-subtle)',
                                   borderRadius: '6px',
                                   fontSize: '0.82rem'
                                 }}
                               >
                                 <div>
-                                  <div style={{ fontWeight: 600, color: '#1e1b4b' }}>{c.feature}</div>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.feature}</div>
                                   <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Transducer Value: {c.value}</div>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
@@ -1802,7 +1802,7 @@ export default function AnalysisResultsPage() {
                 <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', textAlign: 'left' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #ede9f6', color: '#64748b' }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: '#64748b' }}>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Benchmark Title</th>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Component Type</th>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Category</th>
@@ -1812,9 +1812,9 @@ export default function AnalysisResultsPage() {
                     </thead>
                     <tbody>
                       {Object.entries(researchData.provenance_registry || {}).map(([key, bm]) => (
-                        <tr key={key} style={{ borderBottom: '1px solid #ede9f6' }}>
+                        <tr key={key} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                           <td style={{ padding: '0.75rem' }}>
-                            <strong style={{ color: '#1e1b4b', display: 'block' }}>{bm.title}</strong>
+                            <strong style={{ color: 'var(--text-primary)', display: 'block' }}>{bm.title}</strong>
                             <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Citation: {bm.citation}</span>
                           </td>
                           <td style={{ padding: '0.75rem' }}>
@@ -1857,7 +1857,7 @@ export default function AnalysisResultsPage() {
                 subtitle="Demonstrating avoidance of false positive anomaly alerts on healthy operational speed and load transitions."
               >
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '0.5rem', marginBottom: '1.25rem' }}>
-                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Global Baseline FPR (Transitions)</div>
                     <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#dc2626' }}>
                       {((researchData.regime_comparison?.global_baseline?.false_positive_rate_healthy ?? 0.4286) * 100).toFixed(1)}%
@@ -1877,7 +1877,7 @@ export default function AnalysisResultsPage() {
                     </div>
                   </div>
 
-                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Defect Recall (Fault Sensitivity)</div>
                     <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>
                       {((researchData.regime_comparison?.regime_conditioned_baseline?.defect_recall ?? 1.0) * 100).toFixed(1)}%
@@ -1889,11 +1889,11 @@ export default function AnalysisResultsPage() {
                 </div>
 
                 {/* Per-regime breakdown table */}
-                <h4 style={{ fontSize: '0.9rem', color: '#1e1b4b', marginBottom: '0.5rem', fontWeight: 700 }}>Per-Regime False Alarm Prevention Breakdown:</h4>
+                <h4 style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '0.5rem', fontWeight: 700 }}>Per-Regime False Alarm Prevention Breakdown:</h4>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem', textAlign: 'left' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #ede9f6', color: '#64748b' }}>
+                      <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: '#64748b' }}>
                         <th style={{ padding: '0.5rem' }}>Operating Regime</th>
                         <th style={{ padding: '0.5rem' }}>Samples Evaluated</th>
                         <th style={{ padding: '0.5rem' }}>Global FPR</th>
@@ -1903,8 +1903,8 @@ export default function AnalysisResultsPage() {
                     </thead>
                     <tbody>
                       {Object.entries(researchData.regime_comparison?.per_regime_breakdown || {}).map(([regName, rData]) => (
-                        <tr key={regName} style={{ borderBottom: '1px solid #ede9f6' }}>
-                          <td style={{ padding: '0.5rem', fontWeight: 600, color: '#1e1b4b' }}>{regName}</td>
+                        <tr key={regName} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                          <td style={{ padding: '0.5rem', fontWeight: 600, color: 'var(--text-primary)' }}>{regName}</td>
                           <td style={{ padding: '0.5rem', color: '#334155' }}>{rData.samples_count}</td>
                           <td style={{ padding: '0.5rem', color: rData.fpr_global > 0 ? '#dc2626' : '#64748b' }}>
                             {rData.fpr_global !== null ? `${(rData.fpr_global * 100).toFixed(0)}%` : 'N/A (Defect Only)'}
@@ -1931,7 +1931,7 @@ export default function AnalysisResultsPage() {
               >
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginTop: '0.5rem' }}>
                   {/* Vibration Path Only */}
-                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <strong style={{ color: '#0284c7', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Icon name="activity" size={16} color="#0284c7" /> Mechanical Vibration Only
@@ -1951,7 +1951,7 @@ export default function AnalysisResultsPage() {
                   </div>
 
                   {/* Thermal Path Only */}
-                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid #ede9f6', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <strong style={{ color: '#ea580c', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Icon name="thermometer" size={16} color="#ea580c" /> Thermal Path Only
@@ -1971,7 +1971,7 @@ export default function AnalysisResultsPage() {
                   </div>
 
                   {/* Multi-Signal Fused Path */}
-                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--primary-border)', boxShadow: '0 1px 2px rgba(124, 58, 237, 0.05)' }}>
+                  <div style={{ background: '#ffffff', padding: '1rem', borderRadius: '8px', border: '1px solid var(--primary-border)', boxShadow: '0 1px 2px rgba(15, 118, 110, 0.08)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <strong style={{ color: 'var(--primary)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Icon name="layer" size={16} color="var(--primary)" /> Multi-Signal Fused
@@ -2035,7 +2035,7 @@ export default function AnalysisResultsPage() {
           <div
             style={{
               background: '#ffffff',
-              border: '1px solid #ede9f6',
+              border: '1px solid var(--border-subtle)',
               borderRadius: '12px',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               maxWidth: '560px',
@@ -2046,7 +2046,7 @@ export default function AnalysisResultsPage() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e1b4b', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                 Launch Verified Condition Analysis Run
               </h2>
               <button
@@ -2069,7 +2069,7 @@ export default function AnalysisResultsPage() {
 
             <form onSubmit={handleRunSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                   Target Industrial Machine:
                 </label>
                 <select
@@ -2087,7 +2087,7 @@ export default function AnalysisResultsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                   Telemetry Dataset:
                 </label>
                 <select
@@ -2105,7 +2105,7 @@ export default function AnalysisResultsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                   Trained Model Artifact:
                 </label>
                 <select
@@ -2139,7 +2139,7 @@ export default function AnalysisResultsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                     Window Size:
                   </label>
                   <input
@@ -2153,7 +2153,7 @@ export default function AnalysisResultsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                     Overlap Ratio:
                   </label>
                   <input
@@ -2208,7 +2208,7 @@ export default function AnalysisResultsPage() {
           <div
             style={{
               background: '#ffffff',
-              border: '1px solid #ede9f6',
+              border: '1px solid var(--border-subtle)',
               borderRadius: '12px',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               maxWidth: '540px',
@@ -2219,7 +2219,7 @@ export default function AnalysisResultsPage() {
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e1b4b', margin: 0 }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                 Train Machine Learning Model
               </h2>
               <button
@@ -2242,7 +2242,7 @@ export default function AnalysisResultsPage() {
 
             <form onSubmit={handleTrainSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                   Model Name:
                 </label>
                 <input
@@ -2257,7 +2257,7 @@ export default function AnalysisResultsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                     Algorithm Architecture:
                   </label>
                   <select
@@ -2271,7 +2271,7 @@ export default function AnalysisResultsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                     Fault Domain Taxonomy:
                   </label>
                   <select
@@ -2287,7 +2287,7 @@ export default function AnalysisResultsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                   Select Training Dataset:
                 </label>
                 <select
@@ -2306,7 +2306,7 @@ export default function AnalysisResultsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                     Window Size (Samples):
                   </label>
                   <input
@@ -2320,7 +2320,7 @@ export default function AnalysisResultsPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#1e1b4b', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
                     Overlap Ratio (0.0 - 0.9):
                   </label>
                   <input

@@ -639,12 +639,12 @@ export default function MachineDetailPage() {
                 assignedTechs.map((t) => (
                   <div key={t._id || t} style={{
                     backgroundColor: '#ffffff',
-                    border: '1px solid #ede9f6',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: 8,
                     padding: '10px 14px',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                   }}>
-                    <div style={{ fontWeight: 700, color: '#1e1b4b', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Icon name="user" size={13} color="var(--primary)" /> {t.fullName || t.name || 'Technician'}
                     </div>
                     <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
@@ -786,14 +786,14 @@ export default function MachineDetailPage() {
                   {order.technicianFeedback && (order.technicianFeedback.findings || order.technicianFeedback.workPerformed) && (
                     <div style={{
                       backgroundColor: '#f8fafc',
-                      border: '1px solid #ede9f6',
+                      border: '1px solid var(--border-subtle)',
                       borderRadius: 6,
                       padding: '10px 14px',
                       marginBottom: 10,
                       gap: 6
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: '#4338ca', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Icon name="edit" size={13} color="#4338ca" /> Technician Field Report:
+                      <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="edit" size={13} color="var(--primary)" /> Technician Field Report:
                       </div>
                       {order.technicianFeedback.findings && (
                         <div style={{ fontSize: 12, color: '#334155' }}>
@@ -829,7 +829,7 @@ export default function MachineDetailPage() {
                   )}
 
                   {/* Audit Trail Timeline */}
-                  <div style={{ borderTop: '1px solid #ede9f6', paddingTop: 8 }}>
+                  <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
                     <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Audit History:</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                       {(order.statusHistory || []).map((h, i) => (

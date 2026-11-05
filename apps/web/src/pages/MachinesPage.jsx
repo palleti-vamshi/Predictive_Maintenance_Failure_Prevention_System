@@ -577,9 +577,9 @@ export default function MachinesPage() {
                     padding: '6px 10px',
                     borderRadius: 4,
                     background: 'rgba(255, 255, 255, 0.04)',
-                    borderLeft: '3px solid #8b5cf6'
+                    borderLeft: '3px solid var(--primary)'
                   }}>
-                    <strong style={{ color: '#c4b5fd' }}>Operating Context:</strong> {machine.operatingContext}
+                    <strong style={{ color: 'var(--primary)' }}>Operating Context:</strong> {machine.operatingContext}
                   </div>
                 )}
 
@@ -611,7 +611,7 @@ export default function MachinesPage() {
                 </div>
 
                 {/* Assigned Technicians */}
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #ede9f6' }}>
+                <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>
                   <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Assigned Field Technicians:
                   </span>

@@ -444,7 +444,7 @@ export default function AlertsPage() {
                     borderLeft: `4px solid ${priorityColor}`,
                     padding: '1rem',
                     cursor: 'pointer',
-                    boxShadow: isSelected ? '0 4px 12px rgba(124, 58, 237, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                    boxShadow: isSelected ? '0 4px 12px rgba(15, 118, 110, 0.12)' : '0 1px 3px rgba(0,0,0,0.02)',
                     transition: 'border-color 0.15s ease, box-shadow 0.15s ease'
                   }}
                   role="button"
