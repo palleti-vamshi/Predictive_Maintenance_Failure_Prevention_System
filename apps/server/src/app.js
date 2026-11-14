@@ -13,6 +13,8 @@ import modelRoutes from './routes/model.routes.js';
 import analysisRunRoutes from './routes/analysisRun.routes.js';
 import alertRoutes from './routes/alert.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import assistantRoutes from './routes/assistant.routes.js';
+import searchRoutes from './routes/search.routes.js';
 import { corsOptions } from './config/cors.js';
 
 const app = express();
@@ -25,7 +27,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self)');
   next();
 });
 
@@ -109,6 +111,8 @@ app.use('/api/models', modelRoutes);
 app.use('/api/analysis-runs', analysisRunRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/assistant', assistantRoutes);
+app.use('/api/search', searchRoutes);
 
 // Health & Liveness Probes (Public)
 app.use('/api', healthRoutes);

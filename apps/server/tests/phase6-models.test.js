@@ -51,7 +51,7 @@ test('ML Model Listing & Retrieval: Manager retrieves seeded models with verifie
 
   // Find Random Forest Gear Fault Classifier
   const rfModel = listData.models.find(
-    (m) => m.modelType === MODEL_TYPES.RANDOM_FOREST && m.targetDomain === FAULT_DOMAINS.GEAR_FAULTS
+    (m) => m.modelType === MODEL_TYPES.RANDOM_FOREST && m.targetDomain === FAULT_DOMAINS.GEAR_FAULTS && m.status === MODEL_STATUS.READY
   );
   assert.ok(rfModel, 'Random Forest gear fault classifier must be present in models list');
   assert.equal(rfModel.status, MODEL_STATUS.READY);

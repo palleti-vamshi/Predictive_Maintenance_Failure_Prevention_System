@@ -114,21 +114,83 @@ This launches the Expo Metro development server:
 
 ## Database Configuration (MongoDB)
 
-The API server connects to MongoDB via Mongoose using `MONGODB_URI` from `.env`.
+The API server connects to MongoDB via Mongoose using `MONGODB_URI` from `.env` (defaults to `mongodb://localhost:27017/predictive_maintenance`).
 
-### Running MongoDB Locally
+### Option A: macOS Homebrew Service
 
-Using Docker:
-```bash
-docker run -d -p 27017:27017 --name pm-mongo mongo:latest
-```
+The project runs on MongoDB 8.0 Community Edition. On macOS with the `mongodb/brew` tap, the installed formula is `mongodb-community@8.0`:
 
-Or using Homebrew (macOS):
-```bash
-brew services start mongodb-community
-```
+1. **Start MongoDB Daemon in Background:**
+   ```bash
+   mongod --config /opt/homebrew/etc/mongod.conf --fork
+   ```
+2. **Verify Daemon Health:**
+   ```bash
+   mongosh --eval "db.adminCommand('ping')"
+   # Returns: { ok: 1 }
+   ```
+3. **Stop MongoDB Daemon (When Done):**
+   ```bash
+   mongosh admin --eval "db.shutdownServer()"
+   # or: pkill mongod
+   ```
+*Data Persistence:* Data files persist across restarts in `/opt/homebrew/var/mongodb`.
 
-If MongoDB is unavailable, the backend gracefully starts and reports `"status": "disconnected"` in the `/api/health` response without terminating the server.
+### Option B: Docker Compose
+
+For environments running Docker, a production-grade compose configuration is provided:
+
+1. **Start MongoDB Container:**
+   ```bash
+   docker compose up -d
+   ```
+2. **Verify Container Health:**
+   ```bash
+   docker compose ps
+   ```
+3. **Stop Container:**
+   ```bash
+   docker compose down
+   ```
+*Data Persistence:* Database files persist in the named Docker volume `mongodb_data`.
+
+### Offline Database & Fail-Fast Behavior
+
+If MongoDB is offline:
+- Express boots immediately without blocking.
+- `/api/health` reports `status: "degraded"` with `api.reachable: true` and `database.connected: false`.
+- Authentication endpoints (`/api/auth/login`, `/api/auth/me`) fail fast in < 5ms with HTTP 503 (`DATABASE_UNAVAILABLE`) rather than buffering queries or hanging the UI.
+- The web app displays a clear amber diagnostic alert with exact startup commands instead of hanging on an endless loading screen.
+- When MongoDB is started, the Express server automatically connects in the background without needing a manual restart.
+
+---
+
+## Local Network & Mobile API Connectivity
+
+When running the mobile app on a physical device (via Expo Go on the same Wi-Fi) or emulator:
+
+1. **Find your Mac's Local Network IP:**
+   ```bash
+   ipconfig getifaddr en0
+   # Example output: 192.168.137.189
+   ```
+
+2. **Update Mobile Environment:**
+   In `apps/mobile/.env`:
+   ```bash
+   EXPO_PUBLIC_API_BASE_URL=http://<YOUR_MAC_LAN_IP>:5001/api
+   ```
+   *(e.g. `http://192.168.137.189:5001/api`)*
+
+3. **Start Expo with Clean Cache:**
+   ```bash
+   npm run dev:mobile -- -c
+   # or: npx expo start -c --workspace=@predictive-maintenance/mobile
+   ```
+
+4. **Network & CORS Configuration:**
+   - The Express server binds to `0.0.0.0:5001` (`process.env.HOST || '0.0.0.0'`) so all local network devices can reach it.
+   - Development CORS automatically accepts loopback (`localhost`, `127.0.0.1`) and RFC 1918 private IPv4 origins (`10.*`, `192.168.*`, `172.16-31.*`) without exposing production endpoints.
 
 ---
 

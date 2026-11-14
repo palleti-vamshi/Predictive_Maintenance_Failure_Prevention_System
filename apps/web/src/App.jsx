@@ -13,7 +13,9 @@ import AlertsPage from './pages/AlertsPage.jsx';
 import ResearchBenchmarkPage from './pages/ResearchBenchmarkPage.jsx';
 import AuditTrailPage from './pages/AuditTrailPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import SimulatorPage from './pages/SimulatorPage.jsx';
 import Icon from './components/common/Icon.jsx';
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -41,6 +43,8 @@ function RouteSwitch({ apiStatus, onRefreshApi }) {
       return <AuditTrailPage />;
     case 'settings':
       return <SettingsPage apiStatus={apiStatus} onRefreshApi={onRefreshApi} />;
+    case 'simulator':
+      return <SimulatorPage />;
     default:
       return <FactoryOverviewPage />;
   }
@@ -48,8 +52,21 @@ function RouteSwitch({ apiStatus, onRefreshApi }) {
 
 function AuthenticatedApp({ apiStatus, onRefreshApi }) {
   const { isAuthenticated, loading } = useAuth();
+  const [forceBypass, setForceBypass] = useState(false);
+  const [showBypassBtn, setShowBypassBtn] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      timer = setTimeout(() => setShowBypassBtn(true), 1500);
+    } else {
+      setShowBypassBtn(false);
+      setForceBypass(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  if (loading && !forceBypass) {
     return (
       <div className="session-loading-screen">
         <div className="session-loading-box">
@@ -58,19 +75,41 @@ function AuthenticatedApp({ apiStatus, onRefreshApi }) {
           </div>
           <div className="session-loading-title">Verifying Factory Authentication...</div>
           <p className="session-loading-sub">Querying secure server session credentials</p>
+          {showBypassBtn && (
+            <div style={{ marginTop: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={() => setForceBypass(true)}
+                style={{
+                  background: 'var(--surface-sunken, #f1f5f9)',
+                  border: '1px solid var(--border-subtle, #cbd5e1)',
+                  borderRadius: '6px',
+                  padding: '6px 14px',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  color: 'var(--text-secondary, #475569)',
+                  cursor: 'pointer'
+                }}
+              >
+                Skip Waiting & Open Sign In
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || forceBypass) {
     return <LoginPage />;
   }
 
   return (
     <RouterProvider>
       <Shell apiStatus={apiStatus}>
-        <RouteSwitch apiStatus={apiStatus} onRefreshApi={onRefreshApi} />
+        <ErrorBoundary>
+          <RouteSwitch apiStatus={apiStatus} onRefreshApi={onRefreshApi} />
+        </ErrorBoundary>
       </Shell>
     </RouterProvider>
   );

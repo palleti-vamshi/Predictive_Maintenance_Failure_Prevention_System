@@ -116,10 +116,22 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    if (req.user.role === USER_ROLES.TECHNICIAN) {
+      const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
+      const alertMachineId = (alert.machineId?._id || alert.machineId)?.toString();
+      if (!assignedMachineIds.includes(alertMachineId)) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Access denied. You are not assigned to the machine associated with this alert.'
+        });
+      }
+    }
+
     // Role-based machine access check
     if (req.user.role !== USER_ROLES.FACTORY_MANAGER) {
       const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
-      if (!assignedMachineIds.includes(alert.machineId?._id?.toString())) {
+      const alertMachineId = (alert.machineId?._id || alert.machineId)?.toString();
+      if (!assignedMachineIds.includes(alertMachineId)) {
         return res.status(403).json({
           error: 'Forbidden',
           message: 'Access denied. You do not have permissions for this machine.'
@@ -162,6 +174,16 @@ router.post('/:id/acknowledge', async (req, res) => {
         error: 'NotFound',
         message: 'Alert not found within your factory scope.'
       });
+    }
+
+    if (req.user.role === USER_ROLES.TECHNICIAN) {
+      const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
+      if (!assignedMachineIds.includes(alert.machineId?.toString())) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Access denied. You are not assigned to the machine associated with this alert.'
+        });
+      }
     }
 
     if (alert.status === ALERT_STATUSES.ACKNOWLEDGED) {
@@ -227,6 +249,16 @@ router.post('/:id/observations', async (req, res) => {
       });
     }
 
+    if (req.user.role === USER_ROLES.TECHNICIAN) {
+      const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
+      if (!assignedMachineIds.includes(alert.machineId?.toString())) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Access denied. You are not assigned to the machine associated with this alert.'
+        });
+      }
+    }
+
     alert.technicianObservations.push({
       technicianId: req.user._id,
       technicianName: req.user.fullName,
@@ -269,6 +301,16 @@ router.post('/:id/work-order', requireManager, async (req, res) => {
         error: 'NotFound',
         message: 'Alert not found within your factory scope.'
       });
+    }
+
+    if (req.user.role === USER_ROLES.TECHNICIAN) {
+      const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
+      if (!assignedMachineIds.includes(alert.machineId?.toString())) {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'Access denied. You are not assigned to the machine associated with this alert.'
+        });
+      }
     }
 
     if (alert.maintenanceWorkOrderId) {

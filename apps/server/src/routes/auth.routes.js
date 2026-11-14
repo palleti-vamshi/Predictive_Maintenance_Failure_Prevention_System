@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import { Factory } from '../models/Factory.js';
 import { Session } from '../models/Session.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { requireDatabaseConnection } from '../config/database.js';
 import { authRateLimiter, otpRateLimiter } from '../middleware/rateLimiter.js';
 import { env } from '../config/env.js';
 import { USER_ROLES } from '@predictive-maintenance/shared';
@@ -38,7 +39,7 @@ router.post('/password-recovery', otpRateLimiter, (req, res) => {
  * Authenticates user credentials, creates a server-side session,
  * sets an HttpOnly cookie for web browsers, and returns a sessionToken for mobile.
  */
-router.post('/login', authRateLimiter, async (req, res) => {
+router.post('/login', requireDatabaseConnection, authRateLimiter, async (req, res) => {
   try {
     const rawIdentifier = req.body.emailOrUsername || req.body.email || req.body.username;
     const { password } = req.body;
@@ -103,10 +104,16 @@ router.post('/login', authRateLimiter, async (req, res) => {
       path: '/'
     });
 
+    // Security hardening: For standard browser origins, rely strictly on HttpOnly cookie
+    // to prevent bearer token exfiltration via DOM/XSS. Mobile apps and API scripts receive sessionToken.
+    const isBrowserClient = Boolean(req.headers.origin) &&
+      req.body?.clientType !== 'mobile' &&
+      req.headers['x-client-type'] !== 'mobile';
+
     return res.status(200).json({
       success: true,
       message: 'Authentication successful.',
-      sessionToken: rawToken, // Provided for Expo SecureStore on mobile
+      ...(isBrowserClient ? {} : { sessionToken: rawToken }),
       user: user.toJSON()
     });
   } catch (err) {

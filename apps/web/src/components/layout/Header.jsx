@@ -9,7 +9,13 @@ import { USER_ROLES } from '@predictive-maintenance/shared';
  * Features active factory context switcher, demo data label, global search bar,
  * and live system/alert indicators.
  */
-export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) {
+export default function Header({
+  onToggleMobileNav,
+  mobileNavOpen,
+  apiStatus,
+  onOpenSearch,
+  onOpenAssistant
+}) {
   const { user, switchFactory } = useAuth();
   const { navigate } = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,19 +33,8 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return;
-
-    if (query.startsWith('gb') || query.startsWith('br') || query.startsWith('pm') || query.includes('gear') || query.includes('machine')) {
-      navigate(ROUTES.MACHINES);
-    } else if (query.startsWith('al-') || query.includes('alert')) {
-      navigate(ROUTES.ALERTS);
-    } else if (query.startsWith('wo-') || query.includes('work') || query.includes('maint')) {
-      navigate(ROUTES.MAINTENANCE);
-    } else if (query.startsWith('an-') || query.includes('analysis')) {
-      navigate(ROUTES.ANALYSIS);
-    } else {
-      navigate(ROUTES.MACHINES);
+    if (onOpenSearch) {
+      onOpenSearch(searchQuery.trim());
     }
   };
 
@@ -99,7 +94,8 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
             type="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search machines, alerts, work orders..."
+            onClick={() => onOpenSearch && onOpenSearch(searchQuery)}
+            placeholder="Search machines, alerts, work orders... (Click to expand)"
             className="header-search-input"
             aria-label="Global search across machines, alerts, and work orders"
           />
@@ -108,6 +104,19 @@ export default function Header({ onToggleMobileNav, mobileNavOpen, apiStatus }) 
 
       {/* Right Utility Actions */}
       <div className="header-right">
+        {/* MechGuard Copilot Trigger */}
+        <button
+          type="button"
+          className="header-assistant-btn"
+          onClick={onOpenAssistant}
+          title="Open MechGuard Copilot"
+          aria-label="Open MechGuard Copilot"
+        >
+          <Icon name="activity" size={15} color="#0f766e" />
+          <span className="header-assistant-text">MechGuard Copilot</span>
+          <span className="header-assistant-badge">Copilot</span>
+        </button>
+
         {/* Quick Alerts Shortcut */}
         <button
           type="button"

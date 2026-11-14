@@ -43,6 +43,38 @@ export const GEARBOX_SIGNAL_BOUNDS = Object.freeze({
   load_torque: { min: -100, max: 25000, unit: 'Nm', label: 'Load Torque' }
 });
 
-export const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB limit
+export const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB legacy/default limit
+export const MAX_OPERATIONAL_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB operational limit
+export const MAX_RESEARCH_UPLOAD_SIZE_BYTES = 1024 * 1024 * 1024; // 1 GB research limit
+export const DEFAULT_CHUNK_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB per upload chunk
 export const ACCEPTED_FILE_EXTENSIONS = Object.freeze(['.csv', '.txt']);
+export const ACCEPTED_RESEARCH_EXTENSIONS = Object.freeze([
+  '.csv',
+  '.txt',
+  '.zip',
+  '.tar.gz',
+  '.tgz',
+  '.gz'
+]);
+
+export const DATASET_JOB_STATUS = Object.freeze({
+  QUEUED: 'queued',
+  PROCESSING: 'processing',
+  COMPLETE: 'complete',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+});
+
+export const DATASET_JOB_STAGES = Object.freeze({
+  QUEUED: 'queued',
+  VALIDATING_INTEGRITY: 'validating_integrity',
+  INSPECTING_ARCHIVE: 'inspecting_archive',
+  EXTRACTING_ARCHIVE: 'extracting_archive',
+  STREAM_PROFILING: 'stream_profiling',
+  COMPUTING_STATISTICS: 'computing_statistics',
+  EVALUATING_COMPATIBILITY: 'evaluating_compatibility',
+  COMPLETE: 'complete',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+});
 

@@ -304,8 +304,10 @@ export default function AlertsPage() {
       <div className="page-header">
         <div>
           <div className="specimen-tag-row">
-            <span className="badge badge-demo">DEMO DATA</span>
             <span className="badge badge-operational">CONDITION SURVEILLANCE</span>
+            <span className="badge" style={{ backgroundColor: 'var(--surface-sunken)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', fontSize: '0.72rem', fontWeight: 600 }}>
+              {counts.total} MONITORED ALERTS
+            </span>
           </div>
           <h1 className="page-title">Alerts</h1>
           <p className="page-subtitle">
@@ -478,8 +480,13 @@ export default function AlertsPage() {
                   </div>
 
                   {/* Headline: Machine & Title */}
-                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.3rem' }}>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                     <strong>{alert.machineId?.code || alert.machineCode || 'Machine'}</strong> · {alert.title}
+                    {(alert.isSimulatorDerived || alert.datasetId?.isSimulatorDerived || alert.title?.includes('[SIMULATED]')) && (
+                      <span className="badge" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#D97706', border: '1px solid rgba(217, 119, 6, 0.3)', fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.35rem' }}>
+                        SIMULATED
+                      </span>
+                    )}
                   </div>
 
                   {/* Summary of Evidence Snippet */}

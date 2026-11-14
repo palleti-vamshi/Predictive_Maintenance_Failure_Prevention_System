@@ -12,7 +12,8 @@ export const ROUTES = Object.freeze({
   ALERTS: '#/alerts',
   RESEARCH: '#/research',
   AUDIT: '#/audit',
-  SETTINGS: '#/settings'
+  SETTINGS: '#/settings',
+  SIMULATOR: '#/simulator'
 });
 
 export const NAV_ITEMS = Object.freeze([
@@ -130,12 +131,13 @@ export function RouterProvider({ children }) {
 
     if (pathPart === ROUTES.MACHINES) return { routeKey: 'machines', baseRoute: ROUTES.MACHINES, params: {}, queryParams };
     if (pathPart === ROUTES.MAINTENANCE) return { routeKey: 'maintenance', baseRoute: ROUTES.MAINTENANCE, params: {}, queryParams };
-    if (pathPart === ROUTES.DATASETS_UPLOAD) return { routeKey: 'datasets', baseRoute: ROUTES.DATASETS_UPLOAD, params: {}, queryParams };
+    if (pathPart === ROUTES.DATASETS_UPLOAD || pathPart === '#/datasets') return { routeKey: 'datasets', baseRoute: ROUTES.DATASETS_UPLOAD, params: {}, queryParams };
     if (pathPart === ROUTES.ANALYSIS) return { routeKey: 'analysis', baseRoute: ROUTES.ANALYSIS, params: {}, queryParams };
     if (pathPart === ROUTES.ALERTS) return { routeKey: 'alerts', baseRoute: ROUTES.ALERTS, params: {}, queryParams };
     if (pathPart === ROUTES.RESEARCH) return { routeKey: 'research', baseRoute: ROUTES.RESEARCH, params: {}, queryParams };
     if (pathPart === ROUTES.AUDIT) return { routeKey: 'audit', baseRoute: ROUTES.AUDIT, params: {}, queryParams };
     if (pathPart === ROUTES.SETTINGS) return { routeKey: 'settings', baseRoute: ROUTES.SETTINGS, params: {}, queryParams };
+    if (pathPart === ROUTES.SIMULATOR) return { routeKey: 'simulator', baseRoute: ROUTES.SIMULATOR, params: {}, queryParams };
 
     // Default to Overview
     return { routeKey: 'overview', baseRoute: ROUTES.OVERVIEW, params: {}, queryParams };

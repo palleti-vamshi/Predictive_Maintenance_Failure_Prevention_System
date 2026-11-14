@@ -45,7 +45,9 @@ router.get('/factory-users', async (req, res) => {
 
     const workloadMap = {};
     activeTasksByTech.forEach((t) => {
-      workloadMap[t._id.toString()] = t.count;
+      if (t._id) {
+        workloadMap[t._id.toString()] = t.count;
+      }
     });
 
     const enrichedUsers = users.map((u) => {

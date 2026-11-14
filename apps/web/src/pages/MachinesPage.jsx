@@ -469,7 +469,7 @@ export default function MachinesPage() {
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: 18 }}>
-            <label style={{ fontSize: 13, color: '#94a3b8', cursor: 'pointer' }}>
+            <label style={{ fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={includeDecommissioned}
@@ -537,9 +537,11 @@ export default function MachinesPage() {
                       <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => navigate(`#/machines/${machineId}`)}
+                        onClick={() => navigate(`#/machines/${machineId}?tab=kinematics`)}
+                        data-testid={`inspect-kinematics-${machineId}`}
+                        title={machine.type === MACHINE_TYPES.GEARBOX ? 'Inspect gearbox kinematics and reduction architecture' : 'Inspect equipment profile'}
                       >
-                        <span>Profile</span>
+                        <span>{machine.type === MACHINE_TYPES.GEARBOX ? 'Inspect Kinematics' : 'Inspect Profile'}</span>
                         <Icon name="arrowRight" size={13} style={{ marginLeft: 6 }} />
                       </Button>
                     </div>
@@ -572,14 +574,15 @@ export default function MachinesPage() {
                 {machine.operatingContext && (
                   <div style={{
                     fontSize: 12,
-                    color: '#94a3b8',
+                    color: 'var(--text-secondary)',
                     marginBottom: 10,
-                    padding: '6px 10px',
-                    borderRadius: 4,
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    borderLeft: '3px solid var(--primary)'
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    background: '#f0fdf8',
+                    border: '1px solid rgba(15, 118, 110, 0.2)',
+                    borderLeft: '3px solid #0f766e'
                   }}>
-                    <strong style={{ color: 'var(--primary)' }}>Operating Context:</strong> {machine.operatingContext}
+                    <strong style={{ color: '#0f766e' }}>Operating Context:</strong> {machine.operatingContext}
                   </div>
                 )}
 
@@ -846,7 +849,7 @@ export default function MachinesPage() {
 
                     {newMachine.stages.map((stg, idx) => (
                       <div key={idx} style={{ display: 'grid', gridTemplateColumns: '60px 2fr 1fr 2fr 40px', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Stg {idx + 1}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Stg {idx + 1}</span>
                         <input
                           type="text"
                           className="form-select"

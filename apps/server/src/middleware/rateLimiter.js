@@ -80,3 +80,10 @@ export const uploadRateLimiter = createRateLimiter({
   message: 'Dataset upload rate limit exceeded. Please wait a few minutes before uploading additional files.'
 });
 
+// 4. Chunk Upload Rate Limiter: high throughput for chunk streams, max 5000 chunks per 15 minutes per IP
+export const chunkUploadRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5000,
+  message: 'Chunk upload rate limit exceeded. Please throttle chunk transfer rate.'
+});
+

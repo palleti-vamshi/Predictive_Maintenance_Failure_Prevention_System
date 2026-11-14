@@ -11,7 +11,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
  * Features grouped sections (OPERATE, DATA, RESEARCH), active page indicator,
  * live counts for alerts and maintenance, and user profile drawer.
  */
-export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
+export default function Sidebar({ mobileNavOpen, onCloseMobileNav, onOpenAssistant }) {
   const { user, logout } = useAuth();
   const { routeKey, navigate } = useRouter();
 
@@ -158,6 +158,12 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
         icon: 'research'
       },
       {
+        key: 'simulator',
+        label: 'Gearbox Simulator',
+        hash: ROUTES.SIMULATOR,
+        icon: 'activity'
+      },
+      {
         key: 'audit',
         label: 'Audit Trail',
         hash: ROUTES.AUDIT,
@@ -239,6 +245,28 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav }) {
 
         {/* Grouped Navigation */}
         <nav className="sidebar-nav" aria-label="Main Navigation">
+          {/* MechGuard Copilot Quick Launcher */}
+          <div className="sidebar-assistant-launcher-wrap">
+            <button
+              type="button"
+              className="sidebar-assistant-btn"
+              onClick={() => {
+                if (onOpenAssistant) onOpenAssistant();
+                if (onCloseMobileNav) onCloseMobileNav();
+              }}
+              title="Launch MechGuard Copilot"
+            >
+              <div className="assistant-icon-glow">
+                <Icon name="activity" size={15} color="#22b8a5" />
+              </div>
+              <div className="assistant-btn-text">
+                <span className="assistant-btn-title">MechGuard Copilot</span>
+                <span className="assistant-btn-sub">Maintenance Copilot</span>
+              </div>
+              <span className="assistant-btn-tag">COPILOT</span>
+            </button>
+          </div>
+
           {renderNavGroup('OPERATE', operateItems)}
           {renderNavGroup('DATA', dataItems)}
           {renderNavGroup('RESEARCH', researchItems)}

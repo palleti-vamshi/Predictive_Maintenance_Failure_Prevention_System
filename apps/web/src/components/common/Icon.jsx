@@ -152,6 +152,16 @@ export default function Icon({ name, size = 18, color = 'currentColor', classNam
         strokeLinejoin="round"
       />
     ),
+    arrowLeft: (
+      <path
+        d="M19 12H5 M12 19l-7-7 7-7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
     upload: (
       <path
         d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4 M17 8l-5-5-5 5 M12 3v12"
@@ -353,6 +363,49 @@ export default function Icon({ name, size = 18, color = 'currentColor', classNam
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    ),
+    minimize: (
+      <path
+        d="M5 12h14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    ),
+    maximize: (
+      <rect
+        x="4"
+        y="4"
+        width="16"
+        height="16"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+    chevronUp: (
+      <path
+        d="M18 15l-6-6-6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    ),
+    grip: (
+      <g fill="currentColor">
+        <circle cx="9" cy="6" r="1.5" />
+        <circle cx="15" cy="6" r="1.5" />
+        <circle cx="9" cy="12" r="1.5" />
+        <circle cx="15" cy="12" r="1.5" />
+        <circle cx="9" cy="18" r="1.5" />
+        <circle cx="15" cy="18" r="1.5" />
+      </g>
     )
   };
 

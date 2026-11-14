@@ -29,7 +29,7 @@
   ],
   "author": "Vamsh_i07",
   "license": "MIT",
-  "dependencies": {
-    "expo-secure-store": "~14.0.1"
+  "overrides": {
+    "react": "19.3.0"
   }
 }

@@ -21,7 +21,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
  * Clean Light-Lavender & White Industrial Workspace
- * Executive fleet overview, active condition alerts, evidence matrix, maintenance actions, and platform stack.
+ * Executive fleet overview, active condition alerts, evidence matrix, and maintenance actions.
  */
 export default function FactoryOverviewPage() {
   const { user } = useAuth();
@@ -47,7 +47,6 @@ export default function FactoryOverviewPage() {
   const [timeWindow, setTimeWindow] = useState('24h');
   const [siteFilter, setSiteFilter] = useState(queryParams?.site || 'all');
   const [statusFilter, setStatusFilter] = useState(queryParams?.status || 'all');
-  const [isArchModalOpen, setIsArchModalOpen] = useState(false);
 
   // Work Order Modals State
   const [isWoModalOpen, setIsWoModalOpen] = useState(false);
@@ -747,7 +746,7 @@ export default function FactoryOverviewPage() {
                 <StatusBadge
                   status={primaryHeroAlert.severity}
                   label={`${primaryHeroAlert.severity.toUpperCase()} ALERT`}
-                  isSimulated={primaryHeroAlert.isSimulated}
+                  isSimulated={Boolean(primaryHeroAlert.isSimulated || primaryHeroAlert.isSimulatorDerived || primaryHeroAlert.title?.includes('[SIMULATED]'))}
                 />
                 <span
                   style={{
@@ -805,7 +804,7 @@ export default function FactoryOverviewPage() {
               <Button
                 variant="secondary"
                 icon="arrowRight"
-                onClick={() => navigate(`#/machines/${heroEvidence.machineCode}`)}
+                onClick={() => navigate(`#/machines/${heroEvidence.machineCode}?tab=kinematics`)}
               >
                 Inspect Kinematics
               </Button>
@@ -1484,121 +1483,7 @@ export default function FactoryOverviewPage() {
         </div>
       )}
 
-      {/* 6. Evaluator-Facing Platform Technology Stack Panel */}
-      <section className="platform-stack-panel" aria-label="Platform Architecture Stack">
-        <div className="platform-stack-header">
-          <div className="platform-stack-title">
-            <Icon name="layer" size={16} color="var(--primary)" />
-            <span>Platform Stack & Technical Implementation</span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsArchModalOpen(true)}
-          >
-            View Architecture & Data Flow
-          </Button>
-        </div>
-
-        <div className="platform-stack-grid">
-          <div className="platform-tech-chip">
-            <span className="platform-tech-layer">Web Application</span>
-            <span className="platform-tech-name">React 18 • Vite 5</span>
-          </div>
-          <div className="platform-tech-chip">
-            <span className="platform-tech-layer">Mobile Client</span>
-            <span className="platform-tech-name">React Native • Expo 52</span>
-          </div>
-          <div className="platform-tech-chip">
-            <span className="platform-tech-layer">API Gateway</span>
-            <span className="platform-tech-name">Node.js • Express</span>
-          </div>
-          <div className="platform-tech-chip">
-            <span className="platform-tech-layer">Persistence</span>
-            <span className="platform-tech-name">MongoDB • Mongoose</span>
-          </div>
-          <div className="platform-tech-chip">
-            <span className="platform-tech-layer">Scientific ML Service</span>
-            <span className="platform-tech-name">Python • scikit-learn • SHAP</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Architecture & Data Flow Dialog */}
-      {isArchModalOpen && (
-        <div
-          className="modal-overlay-glass"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="arch-modal-title"
-        >
-          <div className="modal-dialog-glass" style={{ maxWidth: '680px' }}>
-            <div className="modal-header-glass">
-              <h3 id="arch-modal-title" className="modal-title-glass">
-                System Architecture & Data Flow
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsArchModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                aria-label="Close dialog"
-              >
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-
-            <div className="modal-body-glass" style={{ gap: '1rem', fontSize: '0.825rem', lineHeight: 1.5 }}>
-              <div>
-                <h4 style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.35rem' }}>
-                  1. Multi-Signal Ingestion Pipeline
-                </h4>
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  CSV sensor datasets from high-speed input/output accelerometers and sump thermocouples are parsed, profiled, and validated on the Express API. Columns are mapped to standard physical channels with unit conversion.
-                </p>
-              </div>
-
-              <div>
-                <h4 style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.35rem' }}>
-                  2. Regime-Aware Signal Processing & Scientific ML
-                </h4>
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  A dedicated Python microservice partitions telemetry into operating regimes (speed, torque load, steady-state vs transient) to avoid false alarms during operating transitions (0.0% transition FPR vs 42.9% global baseline FPR).
-                </p>
-              </div>
-
-              <div>
-                <h4 style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.35rem' }}>
-                  3. Decoupled Detectors & Multi-Signal Fusion
-                </h4>
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  Vibration anomalies (ISO 10816 velocity RMS) and thermal drift ($dT/dt$) run through independent calibrated detectors before multi-signal rule-based fusion. TreeSHAP feature attributions explain the exact contribution of each harmonic or temperature band.
-                </p>
-              </div>
-
-              <div>
-                <h4 style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '0.35rem' }}>
-                  4. Scoped Maintenance Orchestration
-                </h4>
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  Factory managers create and dispatch maintenance work orders from evidence-based alerts directly to authorized field technicians, who update inspection findings and work performed on web or mobile.
-                </p>
-              </div>
-            </div>
-
-            <div className="modal-footer-glass">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsArchModalOpen(false)}
-              >
-                Close Architecture View
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 7. Modal: Manager Create & Assign Work Order */}
+      {/* 6. Modal: Manager Create & Assign Work Order */}
       {isWoModalOpen && (
         <div
           className="modal-overlay-glass"
@@ -1759,7 +1644,7 @@ export default function FactoryOverviewPage() {
         </div>
       )}
 
-      {/* 8. Modal: Technician Complete Work Order */}
+      {/* 7. Modal: Technician Complete Work Order */}
       {isCompleteModalOpen && selectedWoForCompletion && (
         <div
           className="modal-overlay-glass"

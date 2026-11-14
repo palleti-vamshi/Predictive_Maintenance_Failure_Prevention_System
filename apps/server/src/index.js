@@ -13,9 +13,9 @@ async function bootstrap() {
     console.error('[Database] Unexpected connection error:', err);
   });
 
-  const server = app.listen(env.PORT, () => {
-    console.log(`[Server] Express API listening on http://localhost:${env.PORT}`);
-    console.log(`[Server] Health check endpoint: http://localhost:${env.PORT}/api/health`);
+  const server = app.listen(env.PORT, env.HOST, () => {
+    console.log(`[Server] Express API listening on http://${env.HOST}:${env.PORT}`);
+    console.log(`[Server] Local health check:  http://localhost:${env.PORT}/api/health`);
     console.log(`[Server] Liveness endpoint:     http://localhost:${env.PORT}/api/liveness`);
   });
 

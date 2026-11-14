@@ -76,7 +76,7 @@ export function AuthProvider({ children }) {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify({ emailOrUsername: email, email, password })
+        body: JSON.stringify({ emailOrUsername: email, email, password, clientType: 'mobile' })
       });
 
       const data = await res.json();

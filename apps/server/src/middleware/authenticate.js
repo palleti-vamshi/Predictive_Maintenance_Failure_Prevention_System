@@ -1,6 +1,7 @@
 import { Session } from '../models/Session.js';
 import { User } from '../models/User.js';
 import { isOriginAllowed } from '../config/cors.js';
+import { isDatabaseConnected } from '../config/database.js';
 
 /**
  * Authentication Middleware:
@@ -9,6 +10,10 @@ import { isOriginAllowed } from '../config/cors.js';
  */
 export async function authenticate(req, res, next) {
   try {
+    if (req.user) {
+      return next();
+    }
+
     let rawToken = null;
     let isCookieAuth = false;
 
@@ -30,6 +35,15 @@ export async function authenticate(req, res, next) {
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Authentication required. No active session token found.'
+      });
+    }
+
+    // Fail-fast if database is offline so requests never hang on buffer timeouts
+    if (!isDatabaseConnected()) {
+      return res.status(503).json({
+        error: 'ServiceUnavailable',
+        code: 'DATABASE_UNAVAILABLE',
+        message: 'MongoDB is offline or unreachable. Authentication cannot be verified without an active database connection.'
       });
     }
 

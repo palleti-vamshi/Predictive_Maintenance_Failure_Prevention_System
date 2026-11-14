@@ -64,6 +64,15 @@ export default function MaintenancePage() {
   const [executionHelpType, setExecutionHelpType] = useState('parts');
   const [executionHelpReason, setExecutionHelpReason] = useState('');
 
+  // Scoped Technician Check-in & Photo CV States
+  const [checkInConsent, setCheckInConsent] = useState(false);
+  const [checkInBay, setCheckInBay] = useState('');
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [checkInError, setCheckInError] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState(null);
+  const [photoFeedbackNotes, setPhotoFeedbackNotes] = useState({});
+
   // Manager Decision Form State
   const [decisionType, setDecisionType] = useState('approved');
   const [decisionNote, setDecisionNote] = useState('');
@@ -272,6 +281,10 @@ export default function MaintenancePage() {
     });
     setExecutionPhotoAttached(false);
     setExecutionShowHelpRequest(false);
+    setCheckInConsent(order.checkIn?.consentAcknowledged || false);
+    setCheckInBay(order.checkIn?.bayIdentifier || '');
+    setCheckInError(null);
+    setPhotoError(null);
     setShowExecutionModal(true);
   };
 
@@ -345,6 +358,165 @@ export default function MaintenancePage() {
       setExecutionHelpReason('');
       setExecutionShowHelpRequest(false);
       setActionSuccess(`${executionHelpType === 'parts' ? 'Parts' : 'Permission'} request submitted to manager.`);
+      setTimeout(() => setActionSuccess(null), 4000);
+      fetchData();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  // Scoped Technician Check-In (GPS with Explicit Consent)
+  const handleGpsCheckIn = async () => {
+    if (!checkInConsent) {
+      setCheckInError('Please check the consent box acknowledging one-time location capture.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      setCheckInError('Geolocation is not supported by your browser. Please use manual bay check-in below.');
+      return;
+    }
+
+    setCheckInLoading(true);
+    setCheckInError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(`${API_BASE}/work-orders/${selectedOrder._id}/check-in`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({
+              method: 'gps',
+              coordinates: {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                accuracyMeters: Math.round(pos.coords.accuracy || 10)
+              },
+              consentAcknowledged: true,
+              verificationNote: 'Verified via browser GPS sensor on-site'
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'GPS check-in failed');
+          setSelectedOrder(data.workOrder);
+          setActionSuccess('On-site GPS check-in verified. Work order transitioned to IN PROGRESS.');
+          setTimeout(() => setActionSuccess(null), 4000);
+          fetchData();
+        } catch (err) {
+          setCheckInError(err.message);
+        } finally {
+          setCheckInLoading(false);
+        }
+      },
+      (geoErr) => {
+        setCheckInLoading(false);
+        setCheckInError(`Geolocation error: ${geoErr.message || 'Permission denied'}. You can use Manual Plant Bay check-in below.`);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Scoped Technician Check-In (Manual Plant Bay Alternative)
+  const handleManualBayCheckIn = async () => {
+    if (!checkInConsent) {
+      setCheckInError('Please check the consent box acknowledging on-site arrival.');
+      return;
+    }
+    if (!checkInBay.trim()) {
+      setCheckInError('Please enter a machine bay or station identifier (e.g. Bay 4 - MCC-2 Unit).');
+      return;
+    }
+
+    setCheckInLoading(true);
+    setCheckInError(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/work-orders/${selectedOrder._id}/check-in`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          method: 'manual',
+          bayIdentifier: checkInBay.trim(),
+          consentAcknowledged: true,
+          verificationNote: `Manual plant station verification at ${checkInBay.trim()}`
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Manual bay check-in failed');
+      setSelectedOrder(data.workOrder);
+      setActionSuccess(`On-site arrival verified at ${checkInBay.trim()}. Work order transitioned to IN PROGRESS.`);
+      setTimeout(() => setActionSuccess(null), 4000);
+      fetchData();
+    } catch (err) {
+      setCheckInError(err.message);
+    } finally {
+      setCheckInLoading(false);
+    }
+  };
+
+  // Upload Casing Photo for CV Defect Inspection
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    setPhotoError(null);
+
+    try {
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result;
+          const base64 = typeof res === 'string' && res.includes(',') ? res.split(',')[1] : res;
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch(`${API_BASE}/work-orders/${selectedOrder._id}/photo-inspection`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          photoBase64: base64Data,
+          filename: file.name,
+          mimeType: file.type || 'image/jpeg'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to upload and analyze inspection photo.');
+      setSelectedOrder(data.workOrder);
+      setActionSuccess('Exterior casing photo analyzed. Review surface defect findings below.');
+      setTimeout(() => setActionSuccess(null), 4000);
+      fetchData();
+    } catch (err) {
+      setPhotoError(err.message);
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  // Submit Technician Confirmation/Rejection Feedback on CV Findings
+  const handlePhotoFeedbackSubmit = async (photoIndex, feedbackStatus) => {
+    try {
+      const note = photoFeedbackNotes[photoIndex] || '';
+      const res = await fetch(`${API_BASE}/work-orders/${selectedOrder._id}/photo-inspection/${photoIndex}/feedback`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          feedbackStatus,
+          technicianNotes: note
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to submit feedback.');
+      setSelectedOrder(data.workOrder);
+      setActionSuccess(`Inspection finding marked as ${feedbackStatus.toUpperCase()}.`);
       setTimeout(() => setActionSuccess(null), 4000);
       fetchData();
     } catch (err) {
@@ -1008,6 +1180,44 @@ export default function MaintenancePage() {
                         <span className={`priority-tag priority-${order.priority?.toLowerCase()}`}>
                           {order.priority?.toUpperCase()} PRIORITY
                         </span>
+                        {order.checkIn?.checkedInAt && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              background: 'rgba(15, 118, 110, 0.1)',
+                              color: '#0F766E',
+                              border: '1px solid rgba(15, 118, 110, 0.25)'
+                            }}
+                          >
+                            <Icon name="check" size={10} color="#0F766E" />
+                            {order.checkIn.method === 'gps' ? 'GPS Checked-In' : `Bay Checked-In (${order.checkIn.bayIdentifier || 'On-Site'})`}
+                          </span>
+                        )}
+                        {order.inspectionPhotos?.length > 0 && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '4px',
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              background: '#F0F9FF',
+                              color: '#0284C7',
+                              border: '1px solid #BAE6FD'
+                            }}
+                          >
+                            <Icon name="file" size={10} color="#0284C7" />
+                            {order.inspectionPhotos.length} Photo{order.inspectionPhotos.length > 1 ? 's' : ''}
+                          </span>
+                        )}
                       </div>
 
                       <StatusBadge
@@ -1206,19 +1416,30 @@ export default function MaintenancePage() {
 
                         {/* Manager View Buttons */}
                         {isManager && (
-                          <Button
-                            key={`reassign-${order._id}`}
-                            variant="secondary"
-                            size="sm"
-                            icon="user"
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setReassignTechId(order.assignedTechnicianId?._id || '');
-                              setShowAssignModal(true);
-                            }}
-                          >
-                            Reassign Technician
-                          </Button>
+                          <React.Fragment key={`mgr-actions-${order._id}`}>
+                            <Button
+                              key={`inspect-${order._id}`}
+                              variant="outline"
+                              size="sm"
+                              icon="wrench"
+                              onClick={() => openExecutionModal(order)}
+                            >
+                              Inspect Checklist & Photos
+                            </Button>
+                            <Button
+                              key={`reassign-${order._id}`}
+                              variant="secondary"
+                              size="sm"
+                              icon="user"
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setReassignTechId(order.assignedTechnicianId?._id || '');
+                                setShowAssignModal(true);
+                              }}
+                            >
+                              Reassign Technician
+                            </Button>
+                          </React.Fragment>
                         )}
                       </div>
 
@@ -1320,6 +1541,163 @@ export default function MaintenancePage() {
               <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.78rem' }}>
                 Alert AL-318 triggered by statistical anomaly cluster (0.68 score vs 0.55 threshold). Physical inspection must verify transducer mounting and check intermediate shaft backlash before teardown.
               </p>
+            </div>
+
+            {/* Scoped Technician On-Site Check-In (Privacy Protected) */}
+            <div
+              style={{
+                marginBottom: '1.25rem',
+                padding: '0.85rem 1rem',
+                borderRadius: '8px',
+                border: selectedOrder.checkIn?.checkedInAt ? '1px solid #A7F3D0' : '1px solid #CBD5E1',
+                background: selectedOrder.checkIn?.checkedInAt ? '#ECFDF5' : '#F8FAFC'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <Icon
+                    name={selectedOrder.checkIn?.checkedInAt ? 'check' : 'location'}
+                    size={16}
+                    color={selectedOrder.checkIn?.checkedInAt ? '#059669' : '#0F766E'}
+                  />
+                  <strong style={{ fontSize: '0.85rem', color: selectedOrder.checkIn?.checkedInAt ? '#065F46' : 'var(--text-primary)' }}>
+                    Physical Machine Presence Verification (Scoped On-Site Check-In)
+                  </strong>
+                </div>
+                {selectedOrder.checkIn?.checkedInAt && (
+                  <span
+                    className="badge"
+                    style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                      color: '#065F46',
+                      fontWeight: 700,
+                      fontSize: '0.7rem'
+                    }}
+                  >
+                    ON-SITE VERIFIED
+                  </span>
+                )}
+              </div>
+
+              {selectedOrder.checkIn?.checkedInAt ? (
+                <div style={{ fontSize: '0.78rem', color: '#047857', lineHeight: 1.45 }}>
+                  <div>
+                    <strong>Verification Method:</strong>{' '}
+                    {selectedOrder.checkIn.method === 'gps'
+                      ? `GPS Coordinates (${selectedOrder.checkIn.coordinates?.latitude?.toFixed(4)}, ${selectedOrder.checkIn.coordinates?.longitude?.toFixed(4)} · accuracy ±${selectedOrder.checkIn.coordinates?.accuracyMeters || 10}m)`
+                      : `Plant Bay Station: ${selectedOrder.checkIn.bayIdentifier || 'On-Site Machine Bay'}`}
+                  </div>
+                  <div style={{ marginTop: '0.2rem', color: '#065F46' }}>
+                    Checked in at: {new Date(selectedOrder.checkIn.checkedInAt).toLocaleString()}
+                  </div>
+                  <div style={{ marginTop: '0.25rem', fontSize: '0.7rem', color: '#059669' }}>
+                    🔒 Privacy Guarantee: Single check-in event recorded for safety compliance. Continuous GPS tracking is never performed.
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: '0.6rem', lineHeight: 1.4 }}>
+                    Notice: Machine bay location is recorded once to verify technician presence at the physical asset prior to teardown. Continuous tracking is never enabled.
+                  </div>
+
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.45rem',
+                      fontSize: '0.75rem',
+                      color: '#334155',
+                      marginBottom: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checkInConsent}
+                      onChange={(e) => setCheckInConsent(e.target.checked)}
+                      style={{ marginTop: '2px', accentColor: '#0F766E' }}
+                    />
+                    <span>
+                      I consent to a single physical presence verification (GPS or Station Bay identifier) for this maintenance order.
+                    </span>
+                  </label>
+
+                  {checkInError && (
+                    <div
+                      style={{
+                        padding: '0.45rem 0.65rem',
+                        background: '#FEF2F2',
+                        border: '1px solid #FCA5A5',
+                        borderRadius: '4px',
+                        color: '#991B1B',
+                        fontSize: '0.75rem',
+                        marginBottom: '0.65rem'
+                      }}
+                    >
+                      {checkInError}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      disabled={checkInLoading || !checkInConsent}
+                      onClick={handleGpsCheckIn}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: checkInConsent ? '#0F766E' : '#CBD5E1',
+                        color: '#FFFFFF',
+                        cursor: checkInConsent ? 'pointer' : 'not-allowed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <Icon name="location" size={13} color="#FFFFFF" />
+                      {checkInLoading ? 'Locating...' : 'Check In with GPS (One-Time)'}
+                    </button>
+
+                    <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontWeight: 600 }}>OR</span>
+
+                    <div style={{ display: 'flex', gap: '0.35rem', flex: 1, minWidth: '220px' }}>
+                      <input
+                        type="text"
+                        placeholder="e.g. Bay 4 - MCC-2 Unit"
+                        value={checkInBay}
+                        onChange={(e) => setCheckInBay(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: '0.35rem 0.55rem',
+                          fontSize: '0.78rem',
+                          borderRadius: '4px',
+                          border: '1px solid #CBD5E1'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={checkInLoading || !checkInConsent || !checkInBay.trim()}
+                        onClick={handleManualBayCheckIn}
+                        style={{
+                          padding: '0.35rem 0.65rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          borderRadius: '4px',
+                          border: '1px solid #CBD5E1',
+                          background: '#FFFFFF',
+                          color: '#334155',
+                          cursor: (checkInConsent && checkInBay.trim()) ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        Verify Bay
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Interactive 4-step Checklist */}
@@ -1458,22 +1836,229 @@ export default function MaintenancePage() {
                 />
               </div>
 
-              {/* Photo Attachment Simulation */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', padding: '0.75rem', borderRadius: '8px', border: '1px dashed var(--border-subtle)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Icon name="file" size={15} color="var(--primary)" />
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {executionPhotoAttached ? 'Photo: gearbox_intermediate_pinion.jpg (1.8 MB)' : 'No photos attached yet'}
-                  </span>
+              {/* Visual Casing Inspection & Computer Vision Assist */}
+              <div
+                style={{
+                  marginBottom: '1.25rem',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  border: '1px solid #CBD5E1',
+                  background: '#FFFFFF'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <Icon name="file" size={16} color="#0F766E" />
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      Visual Casing Inspection & Computer Vision Assist
+                    </strong>
+                  </div>
+                  <label
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      background: 'var(--accent-teal)',
+                      color: '#FFFFFF',
+                      cursor: uploadingPhoto ? 'wait' : 'pointer'
+                    }}
+                  >
+                    <Icon name="file" size={13} color="#FFFFFF" />
+                    {uploadingPhoto ? 'Analyzing Photo...' : '+ Upload Casing Photo'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      disabled={uploadingPhoto}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setExecutionPhotoAttached(!executionPhotoAttached)}
+
+                {/* Mandatory Surface-Only Disclaimer */}
+                <div
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    background: '#FFFBEB',
+                    border: '1px solid #FDE68A',
+                    borderRadius: '6px',
+                    fontSize: '0.72rem',
+                    color: '#92400E',
+                    lineHeight: 1.4,
+                    marginBottom: '0.75rem'
+                  }}
                 >
-                  {executionPhotoAttached ? 'Remove Attachment' : '+ Attach Inspection Photo'}
-                </Button>
+                  <strong>Truthful Boundary:</strong> Purely visual surface analysis of external casing. Cannot diagnose internal gear teeth, bearing spalling, or rotating components.
+                </div>
+
+                {photoError && (
+                  <div
+                    style={{
+                      padding: '0.45rem 0.65rem',
+                      background: '#FEF2F2',
+                      border: '1px solid #FCA5A5',
+                      borderRadius: '4px',
+                      color: '#991B1B',
+                      fontSize: '0.75rem',
+                      marginBottom: '0.65rem'
+                    }}
+                  >
+                    {photoError}
+                  </div>
+                )}
+
+                {/* Uploaded Photos and CV Analysis Findings */}
+                {(selectedOrder.inspectionPhotos || []).length === 0 ? (
+                  <div style={{ fontSize: '0.78rem', color: '#94A3B8', textAlign: 'center', padding: '0.75rem 0' }}>
+                    No inspection photos attached. Upload an exterior gearbox or motor casing photo to run visual screening.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {selectedOrder.inspectionPhotos.map((photo, idx) => {
+                      const analysis = photo.visualDefectAnalysis || {};
+                      const feedback = photo.technicianFeedback || { status: 'pending' };
+
+                      return (
+                        <div
+                          key={photo._id || idx}
+                          style={{
+                            padding: '0.75rem',
+                            borderRadius: '6px',
+                            border: '1px solid #E2E8F0',
+                            background: '#F8FAFC'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#334155' }}>
+                              📷 {photo.originalFilename}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#64748B' }}>
+                              {new Date(photo.uploadedAt).toLocaleTimeString()}
+                            </span>
+                          </div>
+
+                          {/* CV Findings Summary */}
+                          <div style={{ marginBottom: '0.5rem', background: '#FFFFFF', padding: '0.5rem', borderRadius: '4px', border: '1px solid #E2E8F0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748B' }}>
+                                CV DEFECT DETECTION:
+                              </span>
+                              <span
+                                className="badge"
+                                style={{
+                                  backgroundColor: analysis.defectDetected ? 'rgba(217, 119, 6, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                  color: analysis.defectDetected ? '#D97706' : '#059669',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700
+                                }}
+                              >
+                                {analysis.defectDetected ? 'POTENTIAL SURFACE DEFECT' : 'SURFACE NOMINAL'}
+                              </span>
+                            </div>
+
+                            {analysis.findings && analysis.findings.length > 0 ? (
+                              <ul style={{ margin: '0.25rem 0', paddingLeft: '1.25rem', fontSize: '0.75rem', color: '#1E293B' }}>
+                                {analysis.findings.map((f, fIdx) => (
+                                  <li key={fIdx} style={{ marginBottom: '0.2rem' }}>
+                                    <strong>{f.category}</strong> (Confidence: {Math.round((f.confidence || 0) * 100)}%, Severity: {f.severity})
+                                    <div style={{ color: '#64748B', fontSize: '0.7rem' }}>{f.description}</div>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                                No surface rust, corrosion, or lubricant seepage patterns detected.
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.7rem', color: '#64748B', marginTop: '0.35rem', borderTop: '1px solid #F1F5F9', paddingTop: '0.35rem' }}>
+                              <span>Overall Confidence: <strong>{Math.round((analysis.overallConfidence || 0) * 100)}%</strong></span>
+                              <span>Uncertainty: <strong>{analysis.uncertaintyLevel || 'Moderate'}</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Technician Confirmation / Dismissal Feedback */}
+                          {feedback.status === 'pending' ? (
+                            <div style={{ background: '#F1F5F9', padding: '0.5rem', borderRadius: '4px' }}>
+                              <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#475569', marginBottom: '0.3rem' }}>
+                                Technician Verification & Field Note:
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Confirmed minor surface rust; or Dismissed as paint discoloration"
+                                value={photoFeedbackNotes[idx] || ''}
+                                onChange={(e) => setPhotoFeedbackNotes({ ...photoFeedbackNotes, [idx]: e.target.value })}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.3rem 0.5rem',
+                                  fontSize: '0.75rem',
+                                  borderRadius: '4px',
+                                  border: '1px solid #CBD5E1',
+                                  marginBottom: '0.4rem',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePhotoFeedbackSubmit(idx, 'confirmed')}
+                                  style={{
+                                    padding: '0.25rem 0.6rem',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    background: '#0F766E',
+                                    color: '#FFFFFF',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  ✓ Confirm Finding
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePhotoFeedbackSubmit(idx, 'rejected')}
+                                  style={{
+                                    padding: '0.25rem 0.6rem',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 600,
+                                    borderRadius: '4px',
+                                    border: '1px solid #CBD5E1',
+                                    background: '#FFFFFF',
+                                    color: '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  ✗ Dismiss as False Alarm
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                padding: '0.4rem 0.6rem',
+                                borderRadius: '4px',
+                                background: feedback.status === 'confirmed' ? '#ECFDF5' : '#F1F5F9',
+                                border: feedback.status === 'confirmed' ? '1px solid #A7F3D0' : '1px solid #E2E8F0',
+                                fontSize: '0.72rem',
+                                color: feedback.status === 'confirmed' ? '#065F46' : '#475569'
+                              }}
+                            >
+                              <strong>
+                                {feedback.status === 'confirmed' ? '✓ Confirmed by Technician' : '✗ Dismissed as False Alarm'}
+                              </strong>
+                              {feedback.feedbackNote && <span> — "{feedback.feedbackNote}"</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Quick Help Request Toggle */}

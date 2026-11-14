@@ -43,11 +43,40 @@ export function getAllowedOrigins() {
 
 /**
  * Checks whether an origin is allowed by the server CORS / CSRF policy.
+ * In development: allows localhost, 127.0.0.1, and RFC 1918 local network IPs
+ * (e.g. 10.x.x.x, 192.168.x.x, 172.16-31.x.x) for mobile Expo and local devices.
+ * In production: strictly enforces explicit whitelist from CORS_ORIGIN.
  */
 export function isOriginAllowed(origin) {
   if (!origin) return true; // Native clients, mobile fetch, curl, and same-origin requests
   const allowed = getAllowedOrigins();
-  return allowed.includes(origin);
+  if (allowed.includes(origin)) return true;
+
+  const isProduction = process.env.NODE_ENV === 'production' || env.isProd;
+  if (!isProduction) {
+    try {
+      if (origin.startsWith('exp://')) return true;
+
+      const parsed = new URL(origin);
+      const hostname = parsed.hostname;
+
+      // Allow loopback and RFC 1918 private IPv4 networks in development
+      const isLocalOrPrivateNetwork =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname);
+
+      if (isLocalOrPrivateNetwork) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 /**

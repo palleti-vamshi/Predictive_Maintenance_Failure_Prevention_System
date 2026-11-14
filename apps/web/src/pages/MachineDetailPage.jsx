@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Card from '../components/common/Card.jsx';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Button from '../components/common/Button.jsx';
@@ -10,15 +10,317 @@ import {
   WORK_ORDER_PRIORITY,
   OPERATIONAL_STATUS,
   MACHINE_TYPES,
-  MACHINE_TYPE_LABELS
+  MACHINE_TYPE_LABELS,
+  ALERT_STATUSES,
+  ALERT_SEVERITIES
 } from '@predictive-maintenance/shared';
 import { useRouter, ROUTES } from '../router/Router.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * Data-Driven Faults & Attack Scenarios Taxonomy
+ * Grounded in the project's real physical benchmarks, vibration transducers, and Dyno Simulator perturbations.
+ */
+const SCENARIO_DEFINITIONS = [
+  // 1. Excessive Vibration Excursions (Physical)
+  {
+    id: 'excessive_vibration',
+    name: 'Excessive Vibration Excursion',
+    subtitle: 'Radial & Axial Vibration Exceeding ISO 10816 Baseline',
+    category: 'physical',
+    domain: 'general_mechanical',
+    targetComponent: 'Gearbox Housing & Bearings',
+    signals: ['vibration_input_radial', 'vibration_output_radial', 'vibration_input_axial', 'vibration_rms'],
+    description: 'Elevated structural vibration beyond statistical baseline (99.5th percentile threshold). Evaluated via unsupervised anomaly detection.',
+    supportedBy: 'Isolation Forest Anomaly Detector, Rolling RMS Profiler',
+    nominalCriteria: '< 4.5 mm/s RMS (ISO 10816-3 Class II Rigid Mount)',
+    matchAlert: (alert) =>
+      !alert.isSimulatorDerived &&
+      (alert.triggeringPath === 'vibration_path' ||
+        (alert.title || '').toLowerCase().includes('vibration') ||
+        (alert.title || '').toLowerCase().includes('statistical anomaly') ||
+        (alert.contributingSignals || []).some((s) => s.signal?.includes('vibration')))
+  },
+  // 2. Abnormal Temperature Rise & Thermal Friction (Physical)
+  {
+    id: 'abnormal_temperature',
+    name: 'Abnormal Temperature Rise',
+    subtitle: 'Sump Overheating & Boundary Lubrication Breakdown',
+    category: 'physical',
+    domain: 'general_mechanical',
+    targetComponent: 'Sump Oil Reservoir & Mechanical Seals',
+    signals: ['temp_gearbox_sump', 'temp_casing', 'oil_temperature'],
+    description: 'Sump thermal elevation resulting from excessive gear mesh friction, oil breakdown, or low oil volume.',
+    supportedBy: 'Thermal Transducer Path, ISO VG 220 Synthetic Thresholds',
+    nominalCriteria: 'Steady-state < 65°C; Warning > 75°C; Trip > 90°C',
+    matchAlert: (alert) =>
+      !alert.isSimulatorDerived &&
+      (alert.triggeringPath === 'thermal_path' ||
+        (alert.contributingSignals || []).some((s) => s.signal?.includes('temp')))
+  },
+  // 3. Gear Mesh & Tooth Defect (Physical)
+  {
+    id: 'gear_tooth_fault',
+    name: 'Gear Mesh & Tooth Defect',
+    subtitle: 'Pinion/Wheel Tooth Chipping, Root Cracking & Severe Pitting',
+    category: 'physical',
+    domain: 'gear_faults',
+    targetComponent: 'Reduction Stages 1-3 (Sun/Planet/Helical Gears)',
+    signals: ['vibration_input_radial', 'vibration_output_radial', 'gmf_peak_energy'],
+    description: 'Localized tooth surface damage causing periodic impacts at Gear Mesh Frequency (GMF) and sideband modulation.',
+    supportedBy: 'SEU DDS Gearbox Benchmark, Random Forest Multi-Class Classifier',
+    nominalCriteria: 'GMF sideband harmonics < 0.25 g peak; Kurtosis < 3.2',
+    matchAlert: (alert) =>
+      alert.targetDomain === 'gear_faults' ||
+      (alert.title || '').toLowerCase().includes('gear') ||
+      (alert.title || '').toLowerCase().includes('tooth') ||
+      (alert.interval?.predictedClass || '').toLowerCase().includes('gear') ||
+      (alert.interval?.predictedClass || '').toLowerCase().includes('tooth')
+  },
+  // 4. Bearing Degradation (Physical)
+  {
+    id: 'bearing_defect',
+    name: 'Bearing Raceway & Element Defect',
+    subtitle: 'Inner/Outer Ring Fatigue Spalling & Ball/Cage Wear',
+    category: 'physical',
+    domain: 'bearing_faults',
+    targetComponent: 'Drive-End (DE) & Non-Drive-End (NDE) Bearings',
+    signals: ['vibration_input_radial', 'vibration_input_axial', 'bearing_pass_frequencies'],
+    description: 'Subsurface fatigue spalling on bearing raceways producing characteristic impact frequencies (BPFI, BPFO, BSF).',
+    supportedBy: 'CWRU Bearing Benchmark, MFPT Benchmark Classifier',
+    nominalCriteria: 'Crest factor < 4.0; Defect envelope energy < 0.15 g RMS',
+    matchAlert: (alert) =>
+      alert.targetDomain === 'bearing_faults' ||
+      (alert.title || '').toLowerCase().includes('bearing') ||
+      (alert.interval?.predictedClass || '').toLowerCase().includes('bearing') ||
+      (alert.interval?.predictedClass || '').toLowerCase().includes('inner') ||
+      (alert.interval?.predictedClass || '').toLowerCase().includes('outer')
+  },
+  // 5. Shaft Misalignment & Rotor Imbalance (Physical)
+  {
+    id: 'shaft_misalignment',
+    name: 'Shaft Misalignment & Rotor Imbalance',
+    subtitle: 'Angular/Parallel Coupling Offset & 1X/2X Shaft Harmonics',
+    category: 'physical',
+    domain: 'general_mechanical',
+    targetComponent: 'Input Coupling & High-Speed Shaft',
+    signals: ['rotational_speed', 'vibration_input_axial', 'vibration_input_radial'],
+    description: 'Angular or parallel offset between drive motor and gearbox input shaft creating elevated 1X and 2X rotational speed vibration peaks.',
+    supportedBy: 'Shaft Kinematic Harmonics, Multi-Regime Signal Decomposition',
+    nominalCriteria: '2X/1X harmonic ratio < 0.50; Axial vibration < 2.8 mm/s',
+    matchAlert: (alert) =>
+      (alert.title || '').toLowerCase().includes('misalignment') ||
+      (alert.title || '').toLowerCase().includes('imbalance') ||
+      (alert.contributingSignals || []).some((s) => s.signal === 'rotational_speed' && s.deviationRatio > 1.3)
+  },
+
+  // 6. Clutch Slippage (Simulated Physical Fault)
+  {
+    id: 'sim_clutch_slippage',
+    name: 'Clutch Slippage Fault Test',
+    subtitle: 'Torque Transfer Capacity Drop & ΔRPM Divergence',
+    category: 'simulated',
+    simKey: 'clutch_slippage',
+    attackType: 'SIMULATED FAULT',
+    targetComponent: 'Clutch Friction Plate & Driven Hub',
+    signals: ['gearbox_in_rpm', 'torque_nm', 'clutch_slip_rpm', 'clutch_temp'],
+    description: 'Degrades maximum clutch clamping torque, creating speed divergence (ΔRPM) between crankshaft and input shaft while generating friction plate heat.',
+    supportedBy: 'Transmission Dynamics Studio (100 Hz Numerical ODE)',
+    nominalCriteria: 'Non-destructive physical ODE simulation strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('clutch_slippage') || (alert.title || '').toLowerCase().includes('clutch')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('clutch_slippage') || (ds.description || '').toLowerCase().includes('clutch'))
+  },
+  // 7. Gear Tooth Wear (Simulated Physical Fault)
+  {
+    id: 'sim_gear_tooth_wear',
+    name: 'Gear Tooth Wear Fault Test',
+    subtitle: 'Involute Pitting, Mesh Power Loss & GMF Harmonics',
+    category: 'simulated',
+    simKey: 'gear_tooth_wear',
+    attackType: 'SIMULATED FAULT',
+    targetComponent: 'Helical & Planetary Reduction Stages',
+    signals: ['vib_rms', 'gearbox_out_rpm', 'temp_gearbox_sump'],
+    description: 'Simulates progressive gear tooth surface pitting, exciting GMF vibration harmonics while preserving exact kinematic ratio (ω_out = ω_in / ratio).',
+    supportedBy: 'Transmission Dynamics Studio (100 Hz Numerical ODE)',
+    nominalCriteria: 'Non-destructive physical ODE simulation strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('gear_tooth_wear') || (alert.title || '').toLowerCase().includes('tooth wear')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('gear_tooth_wear') || (ds.description || '').toLowerCase().includes('tooth wear'))
+  },
+  // 8. Bearing Failure (Simulated Physical Fault)
+  {
+    id: 'sim_bearing_failure',
+    name: 'Bearing Failure Fault Test',
+    subtitle: 'Parasitic Drag Torque, Casing Heat & Raceway Spalling',
+    category: 'simulated',
+    simKey: 'bearing_failure',
+    attackType: 'SIMULATED FAULT',
+    targetComponent: 'Input/Output Shaft Support Bearings',
+    signals: ['vib_rms', 'torque_nm', 'gearbox_in_rpm'],
+    description: 'Increases Coulomb and viscous bearing friction drag, reducing shaft speed and delivered torque under load while elevating impact vibration.',
+    supportedBy: 'Transmission Dynamics Studio (100 Hz Numerical ODE)',
+    nominalCriteria: 'Non-destructive physical ODE simulation strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('bearing_failure') || (alert.title || '').toLowerCase().includes('bearing failure')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('bearing_failure') || (ds.description || '').toLowerCase().includes('bearing failure'))
+  },
+  // 9. Gearbox Lubrication Failure (Simulated Physical Fault)
+  {
+    id: 'sim_gearbox_lubrication_failure',
+    name: 'Gearbox Lubrication Failure Test',
+    subtitle: 'Boundary Film Breakdown, Sump Overheating & Scuffing',
+    category: 'simulated',
+    simKey: 'gearbox_lubrication_failure',
+    attackType: 'SIMULATED FAULT',
+    targetComponent: 'Sump Oil Reservoir & Hydrodynamic Film',
+    signals: ['temp_gearbox_sump', 'vib_rms', 'coolant_c'],
+    description: 'Collapses hydrodynamic film into severe boundary friction regime, causing sump oil temperature to surge (>95°C) and efficiency to collapse.',
+    supportedBy: 'Transmission Dynamics Studio (100 Hz Numerical ODE)',
+    nominalCriteria: 'Non-destructive physical ODE simulation strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('lubrication') || (alert.title || '').toLowerCase().includes('gearbox_lubrication')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('lubrication') || (ds.description || '').toLowerCase().includes('gearbox_lubrication'))
+  },
+  // 10. Engine Cooling Failure (Simulated Physical Fault)
+  {
+    id: 'sim_engine_cooling_failure',
+    name: 'Engine Cooling Failure Test',
+    subtitle: 'Radiator Throttling, Thermal Overheat & Torque Derating',
+    category: 'simulated',
+    simKey: 'engine_cooling_failure',
+    attackType: 'SIMULATED FAULT',
+    targetComponent: 'Radiator Convective Loop & Cylinder Head',
+    signals: ['coolant_c', 'egt_c', 'torque_nm'],
+    description: 'Restricts radiator heat dissipation, causing coolant to climb past 98°C, triggering electronic thermal derating and EGT elevation.',
+    supportedBy: 'Transmission Dynamics Studio (100 Hz Numerical ODE)',
+    nominalCriteria: 'Non-destructive physical ODE simulation strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('cooling') || (alert.title || '').toLowerCase().includes('engine_cooling')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('cooling') || (ds.description || '').toLowerCase().includes('engine_cooling'))
+  },
+
+  // 11. Vibration Harmonic Spike (Simulated Perturbation)
+  {
+    id: 'sim_vibration_spike',
+    name: 'Vibration Harmonic Spike Attack',
+    subtitle: 'High-Amplitude Resonance Perturbation (+4.0 mm/s)',
+    category: 'simulated',
+    simKey: 'vibration_spike',
+    attackType: 'SIMULATED ATTACK',
+    targetComponent: 'Vibration Transducer Telemetry',
+    signals: ['vibration_rms', 'vibration_input_radial'],
+    description: 'Synthetic high-amplitude harmonic spike perturbation injected in simulator memory to stress dynamic threshold tripping and classifier resistance.',
+    supportedBy: 'Dyno Simulator Studio (Deterministic 100 Hz Engine)',
+    nominalCriteria: 'Non-destructive synthetic test strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('vibration_spike') || (alert.title || '').toLowerCase().includes('spike')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('vibration_spike') || (ds.description || '').toLowerCase().includes('vibration_spike'))
+  },
+  // 7. Progressive Friction Drift (Simulated Perturbation)
+  {
+    id: 'sim_gradual_drift',
+    name: 'Progressive Friction Drift Test',
+    subtitle: 'Simulated Drag Accumulation (+0.2 mm/s/s) & Heat Escalation',
+    category: 'simulated',
+    simKey: 'gradual_drift',
+    attackType: 'SIMULATED ATTACK',
+    targetComponent: 'Transmission Gear Train & Thermal Path',
+    signals: ['vibration_rms', 'temp_gearbox_sump', 'engine_temp'],
+    description: 'Gradual increase in mechanical drag coefficient simulating progressive thermal runaway and boundary lubrication seizure.',
+    supportedBy: 'Dyno Simulator Studio (Continuous Friction Perturbation)',
+    nominalCriteria: 'Non-destructive synthetic test strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('gradual_drift') || (alert.title || '').toLowerCase().includes('drift')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('gradual_drift') || (ds.description || '').toLowerCase().includes('drift'))
+  },
+  // 8. Transducer Gaussian Noise (Simulated Attack)
+  {
+    id: 'sim_sensor_noise',
+    name: 'Transducer Gaussian Noise Attack',
+    subtitle: 'High-Entropy Sensor Jitter & Instrumentation Noise',
+    category: 'simulated',
+    simKey: 'sensor_noise',
+    attackType: 'ATTACK TEST',
+    targetComponent: 'Transducer ADC / Signal Conditioning',
+    signals: ['vibration_input_radial', 'sensor_noise_floor'],
+    description: 'High-variance Gaussian noise injected into transducer stream to evaluate model false-alarm immunity and filter rejection.',
+    supportedBy: 'Dyno Simulator Studio (Gaussian White Noise Perturbation)',
+    nominalCriteria: 'Non-destructive synthetic test strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('sensor_noise') || (alert.title || '').toLowerCase().includes('noise')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('sensor_noise') || (ds.description || '').toLowerCase().includes('noise'))
+  },
+  // 9. Transducer Latchup / Freeze (Simulated Attack)
+  {
+    id: 'sim_stuck_value',
+    name: 'Transducer Latchup (Sensor Freeze)',
+    subtitle: 'Data Tampering with Zero-Variance Constant Telemetry',
+    category: 'simulated',
+    simKey: 'stuck_value',
+    attackType: 'ATTACK TEST',
+    targetComponent: 'Transducer Serial Stream / Bus',
+    signals: ['vibration_rms', 'telemetry_variance'],
+    description: 'Repeated static reading injected into telemetry stream to test variance-collapse detection, timeout guards, and data sufficiency score.',
+    supportedBy: 'Dyno Simulator Studio (Constant Value Latchup)',
+    nominalCriteria: 'Non-destructive synthetic test strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('stuck_value') || (alert.title || '').toLowerCase().includes('latchup')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('stuck_value') || (ds.description || '').toLowerCase().includes('stuck'))
+  },
+  // 10. Telemetry Packet Dropout (Simulated Attack)
+  {
+    id: 'sim_missing_samples',
+    name: 'Telemetry Packet Dropout Attack',
+    subtitle: 'Network Frame Loss & Intermittent Data Omission',
+    category: 'simulated',
+    simKey: 'missing_samples',
+    attackType: 'ATTACK TEST',
+    targetComponent: 'Plant Gateway / Fieldbus Ingestion Pipe',
+    signals: ['telemetry_frames', 'sample_continuity'],
+    description: 'Simulated intermittent network loss dropping up to 20% of telemetry frames to test ML interpolation and data sufficiency checks.',
+    supportedBy: 'Dyno Simulator Studio (Stochastic Dropout Perturbation)',
+    nominalCriteria: 'Non-destructive synthetic test strictly inside browser memory',
+    matchAlert: (alert) =>
+      alert.isSimulatorDerived &&
+      ((alert.title || '').toLowerCase().includes('missing_samples') || (alert.title || '').toLowerCase().includes('dropout')),
+    matchDataset: (ds) =>
+      ds.isSimulatorDerived &&
+      ((ds.title || '').toLowerCase().includes('missing_samples') || (ds.description || '').toLowerCase().includes('dropout'))
+  }
+];
+
 export default function MachineDetailPage() {
-  const { params, navigate } = useRouter();
+  const { params, queryParams, navigate } = useRouter();
   const { user } = useAuth();
   const isManager = user?.role === USER_ROLES.FACTORY_MANAGER;
   const isTechnician = user?.role === USER_ROLES.TECHNICIAN;
@@ -28,10 +330,12 @@ export default function MachineDetailPage() {
   const [workOrders, setWorkOrders] = useState([]);
   const [machineDatasets, setMachineDatasets] = useState([]);
   const [machineAlerts, setMachineAlerts] = useState([]);
+  const [machineAnalysisRuns, setMachineAnalysisRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [activeTab, setActiveTab] = useState('kinematics');
+  const [activeTab, setActiveTab] = useState(queryParams?.tab || 'kinematics');
+  const [scenarioFilter, setScenarioFilter] = useState('all');
 
   // Maintenance note form
   const [noteContent, setNoteContent] = useState('');
@@ -67,6 +371,90 @@ export default function MachineDetailPage() {
 
   // Manager Review Notes Form State
   const [reviewNote, setReviewNote] = useState('');
+
+  // Synchronize active tab from query parameters (e.g. #/machines/GB-104?tab=kinematics)
+  useEffect(() => {
+    if (queryParams?.tab) {
+      setActiveTab(queryParams.tab);
+    }
+  }, [queryParams?.tab]);
+
+  // Data-Driven Scenarios Processing: Connects to actual simulator runs, uploaded datasets, model runs, and alerts
+  // Placed unconditionally at top level to strictly adhere to React Rules of Hooks
+  const scenariosWithData = useMemo(() => {
+    return SCENARIO_DEFINITIONS.map((sc) => {
+      let matchedAlert = null;
+      if (sc.category === 'simulated') {
+        matchedAlert = (machineAlerts || []).find((a) => a.isSimulatorDerived && sc.matchAlert(a));
+      } else {
+        matchedAlert = (machineAlerts || []).find((a) => !a.isSimulatorDerived && sc.matchAlert(a));
+      }
+
+      const matchedRun = sc.category === 'simulated'
+        ? (machineAnalysisRuns || []).find((r) => r.isSimulatorDerived && (r.datasetTitle || '').toLowerCase().includes(sc.simKey))
+        : (machineAnalysisRuns || []).find((r) => !r.isSimulatorDerived && r.targetDomain === sc.domain);
+
+      const matchedDataset = sc.category === 'simulated' && sc.matchDataset
+        ? (machineDatasets || []).find((d) => d.isSimulatorDerived && sc.matchDataset(d))
+        : null;
+
+      let state = 'nominal';
+      let stateLabel = 'Nominal · No Fault';
+      let badgeClass = 'badge-healthy';
+
+      if (matchedAlert) {
+        if (matchedAlert.status === ALERT_STATUSES.OPEN) {
+          state = 'active_alert';
+          stateLabel = 'Active Alert Detected';
+          badgeClass = matchedAlert.severity === ALERT_SEVERITIES.CRITICAL ? 'badge-critical' : 'badge-warning';
+        } else if (matchedAlert.status === ALERT_STATUSES.ACKNOWLEDGED) {
+          state = 'under_investigation';
+          stateLabel = 'Under Investigation';
+          badgeClass = 'badge-warning';
+        } else if (matchedAlert.status === ALERT_STATUSES.RESOLVED) {
+          state = 'resolved';
+          stateLabel = 'Resolved / Mitigated';
+          badgeClass = 'badge-healthy';
+        }
+      } else if (matchedDataset || matchedRun) {
+        if (sc.category === 'simulated') {
+          state = 'simulation_recorded';
+          stateLabel = 'Simulation Recorded';
+          badgeClass = 'scenario-badge-simulated';
+        } else {
+          state = 'analyzed';
+          stateLabel = 'Analyzed · Within Baseline';
+          badgeClass = 'badge-healthy';
+        }
+      } else if (sc.category === 'simulated') {
+        state = 'not_executed';
+        stateLabel = 'Ready in Simulator';
+        badgeClass = 'badge-site';
+      }
+
+      return {
+        ...sc,
+        matchedAlert,
+        matchedRun,
+        matchedDataset,
+        state,
+        stateLabel,
+        badgeClass,
+        hasActiveEvidence: state === 'active_alert' || state === 'under_investigation',
+        hasRecordedData: Boolean(matchedAlert || matchedRun || matchedDataset)
+      };
+    });
+  }, [machineAlerts, machineAnalysisRuns, machineDatasets]);
+
+  const activeScenariosCount = scenariosWithData.filter((s) => s.hasActiveEvidence).length;
+  const simulatedRecordedCount = scenariosWithData.filter((s) => s.category === 'simulated' && s.hasRecordedData).length;
+
+  const filteredScenarios = scenariosWithData.filter((s) => {
+    if (scenarioFilter === 'physical') return s.category === 'physical';
+    if (scenarioFilter === 'simulated') return s.category === 'simulated';
+    if (scenarioFilter === 'active') return s.hasActiveEvidence;
+    return true;
+  });
 
   const fetchMachineAndOrders = useCallback(async () => {
     setLoading(true);
@@ -126,6 +514,16 @@ export default function MachineDetailPage() {
       if (alertRes.ok) {
         const alertData = await alertRes.json();
         setMachineAlerts(alertData.alerts || []);
+      }
+
+      // 5. Fetch verified analysis runs for this machine
+      const arRes = await fetch(`${API_BASE}/analysis-runs?machineId=${mData.machine._id}`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (arRes.ok) {
+        const arData = await arRes.json();
+        setMachineAnalysisRuns(arData.runs || []);
       }
     } catch (err) {
       setErrorStatus(500);
@@ -292,7 +690,8 @@ export default function MachineDetailPage() {
       <div className="page-container">
         <nav className="breadcrumbs" aria-label="Breadcrumbs">
           <button className="breadcrumb-link" onClick={() => navigate(ROUTES.MACHINES)}>
-            Machines
+            <Icon name="arrowLeft" size={13} style={{ marginRight: 4 }} />
+            Machines Catalog
           </button>
           <span className="breadcrumb-separator">/</span>
           <span className="breadcrumb-current">{machineCode}</span>
@@ -326,8 +725,9 @@ export default function MachineDetailPage() {
             }
             action={
               <div style={{ display: 'flex', gap: 10 }}>
-                <Button variant="secondary" onClick={() => navigate(ROUTES.MACHINES)}>
-                  ← Return to Accessible Machines
+                <Button variant="secondary" onClick={() => navigate(ROUTES.MACHINES)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Icon name="arrowLeft" size={14} />
+                  <span>Return to Accessible Machines</span>
                 </Button>
                 {!isNotFound && !isForbidden && (
                   <Button variant="primary" onClick={fetchMachineAndOrders}>
@@ -342,7 +742,35 @@ export default function MachineDetailPage() {
     );
   }
 
-  if (!machine) return null;
+  // Clear empty state when machine data record is unavailable (prevents blank screen)
+  if (!machine) {
+    return (
+      <div className="page-container machine-detail-page">
+        <nav className="breadcrumbs" aria-label="Breadcrumbs">
+          <button className="breadcrumb-link" onClick={() => navigate(ROUTES.MACHINES)}>
+            <Icon name="arrowLeft" size={13} style={{ marginRight: 4 }} />
+            Machines Catalog
+          </button>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">{machineCode}</span>
+        </nav>
+
+        <Card title={`Equipment Record Unavailable (${machineCode})`}>
+          <AlertCallout
+            severity="warning"
+            title="Equipment Record Not Found"
+            description={`No active equipment profile record was found for identifier "${machineCode}". The asset may be decommissioned, unassigned, or awaiting factory registry synchronization.`}
+            action={
+              <Button variant="secondary" onClick={() => navigate(ROUTES.MACHINES)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="arrowLeft" size={14} />
+                <span>Return to Equipment Catalog</span>
+              </Button>
+            }
+          />
+        </Card>
+      </div>
+    );
+  }
 
   const machineId = machine.code || machine.id;
   const isDecomm = machine.isDecommissioned || machine.operationalStatus === OPERATIONAL_STATUS.DECOMMISSIONED;
@@ -360,25 +788,27 @@ export default function MachineDetailPage() {
     : 'No Telemetry Uploaded Yet';
 
   return (
-    <div className="page-container">
+    <div className="page-container machine-detail-page">
       {/* Breadcrumb Navigation */}
       <nav className="breadcrumbs" aria-label="Breadcrumbs">
         <button className="breadcrumb-link" onClick={() => navigate(ROUTES.MACHINES)}>
-          Machines
+          <Icon name="arrowLeft" size={13} style={{ marginRight: 4 }} />
+          Machines Catalog
         </button>
         <span className="breadcrumb-separator">/</span>
-        <span className="breadcrumb-current">{machineId} ({machine.name})</span>
+        <span className="breadcrumb-current">{machineId}</span>
+        <span className="breadcrumb-title-tag">({machine.name})</span>
       </nav>
 
       {/* Header Bar */}
-      <div className="page-header">
-        <div>
+      <div className="page-header machine-detail-header">
+        <div className="machine-header-info">
           <div className="specimen-tag-row">
-            <span className="mono-code" style={{ fontSize: '1rem' }}>{machineId}</span>
+            <span className="mono-code machine-code-pill">{machineId}</span>
             <span className="badge badge-site">
               {MACHINE_TYPE_LABELS[machine.type] || machine.type || 'Equipment'}
             </span>
-            <span className={`badge ${isDecomm ? 'badge-critical' : 'badge-info'}`}>
+            <span className={`badge ${isDecomm ? 'badge-critical' : 'badge-healthy'}`}>
               {machine.operationalStatus?.toUpperCase() || 'OPERATIONAL'}
             </span>
             <StatusBadge
@@ -393,19 +823,63 @@ export default function MachineDetailPage() {
               <Icon name="clock" size={11} style={{ marginRight: 4 }} />
               {telemetryFreshness}
             </span>
+            <button
+              type="button"
+              className={`badge ${activeScenariosCount > 0 ? 'badge-warning' : 'badge-healthy'}`}
+              style={{ cursor: 'pointer', border: 'none' }}
+              onClick={() => setActiveTab('scenarios')}
+              title="Jump to Faults & Attack Scenarios"
+            >
+              <Icon name="alert" size={11} style={{ marginRight: 4 }} />
+              {activeScenariosCount > 0 ? `${activeScenariosCount} Active Faults` : 'Scenarios: Nominal'}
+            </button>
+            {simulatedRecordedCount > 0 && (
+              <button
+                type="button"
+                className="badge scenario-badge-simulated"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setActiveTab('scenarios')}
+                title="Jump to Simulated Attack Tests"
+              >
+                <Icon name="activity" size={11} style={{ marginRight: 4 }} />
+                {simulatedRecordedCount} Attack Tests
+              </button>
+            )}
           </div>
           <h1 className="page-title">{machine.name}</h1>
           <p className="page-subtitle">
-            {machine.manufacturer} • Model {machine.model} • Serial: {machine.serialNumber || 'N/A'} • Site: {machine.siteId?.name || machine.site || 'Plant Floor'}
+            <span className="meta-item"><Icon name="cpu" size={13} /> {machine.manufacturer}</span>
+            <span className="meta-sep">•</span>
+            <span className="meta-item">Model {machine.model}</span>
+            <span className="meta-sep">•</span>
+            <span className="meta-item">Serial: <span className="mono-code">{machine.serialNumber || 'N/A'}</span></span>
+            <span className="meta-sep">•</span>
+            <span className="meta-item">Site: {machine.siteId?.name || machine.site || 'Plant Floor'}</span>
           </p>
         </div>
 
         <div className="page-header-actions">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setActiveTab('kinematics');
+              setTimeout(() => {
+                const el = document.getElementById('kinematics-section');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 50);
+            }}
+            title="Inspect gearbox reduction architecture and kinematics"
+            data-testid="inspect-kinematics-btn"
+          >
+            <Icon name="settings" size={14} style={{ marginRight: 6 }} />
+            <span>Inspect Kinematics</span>
+          </Button>
+
           {isManager && !isDecomm && (
             <Button
               variant="outline"
               onClick={() => setShowDecommissionModal(true)}
-              style={{ color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+              style={{ color: '#dc2626', borderColor: 'rgba(239, 68, 68, 0.4)' }}
             >
               Decommission
             </Button>
@@ -493,80 +967,166 @@ export default function MachineDetailPage() {
       )}
 
       {/* Detail Tabs */}
-      <div className="tab-bar">
+      <div className="tab-bar" role="tablist" aria-label="Machine Details Tabs">
         <button
+          role="tab"
+          aria-selected={activeTab === 'kinematics'}
           className={`tab-btn ${activeTab === 'kinematics' ? 'tab-btn-active' : ''}`}
           onClick={() => setActiveTab('kinematics')}
+          data-testid="kinematics-tab"
         >
+          <Icon name="settings" size={14} style={{ marginRight: 6 }} />
           Kinematics & Lubrication
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'scenarios'}
+          className={`tab-btn ${activeTab === 'scenarios' ? 'tab-btn-active' : ''}`}
+          onClick={() => setActiveTab('scenarios')}
+        >
+          <Icon name="shield" size={14} style={{ marginRight: 6 }} />
+          Faults & Attack Scenarios {activeScenariosCount > 0 ? `(${activeScenariosCount} Active)` : ''}
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'workorders'}
           className={`tab-btn ${activeTab === 'workorders' ? 'tab-btn-active' : ''}`}
           onClick={() => setActiveTab('workorders')}
         >
-          Maintenance Work Orders ({workOrders.length})
+          <Icon name="wrench" size={14} style={{ marginRight: 6 }} />
+          Maintenance Tasks ({workOrders.length})
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'sensors'}
           className={`tab-btn ${activeTab === 'sensors' ? 'tab-btn-active' : ''}`}
           onClick={() => setActiveTab('sensors')}
         >
+          <Icon name="activity" size={14} style={{ marginRight: 6 }} />
           Sensor Channels ({signals.length})
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'notes'}
           className={`tab-btn ${activeTab === 'notes' ? 'tab-btn-active' : ''}`}
           onClick={() => setActiveTab('notes')}
         >
-          Field Notes & History ({notes.length})
+          <Icon name="edit" size={14} style={{ marginRight: 6 }} />
+          Field Notes ({notes.length})
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === 'datasets'}
           className={`tab-btn ${activeTab === 'datasets' ? 'tab-btn-active' : ''}`}
           onClick={() => setActiveTab('datasets')}
         >
+          <Icon name="database" size={14} style={{ marginRight: 6 }} />
           Uploaded Datasets ({machineDatasets.length})
         </button>
       </div>
 
       {/* ================= TAB 1: Kinematics & Lubrication ================= */}
       {activeTab === 'kinematics' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div id="kinematics-section" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Kinematic Stages Breakdown */}
           <Card
             title={`Multi-Stage Reduction Architecture (${machine.arrangement || 'Helical-Planetary'})`}
             subtitle="Mechanical stage ratios, mesh parameters, and kinematic transmission stages"
+            className="kinematics-stages-card"
           >
-            <div className="stage-diagram-row">
+            {stages.length === 0 && (
+              <div style={{
+                padding: '16px 20px',
+                background: '#f8fafc',
+                borderRadius: 8,
+                border: '1px solid var(--border-subtle)',
+                marginBottom: 16
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-secondary)', fontWeight: 600, fontSize: 13 }}>
+                  <Icon name="info" size={16} color="#0f766e" />
+                  <span>Direct Synchronous Drive Architecture</span>
+                </div>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  This equipment profile does not configure discrete intermediate gear stages. Drive kinetics follow nominal specifications: overall ratio {machine.gearRatio || '1:1'}, rated speed {machine.ratedSpeedRpm || 1780} RPM, rated load {machine.ratedTorqueNm || 480} Nm.
+                </p>
+              </div>
+            )}
+
+            <div className="stages-diagram-grid">
               {stages.map((stg) => (
                 <div key={stg.stage} className="stage-diagram-card">
-                  <div className="stage-header">
-                    <span className="stage-index">Stage {stg.stage}</span>
-                    <span className="stage-kind">{stg.type}</span>
-                  </div>
-                  <div className="stage-ratio-box">
-                    <span className="ratio-label">Ratio:</span>
-                    <span className="ratio-value">{stg.ratio}</span>
-                  </div>
-                  {stg.teethPinion && (
-                    <div style={{ fontSize: 11, color: '#94a3b8', margin: '4px 0' }}>
-                      Pinion / Gear Teeth: <strong>{stg.teethPinion}T / {stg.teethGear}T</strong>
+                  {/* Distinct stage label & title */}
+                  <div className="stage-card-header">
+                    <div className="stage-badge-pill">
+                      <span className="stage-badge-indicator" />
+                      STAGE {stg.stage}
                     </div>
-                  )}
-                  <div className="stage-condition-badge">
-                    <span>{stg.conditionNotes || stg.condition || 'Nominal Condition'}</span>
+                    <h3 className="stage-name-heading">{stg.type || `Reduction Stage ${stg.stage}`}</h3>
+                  </div>
+
+                  {/* Stage Ratio Field */}
+                  <div className="stage-field-group">
+                    <div className="stage-ratio-metric">
+                      <span className="stage-field-label">Stage Ratio</span>
+                      <span className="stage-ratio-value">{stg.ratio}</span>
+                    </div>
+                  </div>
+
+                  {/* Gear Teeth Specs */}
+                  {stg.teethPinion ? (
+                    <div className="stage-teeth-row">
+                      <span className="stage-teeth-label">Pinion / Gear Teeth:</span>
+                      <span className="stage-teeth-value mono-code">
+                        {stg.teethPinion}T Pinion · {stg.teethGear}T Wheel
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {/* Condition Notes */}
+                  <div className="stage-condition-row">
+                    <span className="stage-field-label">Operating Condition</span>
+                    <div className="stage-condition-chip">
+                      <span className="stage-condition-dot" />
+                      <span>{stg.conditionNotes || stg.condition || 'Nominal Condition'}</span>
+                    </div>
                   </div>
                 </div>
               ))}
 
+              {/* Cumulative Kinematics (Total) */}
               <div className="stage-diagram-card overall-ratio-card">
-                <div className="stage-header">
-                  <span className="stage-index">Total</span>
-                  <span className="stage-kind">Cumulative Kinematics</span>
+                <div className="stage-card-header">
+                  <div className="stage-badge-pill total-badge-pill">
+                    <Icon name="activity" size={12} style={{ marginRight: 4 }} />
+                    TOTAL
+                  </div>
+                  <h3 className="stage-name-heading total-heading">Cumulative Kinematics</h3>
                 </div>
-                <div className="stage-ratio-box">
-                  <span className="ratio-label">Overall Ratio</span>
-                  <span className="ratio-value">{machine.gearRatio || '14.2:1'}</span>
+
+                <div className="stage-field-group">
+                  <div className="stage-ratio-metric total-ratio-metric">
+                    <span className="stage-field-label">Overall Ratio</span>
+                    <span className="stage-ratio-value total-ratio-value">{machine.gearRatio || '14.2:1'}</span>
+                  </div>
                 </div>
-                <div className="stage-condition-badge">
-                  <span>Rated: {machine.ratedSpeedRpm || 1780} RPM @ {machine.ratedTorqueNm || 480} Nm</span>
+
+                <div className="stage-rated-grid">
+                  <div className="stage-rated-item">
+                    <span className="stage-field-label">Rated Speed</span>
+                    <span className="stage-rated-value mono-code">{machine.ratedSpeedRpm || 1780} RPM</span>
+                  </div>
+                  <div className="stage-rated-item">
+                    <span className="stage-field-label">Rated Torque</span>
+                    <span className="stage-rated-value mono-code">{machine.ratedTorqueNm || 480} Nm</span>
+                  </div>
+                </div>
+
+                <div className="stage-condition-row">
+                  <span className="stage-field-label">Kinematic Integrity</span>
+                  <div className="stage-condition-chip total-chip">
+                    <span className="stage-condition-dot total-dot" />
+                    <span>Synchronous Drive · Continuous Mesh</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -583,9 +1143,9 @@ export default function MachineDetailPage() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Position</th>
-                        <th>Type</th>
-                        <th>Model</th>
+                        <th scope="col">Position</th>
+                        <th scope="col">Bearing Type</th>
+                        <th scope="col">Model Specification</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -639,16 +1199,17 @@ export default function MachineDetailPage() {
                 assignedTechs.map((t) => (
                   <div key={t._id || t} style={{
                     backgroundColor: '#ffffff',
-                    border: '1px solid var(--border-subtle)',
+                    border: '1px solid rgba(15, 118, 110, 0.18)',
                     borderRadius: 8,
-                    padding: '10px 14px',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                    padding: '12px 16px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    minWidth: 220
                   }}>
                     <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Icon name="user" size={13} color="var(--primary)" /> {t.fullName || t.name || 'Technician'}
+                      <Icon name="user" size={14} color="#0f766e" /> {t.fullName || t.name || 'Technician'}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
-                      {t.email} • {t.role?.toUpperCase()}
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>
+                      {t.email} • <span className="badge badge-site" style={{ padding: '1px 6px', fontSize: 10 }}>{t.role?.toUpperCase()}</span>
                     </div>
                   </div>
                 ))
@@ -660,15 +1221,372 @@ export default function MachineDetailPage() {
         </div>
       )}
 
+      {/* ================= TAB: Faults & Attack Scenarios ================= */}
+      {activeTab === 'scenarios' && (
+        <div className="scenarios-container">
+          {/* Header Summary Card */}
+          <div className="scenarios-summary-card">
+            <div className="scenarios-summary-text">
+              <h2 className="scenarios-summary-title">
+                <Icon name="shield" size={18} color="#0f766e" />
+                Fault & Attack Defense Matrix
+              </h2>
+              <p className="scenarios-summary-desc">
+                Data-driven correlation of live machine transducer signals, physical failure modes, and controlled synthetic attack perturbations. Grounded strictly in authorized factory records, model inference outputs, and simulator sessions.
+              </p>
+            </div>
+            <div className="scenarios-metrics-pills">
+              <div className="scenario-metric-badge">
+                <span className="scenario-metric-label">Total Scenarios</span>
+                <span className="scenario-metric-val">{scenariosWithData.length}</span>
+              </div>
+              <div className="scenario-metric-badge">
+                <span className="scenario-metric-label">Active Alerts</span>
+                <span className="scenario-metric-val" style={{ color: activeScenariosCount > 0 ? '#b45309' : '#059669' }}>
+                  {activeScenariosCount}
+                </span>
+              </div>
+              <div className="scenario-metric-badge">
+                <span className="scenario-metric-label">Simulated Tests</span>
+                <span className="scenario-metric-val" style={{ color: '#6d28d9' }}>
+                  {simulatedRecordedCount}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Clean Baseline Empty State (When 0 active alerts & 0 attack runs exist) */}
+          {activeScenariosCount === 0 && simulatedRecordedCount === 0 && (
+            <div className="scenario-empty-banner">
+              <div>
+                <h3 className="scenario-empty-title">
+                  <Icon name="check" size={18} color="#059669" />
+                  Nominal Baseline — No Active Faults or Attack Telemetry Recorded
+                </h3>
+                <p className="scenario-empty-desc">
+                  Equipment <strong>{machine.code}</strong> is currently operating within nominal baseline limits with zero active alert intervals or synthetic fault tests in the plant ledger. You can launch a controlled scenario in the simulator or upload a new telemetry dataset to evaluate pipeline detection.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => navigate(`${ROUTES.SIMULATOR}?machine=${machine.code}`)}
+                >
+                  <Icon name="activity" size={13} style={{ marginRight: 6 }} />
+                  Run Simulator Attack Scenario
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`${ROUTES.DATASETS_UPLOAD}?machineId=${machine._id || machineId}`)}
+                >
+                  <Icon name="upload" size={13} style={{ marginRight: 6 }} />
+                  Upload Telemetry Dataset
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Filter Bar */}
+          <div className="scenarios-filter-bar">
+            <div className="scenarios-filter-chips">
+              <button
+                type="button"
+                className={`scenario-filter-chip ${scenarioFilter === 'all' ? 'scenario-filter-chip-active' : ''}`}
+                onClick={() => setScenarioFilter('all')}
+              >
+                All Scenarios ({scenariosWithData.length})
+              </button>
+              <button
+                type="button"
+                className={`scenario-filter-chip ${scenarioFilter === 'physical' ? 'scenario-filter-chip-active' : ''}`}
+                onClick={() => setScenarioFilter('physical')}
+              >
+                Physical Faults ({scenariosWithData.filter((s) => s.category === 'physical').length})
+              </button>
+              <button
+                type="button"
+                className={`scenario-filter-chip ${scenarioFilter === 'simulated' ? 'scenario-filter-chip-active' : ''}`}
+                onClick={() => setScenarioFilter('simulated')}
+              >
+                Simulated & Attack Tests ({scenariosWithData.filter((s) => s.category === 'simulated').length})
+              </button>
+              <button
+                type="button"
+                className={`scenario-filter-chip ${scenarioFilter === 'active' ? 'scenario-filter-chip-active' : ''}`}
+                onClick={() => setScenarioFilter('active')}
+              >
+                Active Detections Only ({activeScenariosCount})
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Showing {filteredScenarios.length} of {scenariosWithData.length} scenarios
+            </div>
+          </div>
+
+          {/* Empty Filter State */}
+          {filteredScenarios.length === 0 && (
+            <Card>
+              <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                <Icon name="filter" size={24} color="#64748b" style={{ marginBottom: 8 }} />
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                  No scenarios matching filter "{scenarioFilter}"
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 12px' }}>
+                  There are no scenarios currently matching this filter criteria for {machine.code}.
+                </p>
+                <Button size="sm" variant="secondary" onClick={() => setScenarioFilter('all')}>
+                  Reset Filter
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* Scenarios Grid */}
+          <div className="scenarios-grid">
+            {filteredScenarios.map((sc) => {
+              const isSim = sc.category === 'simulated';
+              const hasAlert = Boolean(sc.matchedAlert);
+              const alert = sc.matchedAlert;
+              const run = sc.matchedRun;
+              const ds = sc.matchedDataset;
+
+              return (
+                <div
+                  key={sc.id}
+                  className={`scenario-card ${isSim ? 'scenario-simulated' : ''} ${
+                    hasAlert && alert.severity === ALERT_SEVERITIES.CRITICAL
+                      ? 'scenario-critical-alert'
+                      : hasAlert
+                      ? 'scenario-active-alert'
+                      : ''
+                  }`}
+                >
+                  {/* Card Header */}
+                  <div className="scenario-card-header">
+                    <div className="scenario-title-area">
+                      <div className="scenario-category-row">
+                        {isSim ? (
+                          <span className="scenario-badge-simulated">
+                            <Icon name="activity" size={10} />
+                            {sc.attackType}
+                          </span>
+                        ) : (
+                          <span className="scenario-badge-physical">
+                            <Icon name="cpu" size={10} />
+                            PHYSICAL MACHINE FAULT
+                          </span>
+                        )}
+                        <span className={`badge ${sc.badgeClass}`}>
+                          {sc.stateLabel}
+                        </span>
+                      </div>
+                      <h3 className="scenario-name">{sc.name}</h3>
+                      <p className="scenario-subtitle">{sc.subtitle}</p>
+                    </div>
+
+                    <StatusBadge
+                      status={
+                        hasAlert
+                          ? alert.severity === ALERT_SEVERITIES.CRITICAL
+                            ? 'critical'
+                            : 'warning'
+                          : isSim && sc.hasRecordedData
+                          ? 'demo'
+                          : 'healthy'
+                      }
+                      label={
+                        hasAlert
+                          ? alert.severity.toUpperCase()
+                          : isSim && sc.hasRecordedData
+                          ? 'SIMULATED'
+                          : 'NOMINAL'
+                      }
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <p className="scenario-desc">{sc.description}</p>
+
+                  {/* Technical Specifications */}
+                  <div className="scenario-meta-table">
+                    <div className="scenario-meta-row">
+                      <span className="scenario-meta-key">Target Component:</span>
+                      <span className="scenario-meta-val">{sc.targetComponent}</span>
+                    </div>
+                    <div className="scenario-meta-row">
+                      <span className="scenario-meta-key">Detection Benchmark:</span>
+                      <span className="scenario-meta-val">{sc.supportedBy}</span>
+                    </div>
+                    <div className="scenario-meta-row">
+                      <span className="scenario-meta-key">Nominal Baseline Criteria:</span>
+                      <span className="scenario-meta-val mono-code" style={{ fontSize: '0.7rem' }}>
+                        {sc.nominalCriteria}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 4 }}>
+                      <span className="scenario-meta-key">Monitored Transducer Signals:</span>
+                      <div className="scenario-signals-pills">
+                        {sc.signals.map((sig) => (
+                          <span key={sig} className="scenario-signal-pill mono-code">
+                            {sig}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grounded Evidence Box (Real Data Only!) */}
+                  {hasAlert ? (
+                    <div
+                      className={`scenario-evidence-box ${
+                        alert.severity === ALERT_SEVERITIES.CRITICAL ? 'evidence-critical' : 'evidence-alert'
+                      }`}
+                    >
+                      <div className="scenario-evidence-header">
+                        <span>
+                          <Icon name="alert" size={11} style={{ marginRight: 4 }} />
+                          {alert.isSimulatorDerived ? 'Simulated Alert Evidence' : 'Live Physical Evidence'}
+                        </span>
+                        <span className="mono-code">
+                          {new Date(alert.createdAt).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                          })}{' '}
+                          {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+
+                      <div className="scenario-evidence-content">
+                        <strong>Alert:</strong> {alert.title}
+                        {alert.fusionRationale && <div><em>Rationale:</em> {alert.fusionRationale}</div>}
+                      </div>
+
+                      {alert.contributingSignals && alert.contributingSignals.length > 0 && (
+                        <div className="scenario-evidence-metric-row">
+                          {alert.contributingSignals.slice(0, 3).map((cs, idx) => (
+                            <div key={idx} className="scenario-evidence-metric">
+                              <span className="scenario-evidence-metric-key">{cs.signal}</span>
+                              <span className="scenario-evidence-metric-val">
+                                {cs.peakValue ? Number(cs.peakValue).toFixed(2) : '—'} {cs.unit || ''}{' '}
+                                {cs.deviationRatio ? `(+${Math.round((cs.deviationRatio - 1) * 100)}%)` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {alert.scores?.peakScore !== undefined && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', gap: 12 }}>
+                          <span>Peak Anomaly Score: <strong className="mono-code">{Number(alert.scores.peakScore).toFixed(3)}</strong></span>
+                          <span>Threshold: <span className="mono-code">{Number(alert.scores.calibratedThreshold || 0.65).toFixed(3)}</span></span>
+                        </div>
+                      )}
+                    </div>
+                  ) : run ? (
+                    <div className="scenario-evidence-box">
+                      <div className="scenario-evidence-header">
+                        <span>
+                          <Icon name="analysis" size={11} style={{ marginRight: 4 }} />
+                          Linked Analysis Run
+                        </span>
+                        <span className="mono-code">
+                          {new Date(run.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                      <div className="scenario-evidence-content">
+                        <strong>Model:</strong> {run.modelName} ({run.modelType})
+                        <div>Anomalous Windows: <strong className="mono-code">{run.summary?.anomalousWindowsCount || 0}</strong></div>
+                      </div>
+                    </div>
+                  ) : ds ? (
+                    <div className="scenario-evidence-box">
+                      <div className="scenario-evidence-header">
+                        <span>
+                          <Icon name="database" size={11} style={{ marginRight: 4 }} />
+                          Simulated Telemetry Run Recorded
+                        </span>
+                        <span className="mono-code">
+                          {new Date(ds.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                      <div className="scenario-evidence-content">
+                        <strong>Dataset:</strong> {ds.title}
+                        <div>Samples: <span className="mono-code">{ds.totalRows?.toLocaleString()} rows</span></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="scenario-evidence-box">
+                      <div className="scenario-evidence-header">
+                        <span>
+                          <Icon name="check" size={11} style={{ marginRight: 4, color: '#059669' }} />
+                          {isSim ? 'Simulation State' : 'Operational Condition'}
+                        </span>
+                        <span style={{ color: '#059669', fontWeight: 600 }}>Nominal</span>
+                      </div>
+                      <div className="scenario-evidence-content" style={{ color: 'var(--text-secondary)' }}>
+                        {isSim
+                          ? 'Scenario ready for non-destructive evaluation in Dyno Simulator Studio.'
+                          : 'No active anomalous intervals detected. Live physical telemetry adheres to nominal baseline.'}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card Action Footer */}
+                  <div className="scenario-card-actions">
+                    {isSim ? (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => navigate(`${ROUTES.SIMULATOR}?machine=${machine.code}&fault=${sc.simKey}`)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        <Icon name="activity" size={12} />
+                        <span>Launch in Simulator →</span>
+                      </Button>
+                    ) : (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        Physical Machine Specimen: <strong className="mono-code">{machine.code}</strong>
+                      </div>
+                    )}
+
+                    {hasAlert ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => navigate(`${ROUTES.ALERTS}?machineId=${machine._id || machineId}`)}
+                      >
+                        View Alert Record →
+                      </Button>
+                    ) : run ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => navigate(ROUTES.ANALYSIS)}
+                      >
+                        View Analysis →
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ================= TAB 2: Maintenance Work Orders ================= */}
       {activeTab === 'workorders' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                 Machine Work Order & Task Ledger
               </h2>
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '2px 0 0' }}>
                 Server-audited task assignment lifecycle: Open → Accepted → In Progress → Completed → Reviewed.
               </p>
             </div>
@@ -778,30 +1696,30 @@ export default function MachineDetailPage() {
                     </div>
                   }
                 >
-                  <p style={{ color: '#cbd5e1', fontSize: 13, margin: '0 0 10px', lineHeight: 1.5 }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 10px', lineHeight: 1.5 }}>
                     {order.description}
                   </p>
 
                   {/* Technician Feedback if completed */}
                   {order.technicianFeedback && (order.technicianFeedback.findings || order.technicianFeedback.workPerformed) && (
                     <div style={{
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid var(--border-subtle)',
+                      backgroundColor: '#f0fdf8',
+                      border: '1px solid rgba(15, 118, 110, 0.2)',
                       borderRadius: 6,
                       padding: '10px 14px',
                       marginBottom: 10,
                       gap: 6
                     }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Icon name="edit" size={13} color="var(--primary)" /> Technician Field Report:
+                      <div style={{ fontWeight: 700, fontSize: 12, color: '#0f766e', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="edit" size={13} color="#0f766e" /> Technician Field Report:
                       </div>
                       {order.technicianFeedback.findings && (
-                        <div style={{ fontSize: 12, color: '#334155' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
                           <strong>Inspection Findings:</strong> {order.technicianFeedback.findings}
                         </div>
                       )}
                       {order.technicianFeedback.workPerformed && (
-                        <div style={{ fontSize: 12, color: '#334155' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>
                           <strong>Work Performed:</strong> {order.technicianFeedback.workPerformed}
                         </div>
                       )}
@@ -830,12 +1748,12 @@ export default function MachineDetailPage() {
 
                   {/* Audit Trail Timeline */}
                   <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
-                    <span style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Audit History:</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Audit History:</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
                       {(order.statusHistory || []).map((h, i) => (
-                        <div key={i} style={{ fontSize: 11, color: '#64748b' }}>
+                        <div key={i} style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           • {new Date(h.timestamp).toLocaleTimeString()} ({new Date(h.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}):{' '}
-                          <strong style={{ color: '#f8fafc' }}>{h.status?.toUpperCase()}</strong> by {h.changedByName} ({h.changedByRole})
+                          <strong style={{ color: 'var(--text-primary)' }}>{h.status?.toUpperCase()}</strong> by {h.changedByName} ({h.changedByRole})
                           {h.note && ` — "${h.note}"`}
                         </div>
                       ))}
@@ -1069,9 +1987,10 @@ export default function MachineDetailPage() {
                           href={`${API_BASE}/datasets/${ds._id}/download`}
                           download
                           className="btn btn-secondary btn-sm"
-                          style={{ textDecoration: 'none' }}
+                          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                         >
-                          ⬇ CSV
+                          <Icon name="download" size={12} />
+                          <span>Download CSV</span>
                         </a>
                       </td>
                     </tr>
@@ -1262,7 +2181,7 @@ export default function MachineDetailPage() {
               </button>
             </div>
 
-            <p style={{ fontSize: 13, color: '#94a3b8', margin: '0 0 12px' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
               Final review for <strong>{showReviewOrderModal.orderNumber}</strong> ({showReviewOrderModal.title}). Review technician findings and close out work order.
             </p>
 
@@ -1306,7 +2225,7 @@ export default function MachineDetailPage() {
               </button>
             </div>
 
-            <p style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.5, margin: '0 0 12px' }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 12px' }}>
               Are you sure you want to soft-decommission <strong>{machineId} ({machine.name})</strong>?
               Historical telemetry and notes will remain intact, but this machine will be unavailable for new operational datasets or work orders.
             </p>

@@ -9,6 +9,7 @@ import { startAnalysisRunJob, runResearchEvaluationCli } from '../services/mlJob
 import {
   ANALYSIS_RUN_STATUS,
   MODEL_STATUS,
+  MODEL_TYPES,
   DATASET_STATUS,
   USER_ROLES
 } from '@predictive-maintenance/shared';
@@ -38,6 +39,13 @@ router.param('runId', (req, res, next, runId) => {
  */
 router.post('/', async (req, res) => {
   try {
+    if (req.user.role === USER_ROLES.VIEWER) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Viewer accounts have read-only access and cannot initiate analysis runs.'
+      });
+    }
+
     const userFactoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
     const {
       datasetId,
@@ -166,6 +174,19 @@ router.post('/', async (req, res) => {
       });
     }
 
+    if (
+      (modelComponent.includes('bearing') || model.targetDomain === 'bearing_faults') &&
+      machineType === 'gearbox' &&
+      !dataset.title?.toLowerCase().includes('bearing') &&
+      dataset.referenceDetails?.machineType !== 'bearing' &&
+      !dataset.componentType?.includes('bearing')
+    ) {
+      return res.status(400).json({
+        error: 'IncompatibleMachineError',
+        message: `Incompatible machine profile: Model "${model.name}" is specialized for isolated bearing fault test-benches, but selected machine "${machine.name} (${machine.code})" is an industrial gearbox. Please select a calibrated gearbox model or specify a dedicated bearing monitoring dataset.`
+      });
+    }
+
     const datasetCols = dataset.columns || dataset.columnMappings || [];
     const mappedSignalNames = datasetCols
       .filter((c) => c.mappedSignal && c.mappedSignal !== 'timestamp' && c.mappedSignal !== 'label')
@@ -176,6 +197,22 @@ router.post('/', async (req, res) => {
         error: 'IncompatibleDatasetError',
         message: `Dataset "${dataset.title}" has no mapped sensor signal channels. Cannot run analysis.`
       });
+    }
+
+    // Require ground-truth fault labels for supervised classification models
+    if (model.modelType === MODEL_TYPES.RANDOM_FOREST) {
+      const hasLabelCol = datasetCols.some(
+        (c) => c.isLabel || /^(label|fault_class|defect_class|defect|class)$/i.test(c.rawHeader || c.name || '')
+      );
+      const hasLabelDistribution = dataset.labelDistribution && (
+        dataset.labelDistribution instanceof Map ? dataset.labelDistribution.size > 1 : Object.keys(dataset.labelDistribution).length > 1
+      );
+      if (!hasLabelCol && !hasLabelDistribution) {
+        return res.status(400).json({
+          error: 'IncompatibleDatasetError',
+          message: `Incompatible dataset: Random Forest classifier "${model.name}" requires ground-truth fault classification labels, but dataset "${dataset.title}" contains unlabelled continuous telemetry. Please select an anomaly detection model (e.g. Isolation Forest) or map a valid fault label column.`
+        });
+      }
     }
 
     if (model.featureNames && model.featureNames.length > 0) {
@@ -223,6 +260,7 @@ router.post('/', async (req, res) => {
       targetDomain: model.targetDomain,
       componentType: machine.componentType || model.componentType || 'gearbox',
       mappedSignals: mappedSignalNames,
+      isSimulatorDerived: Boolean(dataset.isSimulatorDerived || dataset.isDemoData),
       configuration: {
         windowSize: configuration.windowSize || 256,
         overlapRatio: configuration.overlapRatio || 0.5,

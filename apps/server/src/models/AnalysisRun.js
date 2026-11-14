@@ -77,6 +77,11 @@ const analysisRunSchema = new mongoose.Schema(
         type: String
       }
     ],
+    isSimulatorDerived: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
     configuration: {
       windowSize: { type: Number, default: 256 },
       overlapRatio: { type: Number, default: 0.5 },

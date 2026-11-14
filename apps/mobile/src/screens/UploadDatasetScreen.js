@@ -21,8 +21,7 @@ import {
   DATASET_STATUS,
   AI_TASK_TYPES
 } from '@predictive-maintenance/shared';
-
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5001/api';
+import { API_BASE } from '../services/apiConfig.js';
 
 export default function UploadDatasetScreen() {
   const { sessionToken } = useAuth();

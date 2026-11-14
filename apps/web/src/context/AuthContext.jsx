@@ -8,28 +8,58 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [dbOffline, setDbOffline] = useState(false);
+  const [apiOffline, setApiOffline] = useState(false);
+  const [systemNotice, setSystemNotice] = useState(null);
 
-  // Check current session on mount via GET /api/auth/me (using HttpOnly cookie)
+  // Check current session on mount via GET /api/auth/me (using HttpOnly cookie) with fail-fast timeout
   const checkCurrentSession = useCallback(async () => {
     setLoading(true);
     setAuthError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
     try {
       const url = `${API_BASE}/auth/me`;
       const res = await fetch(url, {
         method: 'GET',
         credentials: 'include',
-        headers: { Accept: 'application/json' }
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
       });
 
-      if (res.ok) {
+      if (res.status === 503) {
+        // Database offline on server
+        const data = await res.json().catch(() => ({}));
+        setDbOffline(true);
+        setApiOffline(false);
+        setSystemNotice(
+          data.message ||
+            'MongoDB is offline or unreachable. Please start MongoDB using `brew services start mongodb-community@8.0` or `docker compose up -d`.'
+        );
+        setUser(null);
+      } else if (res.ok) {
         const data = await res.json();
         setUser(data.user);
+        setDbOffline(false);
+        setApiOffline(false);
+        setSystemNotice(null);
       } else {
         setUser(null);
+        setDbOffline(false);
+        setApiOffline(false);
       }
-    } catch {
+    } catch (err) {
       setUser(null);
+      if (err.name === 'AbortError') {
+        setApiOffline(true);
+        setSystemNotice('Session check timed out (3.5s). The backend API server may be offline or unresponsive.');
+      } else {
+        setApiOffline(true);
+        setSystemNotice('Cannot connect to MechGuard AI backend API server. Verify port 5001 is running.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, []);
@@ -42,6 +72,9 @@ export function AuthProvider({ children }) {
   const login = async (emailOrUsername, password, expectedRole = null) => {
     setLoading(true);
     setAuthError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
     try {
       const url = `${API_BASE}/auth/login`;
       const res = await fetch(url, {
@@ -51,16 +84,32 @@ export function AuthProvider({ children }) {
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
-        body: JSON.stringify({ emailOrUsername, password })
+        body: JSON.stringify({ emailOrUsername, password }),
+        signal: controller.signal
       });
 
-      const data = await res.json();
+      if (res.status === 503) {
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          data.message ||
+          'MongoDB is offline or unreachable. Please start MongoDB (`brew services start mongodb-community@8.0` or `docker compose up -d`).';
+        setDbOffline(true);
+        setAuthError(msg);
+        setSystemNotice(msg);
+        return { success: false, message: msg, code: 'DATABASE_UNAVAILABLE' };
+      }
+
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         const msg = data.message || 'Login failed. Please check your credentials.';
         setAuthError(msg);
         return { success: false, message: msg };
       }
+
+      setDbOffline(false);
+      setApiOffline(false);
+      setSystemNotice(null);
 
       // Role boundary check: Ensure server-verified role matches expected sign-in context
       if (expectedRole) {
@@ -188,6 +237,10 @@ export function AuthProvider({ children }) {
         user,
         loading,
         authError,
+        dbOffline,
+        apiOffline,
+        systemNotice,
+        clearNotice: () => setSystemNotice(null),
         isAuthenticated: !!user,
         login,
         logout,

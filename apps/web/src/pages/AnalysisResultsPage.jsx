@@ -37,14 +37,22 @@ function AnalysisReportUXPilot({ selectedRun, user, navigate }) {
     : '19 May 2025';
   const executedBy = selectedRun.createdByName || user?.fullName || 'Priya Raman';
 
-  // Classifier probabilities
-  const faultProb = selectedRun.classificationSummary?.faultProbability ?? 0.64;
-  const classProbabilities = [
-    { label: 'Gear tooth wear', value: faultProb, color: 'var(--primary)', isHighlight: true },
-    { label: 'Shaft misalignment', value: 0.19, color: '#64748b' },
-    { label: 'Normal', value: 0.14, color: '#10b981' },
-    { label: 'Lubrication loss', value: 0.03, color: '#94a3b8' }
-  ];
+  // Model Type & Scope Verification
+  const isSupervised = selectedRun.modelType === MODEL_TYPES.RANDOM_FOREST;
+  const hasClassificationSummary = Boolean(selectedRun.classificationSummary && isSupervised);
+
+  // Classifier probabilities (only when supervised classification was executed)
+  const faultProb = hasClassificationSummary
+    ? selectedRun.classificationSummary?.faultProbability ?? 0.64
+    : null;
+  const classProbabilities = hasClassificationSummary
+    ? [
+        { label: 'Gear tooth wear', value: faultProb, color: 'var(--primary)', isHighlight: true },
+        { label: 'Shaft misalignment', value: 0.19, color: '#64748b' },
+        { label: 'Normal', value: 0.14, color: '#10b981' },
+        { label: 'Lubrication loss', value: 0.03, color: '#94a3b8' }
+      ]
+    : [];
 
   // TreeSHAP Feature Attributions
   const shapFeatures = [
@@ -139,85 +147,153 @@ function AnalysisReportUXPilot({ selectedRun, user, navigate }) {
 
       {/* 3. Two-Column Layout: RF Classification vs IF Anomaly */}
       <div className="report-two-col-grid">
-        {/* Left Column: Fault classification */}
+        {/* Left Column: Fault classification or Baseline Profiling */}
         <div className="report-panel-card">
-          <div className="panel-header">
-            <div className="panel-title-group">
-              <h3 className="panel-title">Fault classification</h3>
-              <span className="panel-badge-pill">Random Forest · supervised · labelled simulator classes</span>
-            </div>
-          </div>
-
-          <div>
-            <div className="prediction-headline">
-              <span className="headline-label">Most likely class across telemetry run (mean of {totalWindows} analysis windows)</span>
-              <div className="headline-result">
-                <span className="headline-class">Gear tooth wear</span>
-                <span className="headline-prob">p = 0.64</span>
+          {hasClassificationSummary ? (
+            <>
+              <div className="panel-header">
+                <div className="panel-title-group">
+                  <h3 className="panel-title">Fault classification</h3>
+                  <span className="panel-badge-pill">Random Forest · supervised · labelled simulator classes</span>
+                </div>
               </div>
-            </div>
 
-            <div className="probability-breakdown-list">
-              {classProbabilities.map((cls) => (
-                <div key={cls.label} className="prob-row">
-                  <div className="prob-meta">
-                    <span className="prob-name" style={{ fontWeight: cls.isHighlight ? 700 : 500 }}>{cls.label}</span>
-                    <span className="prob-val">{cls.value.toFixed(2)}</span>
-                  </div>
-                  <div className="prob-track">
-                    <div
-                      className="prob-fill"
-                      style={{ width: `${cls.value * 100}%`, backgroundColor: cls.color }}
-                    />
+              <div>
+                <div className="prediction-headline">
+                  <span className="headline-label">Most likely class across telemetry run (mean of {totalWindows} analysis windows)</span>
+                  <div className="headline-result">
+                    <span className="headline-class">Gear tooth wear</span>
+                    <span className="headline-prob">p = {faultProb ? faultProb.toFixed(2) : '0.64'}</span>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="report-eval-callout">
-              <strong>Documented evaluation:</strong> SEU DDS Gearbox specimen evaluation (v1.0.0): macro F1 1.00 on held-out test windows (n = 3, stratified split). Single-run telemetry analysis: 81 windows. Not evaluated on field gearboxes — treat as indicative for this machine.
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-              <h4 className="section-title-sm">Why the classifier chose tooth wear</h4>
-              <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>SHAP · TreeExplainer</span>
-            </div>
-            <p className="section-caption">
-              Bars show each feature's contribution to the "Gear tooth wear" probability, relative to the model's average output (0.27). SHAP explains the output; it does not make a prediction.
-            </p>
-
-            <div className="shap-diverging-chart">
-              {shapFeatures.map((feat) => {
-                const maxRange = 0.25;
-                const isPos = feat.attribution >= 0;
-                const barWidthPct = Math.min(100, (Math.abs(feat.attribution) / maxRange) * 100);
-                return (
-                  <div key={feat.name} className="shap-bar-row">
-                    <span className="shap-feat-name" title={feat.name}>{feat.name}</span>
-                    <div className="shap-axis-container">
-                      <div className="shap-zero-line" />
-                      {isPos ? (
+                <div className="probability-breakdown-list">
+                  {classProbabilities.map((cls) => (
+                    <div key={cls.label} className="prob-row">
+                      <div className="prob-meta">
+                        <span className="prob-name" style={{ fontWeight: cls.isHighlight ? 700 : 500 }}>{cls.label}</span>
+                        <span className="prob-val">{cls.value.toFixed(2)}</span>
+                      </div>
+                      <div className="prob-track">
                         <div
-                          className="shap-bar-pos"
-                          style={{ width: `${barWidthPct / 2}%`, left: '50%' }}
+                          className="prob-fill"
+                          style={{ width: `${cls.value * 100}%`, backgroundColor: cls.color }}
                         />
-                      ) : (
-                        <div
-                          className="shap-bar-neg"
-                          style={{ width: `${barWidthPct / 2}%`, right: '50%' }}
-                        />
-                      )}
+                      </div>
                     </div>
-                    <span className="shap-feat-val" style={{ color: isPos ? 'var(--primary)' : '#64748b' }}>
-                      {isPos ? `+${feat.attribution.toFixed(2)}` : feat.attribution.toFixed(2)}
+                  ))}
+                </div>
+
+                <div className="report-eval-callout">
+                  <strong>Documented evaluation:</strong> SEU DDS Gearbox specimen evaluation (v1.0.0): macro F1 1.00 on held-out test windows (n = 3, stratified split). Single-run telemetry analysis: 81 windows. Not evaluated on field gearboxes — treat as indicative for this machine.
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <h4 className="section-title-sm">Why the classifier chose tooth wear</h4>
+                  <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>SHAP · TreeExplainer</span>
+                </div>
+                <p className="section-caption">
+                  Bars show each feature's contribution to the "Gear tooth wear" probability, relative to the model's average output (0.27). SHAP explains the output; it does not make a prediction.
+                </p>
+
+                <div className="shap-diverging-chart">
+                  {shapFeatures.map((feat) => {
+                    const maxRange = 0.25;
+                    const isPos = feat.attribution >= 0;
+                    const barWidthPct = Math.min(100, (Math.abs(feat.attribution) / maxRange) * 100);
+                    return (
+                      <div key={feat.name} className="shap-bar-row">
+                        <span className="shap-feat-name" title={feat.name}>{feat.name}</span>
+                        <div className="shap-axis-container">
+                          <div className="shap-zero-line" />
+                          {isPos ? (
+                            <div
+                              className="shap-bar-pos"
+                              style={{ width: `${barWidthPct / 2}%`, left: '50%' }}
+                            />
+                          ) : (
+                            <div
+                              className="shap-bar-neg"
+                              style={{ width: `${barWidthPct / 2}%`, right: '50%' }}
+                            />
+                          )}
+                        </div>
+                        <span className="shap-feat-val" style={{ color: isPos ? 'var(--primary)' : '#64748b' }}>
+                          {isPos ? `+${feat.attribution.toFixed(2)}` : feat.attribution.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="panel-header">
+                <div className="panel-title-group">
+                  <h3 className="panel-title">Model Scope & Baseline Profiling</h3>
+                  <span className="panel-badge-pill">Isolation Forest · unsupervised baseline</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="prediction-headline" style={{ background: 'var(--surface-sunken, #f8fafc)', borderLeft: '4px solid var(--primary)', padding: '0.85rem' }}>
+                  <span className="headline-label">Statistical Anomaly Surveillance (No Supervised Classifier Active)</span>
+                  <div className="headline-result" style={{ marginTop: '0.4rem' }}>
+                    <span className="headline-class" style={{ fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                      {anomalousWindows > 0 ? `${anomalousWindows} Statistical Deviation Window(s)` : 'Nominal Telemetry Profile'}
+                    </span>
+                    <span className="headline-prob" style={{ fontSize: '0.85rem', color: anomalousWindows > 0 ? '#b45309' : '#16a34a' }}>
+                      {totalWindows > 0 ? `${((anomalousWindows / totalWindows) * 100).toFixed(1)}% anomalous` : 'Nominal'}
                     </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                    Isolation Forest evaluates continuous multidimensional departure from calibrated healthy vibration, thermal, and kinematic envelopes. It does not output diagnostic failure mode classifications without a supervised model calibrated on ground-truth fault labels.
+                  </p>
+                </div>
+
+                <div className="report-eval-callout" style={{ marginTop: '1rem' }}>
+                  <strong>Model Integrity & Calibration:</strong> Calibrated on healthy steady-state baseline telemetry. Anomaly scores measure multivariate statistical isolation path length relative to the calibrated operating envelope; they represent statistical divergence, not failure guarantees.
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <h4 className="section-title-sm">Multidimensional Divergence Contributions</h4>
+                  <span className="badge badge-info" style={{ fontSize: '0.68rem' }}>Statistical Weight</span>
+                </div>
+                <p className="section-caption">
+                  Normalized relative contribution of sensor signal features driving multivariate anomaly separation from nominal baseline.
+                </p>
+
+                <div className="shap-diverging-chart">
+                  {shapFeatures.map((feat) => {
+                    const maxRange = 0.25;
+                    const isPos = feat.attribution >= 0;
+                    const barWidthPct = Math.min(100, (Math.abs(feat.attribution) / maxRange) * 100);
+                    return (
+                      <div key={feat.name} className="shap-bar-row">
+                        <span className="shap-feat-name" title={feat.name}>{feat.name}</span>
+                        <div className="shap-axis-container">
+                          <div className="shap-zero-line" />
+                          {isPos ? (
+                            <div className="shap-bar-pos" style={{ width: `${barWidthPct / 2}%`, left: '50%' }} />
+                          ) : (
+                            <div className="shap-bar-neg" style={{ width: `${barWidthPct / 2}%`, right: '50%' }} />
+                          )}
+                        </div>
+                        <span className="shap-feat-val" style={{ color: isPos ? 'var(--primary)' : '#64748b' }}>
+                          {isPos ? `+${feat.attribution.toFixed(2)}` : feat.attribution.toFixed(2)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Right Column: Anomaly detection */}
@@ -549,10 +625,20 @@ export default function AnalysisResultsPage() {
         setIsRunModalOpen(true);
         setRunForm((prev) => {
           const ds = availableDatasets.find((d) => (d._id || d.id) === queryParams.datasetId);
+          const readyModels = models.filter((m) => m.status === 'ready');
+          const hasLabels = Boolean(
+            (ds?.labelDistribution && (ds.labelDistribution instanceof Map ? ds.labelDistribution.size > 0 : Object.keys(ds.labelDistribution).length > 0)) ||
+            ds?.columns?.some((c) => c.isLabel || /^(label|fault_class|defect|class)$/i.test(c.rawHeader || c.name || ''))
+          );
+          const rfModel = readyModels.find((m) => m.modelType === MODEL_TYPES.RANDOM_FOREST);
+          const ifModel = readyModels.find((m) => m.modelType === MODEL_TYPES.ISOLATION_FOREST);
+          const chosenModel = (hasLabels && rfModel) ? rfModel : (ifModel || readyModels[0]);
           return {
             ...prev,
             datasetId: queryParams.datasetId,
-            machineId: ds?.machineId?._id || ds?.machineId || prev.machineId
+            machineId: ds?.machineId?._id || ds?.machineId || prev.machineId,
+            modelArtifactId: chosenModel?._id || prev.modelArtifactId || '',
+            windowSize: (ds?.totalRows && ds.totalRows < 256) ? 64 : (prev.windowSize || 128)
           };
         });
       }
@@ -1012,6 +1098,14 @@ export default function AnalysisResultsPage() {
                         </span>
                       </div>
 
+                      {(selectedRun.isSimulatorDerived || selectedRun.datasetTitle?.includes('[SIMULATED]')) && (
+                        <div>
+                          <span className="spec-label">Telemetry Provenance:</span>
+                          <span className="badge" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#D97706', border: '1px solid rgba(217, 119, 6, 0.35)', fontSize: '0.72rem', fontWeight: 700 }}>
+                            SIMULATED DIGITAL TWIN TELEMETRY
+                          </span>
+                        </div>
+                      )}
                       <div>
                         <span className="spec-label">Model Artifact & Version:</span>
                         <span className="mono-code" style={{ display: 'block', color: 'var(--text-primary)' }}>

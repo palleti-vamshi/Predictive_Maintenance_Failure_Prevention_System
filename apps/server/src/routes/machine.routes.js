@@ -499,7 +499,14 @@ router.post('/:codeOrId/assign', requireManager, requireMachineAccess, async (re
 router.get('/:codeOrId/work-orders', requireMachineAccess, async (req, res) => {
   try {
     const machine = req.machine;
-    const workOrders = await MaintenanceWorkOrder.find({ machineId: machine._id })
+    const query = { machineId: machine._id };
+
+    // Technicians strictly see only work orders assigned to them
+    if (req.user.role === USER_ROLES.TECHNICIAN) {
+      query.assignedTechnicianId = req.user._id;
+    }
+
+    const workOrders = await MaintenanceWorkOrder.find(query)
       .populate('assignedTechnicianId', 'fullName email role')
       .populate('createdById', 'fullName role')
       .populate('reviewedById', 'fullName role')

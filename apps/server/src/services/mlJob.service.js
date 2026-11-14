@@ -39,6 +39,39 @@ export function getPythonExecutable() {
   return 'python3';
 }
 
+const ML_PROCESS_TIMEOUT_MS = 120000; // 120s timeout to prevent subprocess hangs
+
+/**
+ * Sanitizes environment passed to child Python processes to prevent leaking
+ * database credentials, JWT secrets, and LLM API keys.
+ */
+function getSanitizedMlEnv() {
+  const allowedKeys = [
+    'PATH',
+    'SYSTEMROOT',
+    'HOME',
+    'USER',
+    'TMPDIR',
+    'TMP',
+    'TEMP',
+    'LANG',
+    'LC_ALL',
+    'SHELL',
+    'LD_LIBRARY_PATH',
+    'DYLD_LIBRARY_PATH'
+  ];
+  const envObj = {
+    PYTHONPATH: ML_SERVICE_DIR,
+    PYTHONUNBUFFERED: '1'
+  };
+  for (const k of allowedKeys) {
+    if (process.env[k] !== undefined) {
+      envObj[k] = process.env[k];
+    }
+  }
+  return envObj;
+}
+
 /**
  * Low-level child_process execution for python cli.py.
  */
@@ -70,14 +103,20 @@ export function runPythonCli({ csvPath, modelType, config, outputDir }) {
 
     const child = spawn(pythonBin, args, {
       cwd: ML_SERVICE_DIR,
-      env: {
-        ...process.env,
-        PYTHONPATH: ML_SERVICE_DIR
-      }
+      env: getSanitizedMlEnv()
     });
 
     let stdoutData = '';
     let stderrData = '';
+    let hasTimedOut = false;
+
+    const timer = setTimeout(() => {
+      hasTimedOut = true;
+      try {
+        child.kill('SIGKILL');
+      } catch {}
+      reject(new Error(`ML training subprocess timed out after ${ML_PROCESS_TIMEOUT_MS / 1000}s.`));
+    }, ML_PROCESS_TIMEOUT_MS);
 
     child.stdout.on('data', (chunk) => {
       stdoutData += chunk.toString();
@@ -88,6 +127,8 @@ export function runPythonCli({ csvPath, modelType, config, outputDir }) {
     });
 
     child.on('close', (code) => {
+      clearTimeout(timer);
+      if (hasTimedOut) return;
       if (code === 0) {
         try {
           const parsed = JSON.parse(stdoutData.trim());
@@ -143,11 +184,21 @@ export async function runResearchEvaluationCli() {
   return new Promise((resolve, reject) => {
     const child = spawn(pythonPath, [cliScript, 'evaluate'], {
       cwd: ML_SERVICE_DIR,
+      env: getSanitizedMlEnv(),
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
     let stdoutData = '';
     let stderrData = '';
+    let hasTimedOut = false;
+
+    const timer = setTimeout(() => {
+      hasTimedOut = true;
+      try {
+        child.kill('SIGKILL');
+      } catch {}
+      reject(new Error(`Research evaluation subprocess timed out after ${ML_PROCESS_TIMEOUT_MS / 1000}s.`));
+    }, ML_PROCESS_TIMEOUT_MS);
 
     child.stdout.on('data', (chunk) => {
       stdoutData += chunk.toString();
@@ -158,6 +209,8 @@ export async function runResearchEvaluationCli() {
     });
 
     child.on('close', (code) => {
+      clearTimeout(timer);
+      if (hasTimedOut) return;
       if (code === 0) {
         try {
           const parsed = JSON.parse(stdoutData.trim());
@@ -342,14 +395,20 @@ export function runPythonAnalysisCli({ csvPath, modelPath, config, outputDir }) 
 
     const child = spawn(pythonBin, args, {
       cwd: ML_SERVICE_DIR,
-      env: {
-        ...process.env,
-        PYTHONPATH: ML_SERVICE_DIR
-      }
+      env: getSanitizedMlEnv()
     });
 
     let stdoutData = '';
     let stderrData = '';
+    let hasTimedOut = false;
+
+    const timer = setTimeout(() => {
+      hasTimedOut = true;
+      try {
+        child.kill('SIGKILL');
+      } catch {}
+      reject(new Error(`ML training subprocess timed out after ${ML_PROCESS_TIMEOUT_MS / 1000}s.`));
+    }, ML_PROCESS_TIMEOUT_MS);
 
     child.stdout.on('data', (chunk) => {
       stdoutData += chunk.toString();
@@ -360,6 +419,8 @@ export function runPythonAnalysisCli({ csvPath, modelPath, config, outputDir }) 
     });
 
     child.on('close', (code) => {
+      clearTimeout(timer);
+      if (hasTimedOut) return;
       if (code === 0) {
         try {
           const parsed = JSON.parse(stdoutData.trim());
@@ -437,6 +498,15 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
       failureReason: `Model ${model.name} is in status '${model.status}', not '${MODEL_STATUS.READY}'.`
     });
     throw new Error(`Model is not ready for analysis (current status: ${model.status}).`);
+  }
+
+  if (!model.storageKey) {
+    const errReason = `Model artifact "${model.name}" has no persisted weights file on disk (storageKey is null).`;
+    await AnalysisRun.findByIdAndUpdate(analysisRunId, {
+      status: ANALYSIS_RUN_STATUS.FAILED,
+      failureReason: errReason
+    });
+    throw new Error(errReason);
   }
 
   const csvPath = getSafeFilePath(dataset.storageKey);
@@ -540,11 +610,15 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
       );
 
       // Generate Alert records for each detected interval
+      const isSimRun = Boolean(analysisRun.isSimulatorDerived);
       for (const intv of intervals) {
         const isAnomTask = results.analysis_task === 'anomaly_detection';
-        const title = isAnomTask
+        const rawTitle = isAnomTask
           ? `Statistical Anomaly Detected in ${analysisRun.componentType || 'Gearbox'}`
           : `Predicted Defect: ${intv.predicted_class} in ${analysisRun.componentType || 'Gearbox'}`;
+        const title = isSimRun && !rawTitle.includes('[SIMULATED]')
+          ? `[SIMULATED] ${rawTitle}`
+          : rawTitle;
 
         const alertDoc = new Alert({
           factoryId: analysisRun.factoryId,
@@ -554,6 +628,7 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
           analysisRunId: analysisRun._id,
           modelArtifactId: analysisRun.modelArtifactId,
           title,
+          isSimulatorDerived: isSimRun,
           severity: intv.severity || ALERT_SEVERITIES.WARNING,
           severityMethod: intv.severity_method || 'calibrated_threshold',
           severityNote:

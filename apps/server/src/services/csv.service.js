@@ -157,12 +157,15 @@ export function parseAndProfileCsv(contentString, options = {}) {
       } else if (/output.*rad.*vib|vib.*rad.*out|accel.*out/i.test(lower)) {
         mappedSignal = GEARBOX_SIGNALS.VIBRATION_OUTPUT_RADIAL.key;
         suggestedUnit = GEARBOX_SIGNALS.VIBRATION_OUTPUT_RADIAL.standardUnit;
-      } else if (/sump.*temp|oil.*temp|temp.*sump/i.test(lower)) {
+      } else if (/coolant|egt|sump.*temp|oil.*temp|temp.*sump/i.test(lower)) {
         mappedSignal = GEARBOX_SIGNALS.TEMPERATURE_GEARBOX_SUMP.key;
         suggestedUnit = GEARBOX_SIGNALS.TEMPERATURE_GEARBOX_SUMP.standardUnit;
       } else if (/bearing.*temp|temp.*bearing/i.test(lower)) {
         mappedSignal = GEARBOX_SIGNALS.TEMPERATURE_BEARING.key;
         suggestedUnit = GEARBOX_SIGNALS.TEMPERATURE_BEARING.standardUnit;
+      } else if (/gearbox_in_rpm|shaft.*speed|rotat.*speed/i.test(lower)) {
+        mappedSignal = GEARBOX_SIGNALS.ROTATIONAL_SPEED.key;
+        suggestedUnit = GEARBOX_SIGNALS.ROTATIONAL_SPEED.standardUnit;
       } else if (/speed|rpm|rotat/i.test(lower)) {
         mappedSignal = GEARBOX_SIGNALS.ROTATIONAL_SPEED.key;
         suggestedUnit = GEARBOX_SIGNALS.ROTATIONAL_SPEED.standardUnit;
@@ -184,12 +187,19 @@ export function parseAndProfileCsv(contentString, options = {}) {
     };
   });
 
+  const lowerHeaders = rawHeaders.map((h) => h.toLowerCase());
+  const isSimulatorSignature = (
+    lowerHeaders.includes('vib_rms') &&
+    (lowerHeaders.includes('torque_nm') || lowerHeaders.includes('gearbox_in_rpm') || lowerHeaders.includes('engine_rpm'))
+  );
+
   return {
     delimiter,
     headers: rawHeaders,
     totalRows: parsedRows.length,
     totalColumns: rawHeaders.length,
     candidateMappings,
+    isSimulatorSignature,
     previewRows: parsedRows.slice(0, 10),
     allRows: parsedRows
   };

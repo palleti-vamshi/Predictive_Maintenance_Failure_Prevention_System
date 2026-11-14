@@ -128,6 +128,11 @@ const alertSchema = new mongoose.Schema(
       enum: Object.values(ALERT_TASK_TYPES),
       required: true
     },
+    isSimulatorDerived: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
     modelDetails: {
       modelName: { type: String, required: true },
       modelType: { type: String, required: true },

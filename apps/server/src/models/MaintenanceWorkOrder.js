@@ -153,6 +153,63 @@ const maintenanceWorkOrderSchema = new mongoose.Schema(
       default: null
     },
     statusHistory: [statusHistorySchema],
+    checkIn: {
+      checkedInAt: Date,
+      checkedInById: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      method: {
+        type: String,
+        enum: ['gps', 'manual']
+      },
+      bayIdentifier: {
+        type: String,
+        trim: true
+      },
+      coordinates: {
+        latitude: Number,
+        longitude: Number,
+        accuracyMeters: Number
+      },
+      consentAcknowledged: {
+        type: Boolean,
+        default: false
+      },
+      verificationNote: {
+        type: String,
+        trim: true
+      }
+    },
+    inspectionPhotos: [
+      {
+        storageKey: { type: String, required: true },
+        originalFilename: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now },
+        uploadedById: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        fileSizeBytes: Number,
+        visualDefectAnalysis: {
+          analysisMethod: { type: String, default: 'rule_based_casing_heuristic' },
+          defectDetected: { type: Boolean, default: false },
+          findings: [
+            {
+              category: { type: String },
+              confidence: { type: Number },
+              severity: { type: String, enum: ['low', 'minor', 'moderate', 'high'] },
+              description: { type: String }
+            }
+          ],
+          overallConfidence: { type: Number },
+          uncertaintyLevel: { type: String, enum: ['Low', 'Moderate', 'High', 'Uncalibrated'], default: 'Uncalibrated' },
+          disclaimer: { type: String }
+        },
+        technicianFeedback: {
+          status: { type: String, enum: ['pending', 'confirmed', 'rejected'], default: 'pending' },
+          feedbackNote: { type: String, trim: true },
+          reviewedAt: Date
+        }
+      }
+    ],
     sourceAlertId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Alert',

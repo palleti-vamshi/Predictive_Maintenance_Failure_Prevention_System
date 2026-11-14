@@ -9,7 +9,7 @@ import Icon from '../components/common/Icon.jsx';
  * high-contrast accessible forms, and server-verified role authentication.
  */
 export default function LoginPage() {
-  const { login, loading, authError } = useAuth();
+  const { login, loading, authError, dbOffline, apiOffline, systemNotice } = useAuth();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -67,6 +67,42 @@ export default function LoginPage() {
             Authorized access for Factory Managers and Maintenance Technicians. Role permissions, factory scopes, and equipment access are securely resolved from your account.
           </p>
         </div>
+
+        {/* System & Database Diagnostic Notice */}
+        {(dbOffline || apiOffline || (systemNotice && !errorMessage)) && (
+          <div
+            className="login-diagnostic-banner"
+            role="alert"
+            style={{
+              background: dbOffline ? '#fffbeb' : '#fef2f2',
+              border: `1px solid ${dbOffline ? '#fde68a' : '#fecaca'}`,
+              borderRadius: '8px',
+              padding: '0.85rem 1rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'flex-start'
+            }}
+          >
+            <Icon
+              name={dbOffline ? 'database' : 'alert'}
+              size={18}
+              color={dbOffline ? '#b45309' : '#b91c1c'}
+            />
+            <div style={{ fontSize: '0.8125rem', color: dbOffline ? '#92400e' : '#991b1b', lineHeight: 1.45 }}>
+              <strong style={{ display: 'block', marginBottom: '0.2rem' }}>
+                {dbOffline ? 'MongoDB Service Unavailable' : 'API Connection Notice'}
+              </strong>
+              <div>{systemNotice}</div>
+              {dbOffline && (
+                <div style={{ marginTop: '0.4rem', fontFamily: 'monospace', fontSize: '0.75rem', background: '#fef3c7', padding: '4px 8px', borderRadius: '4px' }}>
+                  brew services start mongodb-community@8.0<br />
+                  <span style={{ color: '#78350f' }}># or: docker compose up -d</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Error Notification */}
         {errorMessage && (
