@@ -54,9 +54,38 @@ router.get('/', async (req, res) => {
     if (analysisRunId) {
       query.analysisRunId = analysisRunId;
     }
+    if (req.query.isSimulated !== undefined) {
+      query.isSimulatorDerived = req.query.isSimulated === 'true';
+    } else if (req.query.operationalOnly === 'true') {
+      query.isSimulatorDerived = { $ne: true };
+    }
 
-    // Role scoping: Technicians and Viewers can only view alerts for assigned machines
-    if (req.user.role !== USER_ROLES.FACTORY_MANAGER) {
+    // Role scoping: Technicians only view alerts for assigned machines or assigned work orders; Viewers for assigned machines
+    if (req.user.role === USER_ROLES.TECHNICIAN) {
+      const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
+      const myWorkOrders = await MaintenanceWorkOrder.find({
+        factoryId: userFactoryId,
+        assignedTechnicianId: req.user._id
+      }).select('_id sourceAlertId').lean();
+
+      const myWorkOrderIds = myWorkOrders.map((wo) => wo._id);
+      const mySourceAlertIds = myWorkOrders.map((wo) => wo.sourceAlertId).filter(Boolean);
+
+      if (query.machineId) {
+        if (!assignedMachineIds.includes(query.machineId.toString())) {
+          return res.status(403).json({
+            error: 'Forbidden',
+            message: 'Access denied. You do not have permissions for this machine.'
+          });
+        }
+      } else {
+        query.$or = [
+          { machineId: { $in: assignedMachineIds } },
+          { maintenanceWorkOrderId: { $in: myWorkOrderIds } },
+          { _id: { $in: mySourceAlertIds } }
+        ];
+      }
+    } else if (req.user.role === USER_ROLES.VIEWER) {
       const assignedMachineIds = (req.user.assignedMachines || []).map((m) => m._id || m);
       if (query.machineId) {
         if (!assignedMachineIds.map((id) => id.toString()).includes(query.machineId.toString())) {
@@ -119,16 +148,22 @@ router.get('/:id', async (req, res) => {
     if (req.user.role === USER_ROLES.TECHNICIAN) {
       const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
       const alertMachineId = (alert.machineId?._id || alert.machineId)?.toString();
-      if (!assignedMachineIds.includes(alertMachineId)) {
+      const isMachineAssigned = assignedMachineIds.includes(alertMachineId);
+
+      let isWorkOrderAssigned = false;
+      const assignedTechId = alert.maintenanceWorkOrderId?.assignedTechnicianId?.toString?.() ||
+        alert.maintenanceWorkOrderId?.assignedTechnicianId?._id?.toString?.();
+      if (assignedTechId && assignedTechId === req.user._id.toString()) {
+        isWorkOrderAssigned = true;
+      }
+
+      if (!isMachineAssigned && !isWorkOrderAssigned) {
         return res.status(403).json({
           error: 'Forbidden',
-          message: 'Access denied. You are not assigned to the machine associated with this alert.'
+          message: 'Access denied. You are not assigned to the machine or work order associated with this alert.'
         });
       }
-    }
-
-    // Role-based machine access check
-    if (req.user.role !== USER_ROLES.FACTORY_MANAGER) {
+    } else if (req.user.role !== USER_ROLES.FACTORY_MANAGER) {
       const assignedMachineIds = (req.user.assignedMachines || []).map((m) => (m._id || m).toString());
       const alertMachineId = (alert.machineId?._id || alert.machineId)?.toString();
       if (!assignedMachineIds.includes(alertMachineId)) {

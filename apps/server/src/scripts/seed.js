@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { env } from '../config/env.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { Organization } from '../models/Organization.js';
 import { Factory } from '../models/Factory.js';
 import { Site } from '../models/Site.js';
@@ -669,6 +675,97 @@ async function seed() {
       [AI_TASK_TYPES.FAULT_CLASSIFICATION]: {
         isCompatible: false,
         reason: 'Incompatible: No discrete ground-truth fault label column mapped.',
+        recommendedModel: 'Random Forest Multi-Class Classifier'
+      },
+      [AI_TASK_TYPES.REMAINING_USEFUL_LIFE]: {
+        isCompatible: false,
+        reason: 'Incompatible: Lacks run-to-failure progression or explicit time-to-failure targets.',
+        recommendedModel: 'Weibull Hazard / Temporal RUL Regressor'
+      }
+    }
+  });
+
+  // 7a-2. Seed Synthetic Test Dataset (150 rows, 3 classes, 5 signals)
+  const fixturePath = path.resolve(__dirname, '../../../../test-fixtures/mechguard_upload_smoke_test_150.csv');
+  let synthCsvContent = '';
+  if (fs.existsSync(fixturePath)) {
+    synthCsvContent = fs.readFileSync(fixturePath, 'utf-8');
+  } else {
+    synthCsvContent = 'timestamp,shaft_speed_rpm,vibration_input_radial_mm_s,vibration_input_axial_mm_s,sump_temperature_c,mechanical_load_nm,fault_label,data_source\n';
+    const sBase = new Date('2026-01-01T00:00:00Z').getTime();
+    for (let i = 0; i < 150; i++) {
+      const cls = i < 50 ? 'normal' : i < 100 ? 'misalignment_demo' : 'thermal_rise_demo';
+      const ts = new Date(sBase + i * 60000).toISOString();
+      const speed = (1500 + Math.sin(i / 10) * 15).toFixed(2);
+      const vibRad = (cls === 'misalignment_demo' ? 3.4 : 1.7 + Math.random() * 0.1).toFixed(3);
+      const vibAx = (cls === 'misalignment_demo' ? 2.8 : 1.2 + Math.random() * 0.1).toFixed(3);
+      const temp = (cls === 'thermal_rise_demo' ? 68.5 + (i - 100) * 0.2 : 54.0 + Math.random() * 0.2).toFixed(2);
+      const load = (320 + Math.random() * 5).toFixed(2);
+      synthCsvContent += `${ts},${speed},${vibRad},${vibAx},${temp},${load},${cls},SYNTHETIC_UPLOAD_TEST\n`;
+    }
+  }
+
+  const synthStorage = await saveUploadedFile({
+    buffer: Buffer.from(synthCsvContent, 'utf-8'),
+    originalFilename: 'mechguard_upload_smoke_test_150.csv',
+    mimeType: 'text/csv'
+  });
+
+  const datasetSynth = await Dataset.create({
+    factoryId: factoryDetroit._id,
+    siteId: siteLine4._id,
+    machineId: machineGB104._id,
+    datasetType: DATASET_TYPES.SYNTHETIC_QA,
+    title: 'Synthetic Test Data (150 rows, 3 classes)',
+    description: '150-minute synthetic telemetry fixture with 3 discrete fault classes (normal, misalignment_demo, thermal_rise_demo) for ML pipeline verification.',
+    isSimulatorDerived: true,
+    isDemoData: true,
+    status: DATASET_STATUS.READY,
+    uploadedById: managerUser._id,
+    uploadedByName: managerUser.fullName,
+    storageKey: synthStorage.storageKey,
+    originalFilename: synthStorage.originalFilename,
+    fileSizeBytes: synthStorage.fileSizeBytes,
+    fileChecksumSha256: synthStorage.fileChecksumSha256,
+    delimiter: ',',
+    encoding: 'utf-8',
+    dataSchemaVersion: '1.0.0',
+    featurePipelineVersion: '1.0.0',
+    modality: DATASET_MODALITY.LABELED_MULTICLASS,
+    timeRange: {
+      start: new Date('2026-01-01T00:00:00Z'),
+      end: new Date('2026-01-01T02:29:00Z'),
+      durationSeconds: 149 * 60
+    },
+    samplingRateHz: 0.017,
+    samplingIntervalMeanMs: 60000,
+    totalRows: 150,
+    totalColumns: 8,
+    labelColumn: 'fault_label',
+    columns: [
+      { rawHeader: 'timestamp', mappedSignal: 'timestamp', isTimestamp: true, dataType: 'datetime' },
+      { rawHeader: 'shaft_speed_rpm', mappedSignal: 'shaft_speed_rpm', sourceUnit: 'RPM', targetUnit: 'RPM', dataType: 'numeric' },
+      { rawHeader: 'vibration_input_radial_mm_s', mappedSignal: 'vibration_input_radial_mm_s', sourceUnit: 'mm/s', targetUnit: 'mm/s', dataType: 'numeric' },
+      { rawHeader: 'vibration_input_axial_mm_s', mappedSignal: 'vibration_input_axial_mm_s', sourceUnit: 'mm/s', targetUnit: 'mm/s', dataType: 'numeric' },
+      { rawHeader: 'sump_temperature_c', mappedSignal: 'sump_temperature_c', sourceUnit: 'degC', targetUnit: 'degC', dataType: 'numeric' },
+      { rawHeader: 'mechanical_load_nm', mappedSignal: 'mechanical_load_nm', sourceUnit: 'Nm', targetUnit: 'Nm', dataType: 'numeric' },
+      { rawHeader: 'fault_label', mappedSignal: 'fault_label', dataType: 'string', isLabel: true },
+      { rawHeader: 'data_source', mappedSignal: 'data_source', dataType: 'string' }
+    ],
+    labelDistribution: {
+      normal: 50,
+      misalignment_demo: 50,
+      thermal_rise_demo: 50
+    },
+    aiTaskCompatibility: {
+      [AI_TASK_TYPES.ANOMALY_DETECTION]: {
+        isCompatible: true,
+        reason: 'Compatible: 150 observations across 5 telemetry channels provide a stable baseline for Isolation Forest.',
+        recommendedModel: 'Isolation Forest (Unsupervised Outlier Detection)'
+      },
+      [AI_TASK_TYPES.FAULT_CLASSIFICATION]: {
+        isCompatible: true,
+        reason: 'Compatible: 3 ground-truth fault classes mapped.',
         recommendedModel: 'Random Forest Multi-Class Classifier'
       },
       [AI_TASK_TYPES.REMAINING_USEFUL_LIFE]: {

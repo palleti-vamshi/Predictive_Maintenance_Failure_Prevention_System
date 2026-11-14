@@ -111,8 +111,8 @@ def classify_window_regime(
     else:
         speed_var_pct = 0.0
 
-    # 2. Speed-based classification
-    if speed_mean is not None and speed_mean < 0.75 * nominal_speed_rpm:
+    # 2. Speed-based classification (strict: requires absolute low speed < 1000 RPM and < 60% of rated nominal speed)
+    if speed_mean is not None and speed_mean < 1000.0 and speed_mean < 0.60 * nominal_speed_rpm:
         regime_id = REGIME_LOW_SPEED_IDLE
     elif load_mean is not None:
         if load_mean < 0.60 * nominal_load_nm:

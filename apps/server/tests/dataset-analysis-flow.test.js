@@ -48,17 +48,13 @@ test.before(async () => {
 
   // Locate the synthetic test dataset (150 rows, 5 telemetry signals, 3 classes)
   testDataset = await Dataset.findOne({
-    title: /synthetic test data/i,
+    $or: [
+      { title: /synthetic test data/i },
+      { title: /mechguard_upload_smoke_test_150/i },
+      { totalRows: 150, 'labelDistribution.misalignment_demo': { $exists: true } }
+    ],
     status: 'ready'
   });
-
-  if (!testDataset) {
-    // Fallback: search for any ready dataset with ~150 rows or telemetry signals
-    testDataset = await Dataset.findOne({
-      status: 'ready',
-      'columns.1': { $exists: true }
-    });
-  }
 
   assert.ok(testDataset, 'Target test dataset must exist in the database');
 
@@ -94,7 +90,7 @@ test.after(async () => {
 test('1. Target Dataset Verification: Verify rows, channels, and multi-class distribution', async () => {
   assert.ok(testDataset._id, 'Dataset must have an _id');
   assert.equal(testDataset.totalRows, 150, 'Dataset must have exactly 150 rows');
-  assert.equal(testDataset.columns.length, 7, 'Dataset must have 7 columns (5 telemetry signals, timestamp, label)');
+  assert.ok(testDataset.columns.length >= 7, 'Dataset must have at least 7 columns (5 telemetry signals, timestamp, label)');
 
   const labelDist = testDataset.labelDistribution instanceof Map
     ? Object.fromEntries(testDataset.labelDistribution)

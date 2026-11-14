@@ -216,15 +216,21 @@ router.post('/', async (req, res) => {
     }
 
     if (model.featureNames && model.featureNames.length > 0) {
+      const normalizeChannel = (str) =>
+        (str || '').toLowerCase().replace(/_(mm_s|rpm|c|degc|nm|g|bar|hz|v|a)$/i, '');
+
       const primaryVibrationFeatures = model.featureNames.filter((fn) =>
         fn.includes('vib') || fn.includes('accel')
       );
       if (primaryVibrationFeatures.length > 0) {
-        const hasVibMatch = mappedSignalNames.some(
-          (sig) =>
-            (sig.includes('vib') || sig.includes('accel')) &&
-            primaryVibrationFeatures.some((fn) => fn.startsWith(sig) || fn.includes(sig))
-        );
+        const hasVibMatch = mappedSignalNames.some((sig) => {
+          if (!sig.includes('vib') && !sig.includes('accel')) return false;
+          const cleanSig = normalizeChannel(sig);
+          return primaryVibrationFeatures.some((fn) => {
+            const cleanFn = normalizeChannel(fn.split('__')[0]);
+            return cleanFn === cleanSig || fn.includes(cleanSig) || cleanSig.includes(cleanFn);
+          });
+        });
         if (!hasVibMatch) {
           return res.status(400).json({
             error: 'IncompatibleDatasetError',
@@ -233,9 +239,13 @@ router.post('/', async (req, res) => {
         }
       }
 
-      const hasSignalMatch = mappedSignalNames.some((sig) =>
-        model.featureNames.some((fn) => fn.startsWith(sig) || fn.includes(sig))
-      );
+      const hasSignalMatch = mappedSignalNames.some((sig) => {
+        const cleanSig = normalizeChannel(sig);
+        return model.featureNames.some((fn) => {
+          const cleanFn = normalizeChannel(fn.split('__')[0]);
+          return cleanFn === cleanSig || fn.includes(cleanSig) || cleanSig.includes(cleanFn);
+        });
+      });
       if (!hasSignalMatch) {
         return res.status(400).json({
           error: 'IncompatibleDatasetError',

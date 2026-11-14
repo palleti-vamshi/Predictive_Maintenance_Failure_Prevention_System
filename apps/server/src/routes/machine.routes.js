@@ -587,10 +587,19 @@ router.post(
       );
 
       if (!isAssigned) {
-        return res.status(400).json({
-          error: 'BadRequest',
-          message: `Technician "${technician.fullName}" must be assigned to machine "${machine.code}" before receiving a work order.`
-        });
+        if (req.body.grantMachineAccess === true) {
+          await User.findByIdAndUpdate(technician._id, {
+            $addToSet: { assignedMachines: machine._id }
+          });
+          await Machine.findByIdAndUpdate(machine._id, {
+            $addToSet: { assignedTechnicians: technician._id }
+          });
+        } else {
+          return res.status(400).json({
+            error: 'BadRequest',
+            message: `Technician "${technician.fullName}" must be assigned to machine "${machine.code}" before receiving a work order.`
+          });
+        }
       }
 
       // 3. Generate unique order number: WO-<code>-<timestampSlice>

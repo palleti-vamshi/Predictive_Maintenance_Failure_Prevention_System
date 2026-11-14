@@ -285,5 +285,123 @@ router.get('/audit-trail', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/admin/demo-data/preview
+ * Manager-only preview of test/demo records eligible for safe cleanup.
+ * Targets only simulated alerts and automated test work orders, preserving operational assets.
+ */
+router.get('/demo-data/preview', async (req, res) => {
+  try {
+    const factoryId = req.user.factoryId?._id || req.user.factoryId;
+
+    const testWorkOrderQuery = {
+      factoryId,
+      $or: [
+        { isTestRecord: true },
+        { orderNumber: /^WO-TEST/i },
+        { title: { $in: [
+          'Security Audit Casing Inspection',
+          'Investigate High-Frequency Bearing Resonance',
+          'Precision Shaft Bearing Alignment and Sump Flush',
+          'Manager Approved Corrective Inspection'
+        ] } }
+      ]
+    };
+
+    const simulatedAlertQuery = {
+      factoryId,
+      $or: [
+        { isSimulatorDerived: true },
+        { title: /^\[SIMULATED\]/i }
+      ]
+    };
+
+    const [testWOs, simAlerts] = await Promise.all([
+      MaintenanceWorkOrder.find(testWorkOrderQuery).select('orderNumber title status createdAt').lean(),
+      Alert.find(simulatedAlertQuery).select('title severity status createdAt').lean()
+    ]);
+
+    return res.status(200).json({
+      factoryId,
+      counts: {
+        testWorkOrders: testWOs.length,
+        simulatedAlerts: simAlerts.length,
+        totalEligible: testWOs.length + simAlerts.length
+      },
+      preview: {
+        testWorkOrders: testWOs.slice(0, 10),
+        simulatedAlerts: simAlerts.slice(0, 10)
+      }
+    });
+  } catch (err) {
+    console.error('[AdminRoute:DemoDataPreview] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to generate demo data cleanup preview.'
+    });
+  }
+});
+
+/**
+ * POST /api/admin/demo-data/cleanup
+ * Manager-only endpoint to safely remove test records and excess simulated demo alerts.
+ * Requires explicit confirm: true. Preserves operational machines, datasets, and valid work orders.
+ */
+router.post('/demo-data/cleanup', async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    if (!confirm) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'Explicit confirmation (confirm: true) is required to clean up demo/test records.'
+      });
+    }
+
+    const factoryId = req.user.factoryId?._id || req.user.factoryId;
+
+    const testWorkOrderQuery = {
+      factoryId,
+      $or: [
+        { isTestRecord: true },
+        { orderNumber: /^WO-TEST/i },
+        { title: { $in: [
+          'Security Audit Casing Inspection',
+          'Investigate High-Frequency Bearing Resonance',
+          'Precision Shaft Bearing Alignment and Sump Flush',
+          'Manager Approved Corrective Inspection'
+        ] } }
+      ]
+    };
+
+    const simulatedAlertQuery = {
+      factoryId,
+      $or: [
+        { isSimulatorDerived: true },
+        { title: /^\[SIMULATED\]/i }
+      ]
+    };
+
+    const [woDeleteResult, alertDeleteResult] = await Promise.all([
+      MaintenanceWorkOrder.deleteMany(testWorkOrderQuery),
+      Alert.deleteMany(simulatedAlertQuery)
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: `Safely removed ${woDeleteResult.deletedCount} automated test work orders and ${alertDeleteResult.deletedCount} simulated demo alerts. All operational machinery, datasets, and production records remain intact.`,
+      cleaned: {
+        testWorkOrders: woDeleteResult.deletedCount,
+        simulatedAlerts: alertDeleteResult.deletedCount
+      }
+    });
+  } catch (err) {
+    console.error('[AdminRoute:DemoDataCleanup] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to execute demo data cleanup.'
+    });
+  }
+});
+
 export default router;
 

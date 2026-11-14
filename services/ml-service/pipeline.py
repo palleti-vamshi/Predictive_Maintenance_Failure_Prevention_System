@@ -7,6 +7,7 @@ operating-regime-conditioned analysis, multi-signal path fusion, and SHAP output
 
 from typing import Dict, Any, List, Optional, Tuple
 import os
+import re
 import json
 import pandas as pd
 import numpy as np
@@ -43,6 +44,34 @@ def load_csv_safely(csv_path: str) -> pd.DataFrame:
     else:
         sep = ","
     return pd.read_csv(csv_path, sep=sep)
+
+
+def resolve_signal_unit(sig: str) -> str:
+    """Resolve correct engineering unit for a telemetry signal.
+    
+    Ensures RPM, °C, and Nm are preserved and never conflated with vibration velocity (mm/s).
+    """
+    s = (sig or "").lower()
+    if any(k in s for k in ["rpm", "speed", "shaft_speed", "engine_speed", "rotat"]):
+        return "RPM"
+    if any(k in s for k in ["temp", "thermal", "sump", "coolant", "degc", "celsius"]):
+        return "°C"
+    if any(k in s for k in ["torque", "load", "nm"]):
+        return "Nm"
+    if any(k in s for k in ["pressure", "bar", "psi"]):
+        return "bar"
+    if any(k in s for k in ["current", "amp", "ampere"]):
+        return "A"
+    if any(k in s for k in ["voltage", "volt"]):
+        return "V"
+    if any(k in s for k in ["vib", "accel", "velocity", "displacement", "de_rad", "nde_rad"]):
+        return "mm/s"
+    return "mm/s"
+
+
+def normalize_feature_channel(name: str) -> str:
+    """Strip unit suffixes from channel/signal/feature names for cross-dataset model matching."""
+    return re.sub(r'_(mm_s|rpm|c|degc|nm|g|bar|hz|v|a)($|_)', r'\2', (name or '').lower())
 
 
 def run_pipeline(
@@ -279,8 +308,10 @@ def run_analysis(
     # Check signal compatibility against model's expected features
     if expected_features:
         matching_signal_found = False
+        clean_expected = [normalize_feature_channel(f) for f in expected_features]
         for sig in signal_columns:
-            if any(f.startswith(sig) or sig in f for f in expected_features):
+            clean_sig = normalize_feature_channel(sig)
+            if any(f.startswith(clean_sig) or clean_sig in f or f in clean_sig for f in clean_expected):
                 matching_signal_found = True
                 break
         if not matching_signal_found:
@@ -312,7 +343,18 @@ def run_analysis(
         raise ValueError("No valid windows could be extracted from dataset.")
 
     # 5. Align Features to Model Feature Space
-    X_aligned = X.reindex(columns=expected_features, fill_value=0.0)
+    # Map extracted columns (which may carry unit suffixes) to expected model features
+    rename_map = {}
+    normalized_expected = {normalize_feature_channel(ef): ef for ef in expected_features}
+    for col in X.columns:
+        clean_col = normalize_feature_channel(col)
+        if clean_col in normalized_expected:
+            rename_map[col] = normalized_expected[clean_col]
+        elif col in expected_features:
+            rename_map[col] = col
+
+    X_renamed = X.rename(columns=rename_map)
+    X_aligned = X_renamed.reindex(columns=expected_features, fill_value=0.0)
     X_scaled = scaler.transform(X_aligned.values)
 
     # 6. Run Model Inference & Extract Operating Regimes and Thermal Paths per Window
@@ -583,7 +625,7 @@ def run_analysis(
                     "value": f"{win_mean:.2f}",
                     "baseline": f"{overall_mean:.2f}",
                     "delta": f"{pct_delta:+.1f}%",
-                    "unit": "°C" if ("temp" in sig.lower() or "thermal" in sig.lower()) else "RPM" if "rpm" in sig.lower() else "Nm" if "torque" in sig.lower() else "mm/s"
+                    "unit": resolve_signal_unit(sig)
                 })
 
         # Disclaimers and Research Notices

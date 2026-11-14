@@ -41,8 +41,9 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav, onOpenAssista
 
         if (ordersRes.ok && isMounted) {
           const oData = await ordersRes.json();
-          const openOrders = (oData.orders || []).filter(
-            (o) => o.status !== 'closed' && o.status !== 'completed' && o.status !== 'approved'
+          const rawOrders = oData.workOrders || oData.orders || [];
+          const openOrders = rawOrders.filter(
+            (o) => o.status !== 'closed' && o.status !== 'completed' && o.status !== 'approved' && o.status !== 'reviewed'
           );
           setCounts((prev) => ({ ...prev, workOrders: openOrders.length }));
         }
@@ -75,7 +76,7 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav, onOpenAssista
           label: 'My Work',
           hash: ROUTES.MAINTENANCE,
           icon: 'wrench',
-          badge: counts.workOrders ?? 1
+          badge: counts.workOrders ?? 0
         },
         {
           key: 'machines',
@@ -88,7 +89,7 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav, onOpenAssista
           label: 'Condition Alerts',
           hash: ROUTES.ALERTS,
           icon: 'alert',
-          badge: counts.alerts ?? 4
+          badge: counts.alerts ?? 0
         }
       ];
     }
@@ -104,14 +105,14 @@ export default function Sidebar({ mobileNavOpen, onCloseMobileNav, onOpenAssista
         label: 'Maintenance',
         hash: ROUTES.MAINTENANCE,
         icon: 'wrench',
-        badge: counts.workOrders ?? 3
+        badge: counts.workOrders ?? 0
       },
       {
         key: 'alerts',
         label: 'Alerts',
         hash: ROUTES.ALERTS,
         icon: 'alert',
-        badge: counts.alerts ?? 5
+        badge: counts.alerts ?? 0
       }
     ];
   }, [isTech, counts]);

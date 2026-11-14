@@ -520,9 +520,16 @@ export async function startAnalysisRunJob(analysisRunId, { sync = false } = {}) 
     .map((c) => c.mappedSignal || c.rawHeader || c.name);
 
   if (model.featureNames && model.featureNames.length > 0) {
-    const hasSignalMatch = mappedSignalNames.some((sig) =>
-      model.featureNames.some((fn) => fn.startsWith(sig) || fn.includes(sig))
-    );
+    const normalizeChannel = (str) =>
+      (str || '').toLowerCase().replace(/_(mm_s|rpm|c|degc|nm|g|bar|hz|v|a)$/i, '');
+
+    const hasSignalMatch = mappedSignalNames.some((sig) => {
+      const cleanSig = normalizeChannel(sig);
+      return model.featureNames.some((fn) => {
+        const cleanFn = normalizeChannel(fn.split('__')[0]);
+        return cleanFn === cleanSig || fn.includes(cleanSig) || cleanSig.includes(cleanFn);
+      });
+    });
     if (!hasSignalMatch) {
       const errReason = `Incompatible dataset: Mapped signals [${mappedSignalNames.join(', ')}] do not produce the feature channels required by model '${model.name}'.`;
       await AnalysisRun.findByIdAndUpdate(analysisRunId, {

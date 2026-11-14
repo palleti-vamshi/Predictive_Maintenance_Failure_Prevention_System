@@ -133,6 +133,16 @@ const alertSchema = new mongoose.Schema(
       default: false,
       index: true
     },
+    isDemoData: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    isTestRecord: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
     modelDetails: {
       modelName: { type: String, required: true },
       modelType: { type: String, required: true },

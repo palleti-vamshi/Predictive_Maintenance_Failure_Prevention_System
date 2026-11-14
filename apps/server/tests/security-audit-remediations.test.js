@@ -425,6 +425,9 @@ test('Remediation 5: Visual Inspection rejects corrupt payloads and disables aut
   assert.strictEqual(simAnalysis.defectDetected, true);
   assert.strictEqual(simAnalysis.overallConfidence, null);
   assert.strictEqual(simAnalysis.findings[0].confidence, null);
+
+  // Clean up test work order so it does not accumulate on technician workload
+  await MaintenanceWorkOrder.findByIdAndDelete(wo._id);
 });
 
 test('Remediation 6: Model Domain Guardrails reject cross-domain model pairing on gearboxes', async () => {

@@ -86,6 +86,265 @@ router.get('/eligible-technicians', requireManager, async (req, res) => {
 });
 
 /**
+ * GET /api/work-orders/bulk-reassign/preview
+ * Manager-only endpoint to preview balanced workload distribution of unstarted work orders.
+ * Targets eligible unstarted work (OPEN or ASSIGNED) and models distribution across active factory technicians.
+ */
+router.get('/bulk-reassign/preview', requireManager, async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+
+    // 1. Fetch active technicians in manager's factory
+    const technicians = await User.find({
+      factoryId,
+      role: USER_ROLES.TECHNICIAN,
+      isActive: true
+    })
+      .select('fullName email skills availability assignedMachines')
+      .sort({ fullName: 1 })
+      .lean();
+
+    if (technicians.length === 0) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'No active technicians available in this factory for workload balancing.'
+      });
+    }
+
+    // 2. Fetch all work orders in factory
+    const allOrders = await MaintenanceWorkOrder.find({ factoryId })
+      .populate('machineId', 'code name type')
+      .populate('assignedTechnicianId', 'fullName email')
+      .sort({ createdAt: 1 })
+      .lean();
+
+    // Active (non-completed) count per technician
+    const currentActiveWorkload = {};
+    technicians.forEach((t) => {
+      currentActiveWorkload[t._id.toString()] = 0;
+    });
+
+    allOrders.forEach((o) => {
+      const isCompleted = [WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED].includes(o.status);
+      const techId = (o.assignedTechnicianId?._id || o.assignedTechnicianId)?.toString();
+      if (!isCompleted && techId && currentActiveWorkload[techId] !== undefined) {
+        currentActiveWorkload[techId]++;
+      }
+    });
+
+    // 3. Identify eligible unstarted work orders (OPEN or ASSIGNED only, not IN_PROGRESS, not submitted/reviewed)
+    const eligibleOrders = allOrders.filter((o) =>
+      [WORK_ORDER_STATUS.OPEN, WORK_ORDER_STATUS.ASSIGNED].includes(o.status)
+    );
+
+    // 4. Model balanced workload distribution using greedy least-loaded strategy
+    const simulatedWorkload = {};
+    technicians.forEach((t) => {
+      const nonEligibleActive = allOrders.filter((o) => {
+        const isThisTech = (o.assignedTechnicianId?._id || o.assignedTechnicianId)?.toString() === t._id.toString();
+        const isEligible = [WORK_ORDER_STATUS.OPEN, WORK_ORDER_STATUS.ASSIGNED].includes(o.status);
+        const isClosed = [WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED].includes(o.status);
+        return isThisTech && !isEligible && !isClosed;
+      }).length;
+      simulatedWorkload[t._id.toString()] = nonEligibleActive;
+    });
+
+    const plannedReassignments = [];
+
+    for (const order of eligibleOrders) {
+      const currentTechId = (order.assignedTechnicianId?._id || order.assignedTechnicianId)?.toString();
+      const currentTech = technicians.find((t) => t._id.toString() === currentTechId) || order.assignedTechnicianId;
+
+      const sortedTechs = [...technicians].sort((a, b) => {
+        const loadA = simulatedWorkload[a._id.toString()] || 0;
+        const loadB = simulatedWorkload[b._id.toString()] || 0;
+        if (loadA !== loadB) return loadA - loadB;
+        if (a._id.toString() === currentTechId) return -1;
+        if (b._id.toString() === currentTechId) return 1;
+        return a.fullName.localeCompare(b.fullName);
+      });
+
+      const targetTech = sortedTechs[0];
+      simulatedWorkload[targetTech._id.toString()]++;
+
+      plannedReassignments.push({
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        title: order.title,
+        priority: order.priority,
+        status: order.status,
+        machineCode: order.machineId?.code || 'N/A',
+        machineName: order.machineId?.name || 'Equipment',
+        currentTechnician: {
+          id: currentTechId,
+          name: currentTech?.fullName || 'Unassigned',
+          email: currentTech?.email || ''
+        },
+        proposedTechnician: {
+          id: targetTech._id.toString(),
+          name: targetTech.fullName,
+          email: targetTech.email
+        },
+        changed: currentTechId !== targetTech._id.toString()
+      });
+    }
+
+    const currentDistribution = technicians.map((t) => ({
+      technicianId: t._id,
+      fullName: t.fullName,
+      email: t.email,
+      skills: t.skills || [],
+      activeCount: currentActiveWorkload[t._id.toString()] || 0
+    }));
+
+    const proposedDistribution = technicians.map((t) => ({
+      technicianId: t._id,
+      fullName: t.fullName,
+      email: t.email,
+      skills: t.skills || [],
+      currentActiveCount: currentActiveWorkload[t._id.toString()] || 0,
+      proposedTotalCount: simulatedWorkload[t._id.toString()] || 0,
+      delta: (simulatedWorkload[t._id.toString()] || 0) - (currentActiveWorkload[t._id.toString()] || 0)
+    }));
+
+    const changedCount = plannedReassignments.filter((r) => r.changed).length;
+
+    return res.status(200).json({
+      success: true,
+      eligibleCount: eligibleOrders.length,
+      changedCount,
+      currentDistribution,
+      proposedDistribution,
+      reassignments: plannedReassignments
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:BulkReassignPreview] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to generate bulk reassignment preview.'
+    });
+  }
+});
+
+/**
+ * POST /api/work-orders/bulk-reassign
+ * Manager-only endpoint to execute balanced workload redistribution.
+ * Requires explicit confirm: true in request body.
+ */
+router.post('/bulk-reassign', requireManager, async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    if (!confirm) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'Explicit confirmation (confirm: true) is required to execute bulk workload reassignment.'
+      });
+    }
+
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+
+    const technicians = await User.find({
+      factoryId,
+      role: USER_ROLES.TECHNICIAN,
+      isActive: true
+    }).select('fullName email assignedMachines').sort({ fullName: 1 });
+
+    if (technicians.length === 0) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'No active technicians available in this factory.'
+      });
+    }
+
+    const allOrders = await MaintenanceWorkOrder.find({ factoryId })
+      .populate('machineId', 'code name')
+      .populate('assignedTechnicianId', 'fullName email')
+      .sort({ createdAt: 1 });
+
+    const simulatedWorkload = {};
+    technicians.forEach((t) => {
+      const nonEligibleActive = allOrders.filter((o) => {
+        const isThisTech = (o.assignedTechnicianId?._id || o.assignedTechnicianId)?.toString() === t._id.toString();
+        const isEligible = [WORK_ORDER_STATUS.OPEN, WORK_ORDER_STATUS.ASSIGNED].includes(o.status);
+        const isClosed = [WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED].includes(o.status);
+        return isThisTech && !isEligible && !isClosed;
+      }).length;
+      simulatedWorkload[t._id.toString()] = nonEligibleActive;
+    });
+
+    const eligibleOrders = allOrders.filter((o) =>
+      [WORK_ORDER_STATUS.OPEN, WORK_ORDER_STATUS.ASSIGNED].includes(o.status)
+    );
+
+    let reallocatedCount = 0;
+    const executionDetails = [];
+
+    for (const order of eligibleOrders) {
+      const currentTechId = (order.assignedTechnicianId?._id || order.assignedTechnicianId)?.toString();
+      const currentTechName = order.assignedTechnicianId?.fullName || 'Technician';
+
+      const sortedTechs = [...technicians].sort((a, b) => {
+        const loadA = simulatedWorkload[a._id.toString()] || 0;
+        const loadB = simulatedWorkload[b._id.toString()] || 0;
+        if (loadA !== loadB) return loadA - loadB;
+        if (a._id.toString() === currentTechId) return -1;
+        if (b._id.toString() === currentTechId) return 1;
+        return a.fullName.localeCompare(b.fullName);
+      });
+
+      const targetTech = sortedTechs[0];
+      simulatedWorkload[targetTech._id.toString()]++;
+
+      if (currentTechId !== targetTech._id.toString()) {
+        order.assignedTechnicianId = targetTech._id;
+        order.statusHistory.push({
+          status: order.status,
+          changedById: req.user._id,
+          changedByName: req.user.fullName,
+          changedByRole: req.user.role,
+          timestamp: new Date(),
+          note: `Workload rebalanced by Manager ${req.user.fullName}: reassigned from ${currentTechName} to ${targetTech.fullName}.`
+        });
+
+        // Ensure target technician has machine servicing authorization
+        if (order.machineId) {
+          const mId = order.machineId._id || order.machineId;
+          await User.findByIdAndUpdate(targetTech._id, {
+            $addToSet: { assignedMachines: mId }
+          });
+          await Machine.findByIdAndUpdate(mId, {
+            $addToSet: { assignedTechnicians: targetTech._id }
+          });
+        }
+
+        await order.save();
+        reallocatedCount++;
+        executionDetails.push({
+          orderId: order._id,
+          orderNumber: order.orderNumber,
+          from: currentTechName,
+          to: targetTech.fullName
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully rebalanced ${reallocatedCount} unstarted work orders across ${technicians.length} technicians.`,
+      reallocatedCount,
+      totalEligible: eligibleOrders.length,
+      details: executionDetails
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:BulkReassignExecute] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to execute bulk workload reassignment.'
+    });
+  }
+});
+
+/**
  * POST /api/work-orders
  * Manager-only endpoint to create and assign a maintenance work order.
  */
@@ -135,10 +394,19 @@ router.post('/', requireManager, async (req, res) => {
       (m) => (m._id || m).toString() === machine._id.toString()
     );
     if (!hasMachineAccess) {
-      return res.status(400).json({
-        error: 'BadRequest',
-        message: `Technician "${technician.fullName}" is not assigned to machine "${machine.code}".`
-      });
+      if (req.body.grantMachineAccess === true) {
+        await User.findByIdAndUpdate(technician._id, {
+          $addToSet: { assignedMachines: machine._id }
+        });
+        await Machine.findByIdAndUpdate(machine._id, {
+          $addToSet: { assignedTechnicians: technician._id }
+        });
+      } else {
+        return res.status(400).json({
+          error: 'BadRequest',
+          message: `Technician "${technician.fullName}" is not assigned to machine "${machine.code}". Pass grantMachineAccess: true to grant authorization.`
+        });
+      }
     }
 
     const orderNumber = `WO-${machine.code}-${Date.now().toString().slice(-4)}`;
@@ -312,6 +580,102 @@ router.get('/:orderId', async (req, res) => {
     return res.status(500).json({
       error: 'InternalServerError',
       message: 'Failed to retrieve work order.'
+    });
+  }
+});
+
+/**
+ * PATCH /api/work-orders/:orderId/reassign
+ * Manager-only endpoint to reassign a specific work order to a technician.
+ * Validates technician existence, factory scope, and ensures machine servicing access.
+ */
+router.patch('/:orderId/reassign', requireManager, async (req, res) => {
+  try {
+    const factoryId = (req.user.factoryId?._id || req.user.factoryId).toString();
+    const { orderId } = req.params;
+    const { technicianId, note, grantMachineAccess } = req.body;
+
+    if (!technicianId || !mongoose.Types.ObjectId.isValid(technicianId)) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'Valid technicianId is required for reassignment.'
+      });
+    }
+
+    const order = await MaintenanceWorkOrder.findById(orderId);
+    if (!order || order.factoryId.toString() !== factoryId) {
+      return res.status(404).json({
+        error: 'NotFound',
+        message: 'Work order not found within your factory scope.'
+      });
+    }
+
+    if ([WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED].includes(order.status)) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: `Cannot reassign work order in "${order.status}" status.`
+      });
+    }
+
+    const technician = await User.findById(technicianId);
+    if (!technician || technician.factoryId.toString() !== factoryId || technician.role !== USER_ROLES.TECHNICIAN || !technician.isActive) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'Target technician must be an active technician in your factory.'
+      });
+    }
+
+    // Ensure machine servicing access
+    if (order.machineId) {
+      const mId = order.machineId._id || order.machineId;
+      const hasAccess = (technician.assignedMachines || []).some(
+        (m) => (m._id || m).toString() === mId.toString()
+      );
+      if (!hasAccess) {
+        if (grantMachineAccess !== false) {
+          await User.findByIdAndUpdate(technician._id, {
+            $addToSet: { assignedMachines: mId }
+          });
+          await Machine.findByIdAndUpdate(mId, {
+            $addToSet: { assignedTechnicians: technician._id }
+          });
+        } else {
+          return res.status(400).json({
+            error: 'BadRequest',
+            message: `Technician "${technician.fullName}" is not assigned to machine. Check grantMachineAccess to authorize.`
+          });
+        }
+      }
+    }
+
+    const previousTech = await User.findById(order.assignedTechnicianId).select('fullName').lean();
+    order.assignedTechnicianId = technician._id;
+    order.statusHistory.push({
+      status: order.status,
+      changedById: req.user._id,
+      changedByName: req.user.fullName,
+      changedByRole: req.user.role,
+      timestamp: new Date(),
+      note: note || `Work order reassigned from ${previousTech?.fullName || 'previous technician'} to ${technician.fullName} by Manager ${req.user.fullName}.`
+    });
+
+    await order.save();
+
+    const populatedOrder = await MaintenanceWorkOrder.findById(order._id)
+      .populate('machineId', 'code name status operationalStatus arrangement')
+      .populate('assignedTechnicianId', 'fullName email role')
+      .populate('createdById', 'fullName role');
+
+    return res.status(200).json({
+      success: true,
+      message: `Work order successfully reassigned to ${technician.fullName}.`,
+      workOrder: populatedOrder
+    });
+  } catch (err) {
+    console.error('[WorkOrderRoute:Reassign] Error:', err);
+    return res.status(500).json({
+      error: 'InternalServerError',
+      message: 'Failed to reassign work order.'
     });
   }
 });

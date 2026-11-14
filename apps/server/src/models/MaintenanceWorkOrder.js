@@ -75,6 +75,16 @@ const maintenanceWorkOrderSchema = new mongoose.Schema(
       default: WORK_ORDER_STATUS.OPEN,
       index: true
     },
+    isDemoData: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    isTestRecord: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
     dueDate: {
       type: Date,
       required: true

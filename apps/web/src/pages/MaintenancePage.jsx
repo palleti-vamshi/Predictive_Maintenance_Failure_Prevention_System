@@ -15,6 +15,40 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+/**
+ * Returns equipment-specific Lock-Out / Tag-Out (LOTO) instructions and isolation points.
+ * Ensures mechanical gearboxes, centrifugal pumps, and electric motors show accurate, sourced procedures.
+ */
+export function getEquipmentSpecificLoto(machineCode, machineType = 'gearbox') {
+  const code = (machineCode || '').toUpperCase();
+  if (code.startsWith('GB') || (machineType && machineType.toLowerCase().includes('gearbox'))) {
+    return {
+      isolationPoint: `Main Drive Disconnect Switch [DS-${code || 'GB-104'}] & mechanical coupling lock`,
+      procedure: `Lock-Out Tag-Out (LOTO) — Gearbox (${code || 'GB-104'})`,
+      text: `Lock-Out Tag-Out (LOTO) isolation at Main Drive Local Disconnect Switch [DS-${code || 'GB-104'}] and intermediate coupling lock pin before physical mechanical inspection. Zero-energy and oil temperature < 45°C verified.`
+    };
+  }
+  if (code.startsWith('PUMP') || (machineType && machineType.toLowerCase().includes('pump'))) {
+    return {
+      isolationPoint: `Pump Feeder Breaker [CB-${code || 'PUMP-201'}] & suction/discharge valves`,
+      procedure: `Lock-Out Tag-Out (LOTO) — Centrifugal Pump (${code || 'PUMP-201'})`,
+      text: `Lock-Out Tag-Out (LOTO) isolation at pump drive breaker [CB-${code || 'PUMP-201'}] and double block & bleed suction/discharge valves.`
+    };
+  }
+  if (code.startsWith('MTR') || (machineType && machineType.toLowerCase().includes('motor'))) {
+    return {
+      isolationPoint: `Motor Control Center [MCC-415V] supply breaker`,
+      procedure: `Lock-Out Tag-Out (LOTO) — Electric Motor (${code || 'MTR-301'})`,
+      text: `Lock-Out Tag-Out (LOTO) isolation at MCC 415V supply breaker and 3-phase zero potential verification.`
+    };
+  }
+  return {
+    isolationPoint: `Local equipment disconnect switch & lock hasp`,
+    procedure: `Lock-Out Tag-Out (LOTO) — ${code || 'Equipment'}`,
+    text: `Lock-Out Tag-Out (LOTO) isolation at local equipment disconnect switch and zero-energy verification before maintenance.`
+  };
+}
+
 export default function MaintenancePage() {
   const { user } = useAuth();
   const { queryParams, navigate } = useRouter();
@@ -81,6 +115,19 @@ export default function MaintenancePage() {
   const [permissionReason, setPermissionReason] = useState('');
   const [reassignTechId, setReassignTechId] = useState('');
 
+  // Bulk Rebalancing & Safe Demo Data Cleanup State
+  const [showBulkReassignModal, setShowBulkReassignModal] = useState(false);
+  const [bulkPreviewData, setBulkPreviewData] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkError, setBulkError] = useState(null);
+  const [bulkConfirming, setBulkConfirming] = useState(false);
+
+  const [showCleanupModal, setShowCleanupModal] = useState(false);
+  const [cleanupPreview, setCleanupPreview] = useState(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupError, setCleanupError] = useState(null);
+  const [cleanupExecuting, setCleanupExecuting] = useState(false);
+
   // New Work Order Form State (UX Pilot Page 7)
   const [newOrder, setNewOrder] = useState({
     machineCode: '',
@@ -92,7 +139,7 @@ export default function MaintenancePage() {
     sourceAlertId: '',
     sourceAnalysisRunId: '',
     instructions: [
-      'Lock-out tag-out (LOTO) machine at MCC-2 switchgear.',
+      'Lock-out tag-out (LOTO) machine at local safety disconnect switch [DS-GB-104] and mechanical coupling lock.',
       'Record baseline vibration RMS at DE & NDE bearing positions.',
       'Inspect gear tooth contact pattern and intermediate shaft backlash.',
       'Draw 100 ml lubricant sample for spectrographic analysis.'
@@ -616,7 +663,8 @@ export default function MaintenancePage() {
           dueDate: newOrder.dueDate,
           assignedTechnicianId: newOrder.assignedTechnicianId,
           sourceAlertId: newOrder.sourceAlertId || null,
-          sourceAnalysisRunId: newOrder.sourceAnalysisRunId || null
+          sourceAnalysisRunId: newOrder.sourceAnalysisRunId || null,
+          grantMachineAccess: true
         })
       });
       if (!res.ok) {
@@ -634,6 +682,102 @@ export default function MaintenancePage() {
 
   const toggleHistory = (orderId) => {
     setExpandedHistory((prev) => ({ ...prev, [orderId]: !prev[orderId] }));
+  };
+
+  const openBulkReassignModal = async () => {
+    setBulkError(null);
+    setBulkLoading(true);
+    setShowBulkReassignModal(true);
+    try {
+      const res = await fetch(`${API_BASE}/work-orders/bulk-reassign/preview`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to load workload distribution preview.');
+      }
+      const data = await res.json();
+      setBulkPreviewData(data);
+    } catch (err) {
+      setBulkError(err.message);
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleConfirmBulkReassign = async () => {
+    setBulkConfirming(true);
+    setBulkError(null);
+    try {
+      const res = await fetch(`${API_BASE}/work-orders/bulk-reassign`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ confirm: true, note: 'Manager executed automated workload balancing across active technicians.' })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to apply workload balancing.');
+      }
+      const data = await res.json();
+      setShowBulkReassignModal(false);
+      setActionSuccess(`Workload balanced successfully: ${data.reassignedCount} work orders distributed.`);
+      setTimeout(() => setActionSuccess(null), 5000);
+      fetchData();
+    } catch (err) {
+      setBulkError(err.message);
+    } finally {
+      setBulkConfirming(false);
+    }
+  };
+
+  const openCleanupModal = async () => {
+    setCleanupError(null);
+    setCleanupLoading(true);
+    setShowCleanupModal(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/demo-data/preview`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to load test data preview.');
+      }
+      const data = await res.json();
+      setCleanupPreview(data);
+    } catch (err) {
+      setCleanupError(err.message);
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const handleExecuteCleanup = async () => {
+    setCleanupExecuting(true);
+    setCleanupError(null);
+    try {
+      const res = await fetch(`${API_BASE}/admin/demo-data/cleanup`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to clean test data.');
+      }
+      const data = await res.json();
+      setShowCleanupModal(false);
+      setActionSuccess(`Test cleanup complete: removed ${data.deleted?.testWorkOrders || 0} test orders and ${data.deleted?.simulatedAlerts || 0} simulated alerts.`);
+      setTimeout(() => setActionSuccess(null), 5000);
+      fetchData();
+    } catch (err) {
+      setCleanupError(err.message);
+    } finally {
+      setCleanupExecuting(false);
+    }
   };
 
   const selectedTech = eligibleTechs.find((t) => t._id === newOrder.assignedTechnicianId);
@@ -844,6 +988,32 @@ export default function MaintenancePage() {
               <option value={WORK_ORDER_PRIORITY.MEDIUM}>Medium</option>
               <option value={WORK_ORDER_PRIORITY.LOW}>Low</option>
             </select>
+
+            {isManager && activeTab === 'board' && (
+              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon="refresh"
+                  onClick={openBulkReassignModal}
+                  title="Balance unstarted work orders across active technicians"
+                >
+                  Balance Workload
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon="trash"
+                  onClick={openCleanupModal}
+                  title="Preview and clean integration test work orders and simulated alerts"
+                  style={{ color: '#b45309', borderColor: 'rgba(180, 83, 9, 0.3)' }}
+                >
+                  Clean Test Data
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1254,10 +1424,15 @@ export default function MaintenancePage() {
                     )}
 
                     {/* LOTO / Safety Tag Callout */}
-                    <div className="loto-warning-box" style={{ marginBottom: '0.85rem' }}>
-                      <Icon name="shield" size={15} color="#b45309" />
-                      <span>LOTO Required: Lock-Out Tag-Out isolation at MCC-2 Switchgear before physical inspection.</span>
-                    </div>
+                    {(() => {
+                      const loto = getEquipmentSpecificLoto(order.machineId?.code, order.machineId?.type);
+                      return (
+                        <div className="loto-warning-box" style={{ marginBottom: '0.85rem' }}>
+                          <Icon name="shield" size={15} color="#b45309" />
+                          <span>LOTO Required: {loto.text}</span>
+                        </div>
+                      );
+                    })()}
 
                     {/* Assigned Technician & Due Date Row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--bg-surface-subtle)', borderRadius: '8px', marginBottom: '1rem' }}>
@@ -1716,7 +1891,9 @@ export default function MaintenancePage() {
                     onChange={() => {}}
                     style={{ accentColor: 'var(--primary)', cursor: 'pointer' }}
                   />
-                  <span className="checklist-text">1. Lock-out tag-out (LOTO) confirmed at MCC-2 switchgear</span>
+                  <span className="checklist-text">
+                    1. Lock-out tag-out (LOTO) confirmed: {getEquipmentSpecificLoto(selectedOrder?.machineId?.code, selectedOrder?.machineId?.type).isolationPoint}
+                  </span>
                 </div>
                 <div
                   className={`checklist-row ${executionChecklist.baselineVibMeasured ? 'checked-row' : ''}`}
@@ -2290,13 +2467,16 @@ export default function MaintenancePage() {
                 icon="check"
                 onClick={async () => {
                   try {
-                    const res = await fetch(`${API_BASE}/machines/${selectedOrder.machineId?.code}/assign`, {
-                      method: 'POST',
+                    const res = await fetch(`${API_BASE}/work-orders/${selectedOrder._id}/reassign`, {
+                      method: 'PATCH',
                       credentials: 'include',
                       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
                       body: JSON.stringify({ technicianId: reassignTechId })
                     });
-                    if (!res.ok) throw new Error('Failed to reassign technician.');
+                    if (!res.ok) {
+                      const errData = await res.json().catch(() => ({}));
+                      throw new Error(errData.message || 'Failed to reassign technician.');
+                    }
                     setShowAssignModal(false);
                     setActionSuccess('Technician assignment updated.');
                     setTimeout(() => setActionSuccess(null), 4000);
@@ -2307,6 +2487,181 @@ export default function MaintenancePage() {
                 }}
               >
                 Confirm Reassignment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Bulk Workload Rebalancing */}
+      {showBulkReassignModal && (
+        <div className="modal-backdrop" onClick={() => !bulkConfirming && setShowBulkReassignModal(false)}>
+          <div className="modal-card" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Technician Workload Balancing</h3>
+                <p className="modal-subtitle">
+                  Greedy workload distribution across active factory technicians for unstarted open work orders.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => !bulkConfirming && setShowBulkReassignModal(false)}
+                disabled={bulkConfirming}
+              >
+                <Icon name="close" size={16} color="var(--text-muted)" />
+              </button>
+            </div>
+
+            {bulkError && <AlertCallout severity="high" message={bulkError} style={{ marginBottom: '1rem' }} />}
+
+            {bulkLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-secondary)' }}>
+                <p>Computing optimal workload distribution across plant technicians...</p>
+              </div>
+            ) : bulkPreviewData ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Eligible Unstarted Tasks: {bulkPreviewData.eligibleCount}
+                  </span>
+                  <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
+                    {bulkPreviewData.changedCount} Reassignment(s) Needed
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                  {bulkPreviewData.proposedDistribution?.map((p) => (
+                    <div
+                      key={p.technicianId}
+                      style={{
+                        padding: '0.75rem',
+                        background: 'var(--bg-surface-subtle)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-subtle)'
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{p.fullName}</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{p.email}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.6rem', fontSize: '0.78rem' }}>
+                        <span>Current: <strong>{p.currentActiveCount}</strong></span>
+                        <span style={{ color: p.delta < 0 ? '#16a34a' : p.delta > 0 ? '#0284c7' : 'inherit', fontWeight: 600 }}>
+                          Proposed: {p.proposedTotalCount} ({p.delta > 0 ? `+${p.delta}` : p.delta})
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {bulkPreviewData.reassignments?.filter(r => r.changed).length > 0 && (
+                  <div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Reassignment Preview (Sample)
+                    </span>
+                    <div style={{ maxHeight: '160px', overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0.5rem', marginTop: '0.35rem', background: '#ffffff' }}>
+                      {bulkPreviewData.reassignments.filter(r => r.changed).slice(0, 8).map(r => (
+                        <div key={r.orderId} style={{ padding: '0.3rem 0', borderBottom: '1px solid var(--border-subtle)', fontSize: '0.76rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <span><strong>{r.orderNumber}</strong> ({r.machineCode}): {r.title}</span>
+                          <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                            {r.currentTechnician?.name} → {r.proposedTechnician?.name}
+                          </span>
+                        </div>
+                      ))}
+                      {bulkPreviewData.reassignments.filter(r => r.changed).length > 8 && (
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: '0.35rem', fontSize: '0.74rem' }}>
+                          + {bulkPreviewData.reassignments.filter(r => r.changed).length - 8} more work orders
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <div className="modal-actions" style={{ marginTop: '1.25rem' }}>
+              <Button type="button" variant="outline" onClick={() => setShowBulkReassignModal(false)} disabled={bulkConfirming}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                icon="check"
+                disabled={bulkLoading || bulkConfirming || !bulkPreviewData || bulkPreviewData.changedCount === 0}
+                onClick={handleConfirmBulkReassign}
+              >
+                {bulkConfirming ? 'Applying Reassignments...' : `Apply Balanced Reassignment (${bulkPreviewData?.changedCount ?? 0} tasks)`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Safe Test & Demo Data Cleanup */}
+      {showCleanupModal && (
+        <div className="modal-backdrop" onClick={() => !cleanupExecuting && setShowCleanupModal(false)}>
+          <div className="modal-card" style={{ maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Clean Test & Demo Data</h3>
+                <p className="modal-subtitle">
+                  Safely purge integration test work orders and simulated condition alerts while preserving real operational records.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => !cleanupExecuting && setShowCleanupModal(false)}
+                disabled={cleanupExecuting}
+              >
+                <Icon name="close" size={16} color="var(--text-muted)" />
+              </button>
+            </div>
+
+            {cleanupError && <AlertCallout severity="high" message={cleanupError} style={{ marginBottom: '1rem' }} />}
+
+            {cleanupLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-secondary)' }}>
+                <p>Auditing test records and simulated telemetry alerts...</p>
+              </div>
+            ) : cleanupPreview ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <div style={{ padding: '0.85rem', background: '#fef3c7', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: 600 }}>Test Work Orders</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#78350f', margin: '0.2rem 0' }}>
+                      {cleanupPreview.counts?.testWorkOrders || 0}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#92400e' }}>Generated by integration tests (e.g. WO-TEST*)</div>
+                  </div>
+                  <div style={{ padding: '0.85rem', background: '#fef3c7', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#92400e', fontWeight: 600 }}>Simulated Alerts</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#78350f', margin: '0.2rem 0' }}>
+                      {cleanupPreview.counts?.simulatedAlerts || 0}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#92400e' }}>Generated by gearbox simulator runs</div>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '0.75rem', background: 'var(--bg-surface-subtle)', borderRadius: '6px', border: '1px solid var(--border-subtle)', lineHeight: 1.5 }}>
+                  <strong style={{ color: '#16a34a' }}>Audit Guarantee:</strong> Real plant machine telemetry, operational work orders, approved technician reports, and factory baseline configurations remain completely untouched.
+                </div>
+              </div>
+            ) : null}
+
+            <div className="modal-actions" style={{ marginTop: '1.25rem' }}>
+              <Button type="button" variant="outline" onClick={() => setShowCleanupModal(false)} disabled={cleanupExecuting}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                icon="trash"
+                style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                disabled={cleanupLoading || cleanupExecuting || !cleanupPreview || cleanupPreview.counts?.totalEligible === 0}
+                onClick={handleExecuteCleanup}
+              >
+                {cleanupExecuting ? 'Cleaning Test Records...' : `Purge ${cleanupPreview?.counts?.totalEligible ?? 0} Test Records`}
               </Button>
             </div>
           </div>
