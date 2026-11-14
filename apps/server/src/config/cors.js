@@ -94,6 +94,23 @@ export const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'X-Chunk-Index',
+    'X-Chunk-Size',
+    'X-Chunk-Checksum',
+    'X-Client-Type',
+    'X-Session-Token'
+  ],
+  exposedHeaders: [
+    'Content-Disposition',
+    'X-Chunk-Index',
+    'X-Chunk-Size',
+    'X-Chunk-Checksum'
+  ]
 };
 

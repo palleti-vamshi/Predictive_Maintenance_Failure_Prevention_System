@@ -4,7 +4,16 @@
 
 export const DATASET_TYPES = Object.freeze({
   OPERATIONAL: 'operational',
-  REFERENCE: 'reference'
+  REFERENCE: 'reference',
+  SIMULATOR: 'simulator',
+  SYNTHETIC_QA: 'synthetic_qa'
+});
+
+export const DATASET_PROVENANCE_LABELS = Object.freeze({
+  operational: 'Operational Factory Telemetry',
+  simulator: 'Gearbox Simulator Telemetry (Digital Twin)',
+  reference: 'Public Research Benchmark',
+  synthetic_qa: 'Synthetic / QA Test Data'
 });
 
 export const DATASET_STATUS = Object.freeze({

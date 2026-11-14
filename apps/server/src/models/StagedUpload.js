@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { DATASET_TYPES } from '@predictive-maintenance/shared';
 
 /**
  * StagedUpload Schema
@@ -52,8 +53,12 @@ const stagedUploadSchema = new mongoose.Schema(
     },
     datasetType: {
       type: String,
-      enum: ['operational', 'reference'],
-      default: 'operational'
+      enum: Object.values(DATASET_TYPES),
+      default: DATASET_TYPES.OPERATIONAL
+    },
+    isSyntheticQA: {
+      type: Boolean,
+      default: false
     },
     machineId: {
       type: mongoose.Schema.Types.ObjectId,

@@ -335,6 +335,7 @@ router.post('/uploads/initiate', requireTechnicianOrManager, uploadRateLimiter, 
       description = '',
       referenceDetails = null,
       isSimulatorDerived = false,
+      isSyntheticQA = false,
       isDemoData = false
     } = req.body;
 
@@ -344,6 +345,13 @@ router.post('/uploads/initiate', requireTechnicianOrManager, uploadRateLimiter, 
         message: 'originalFilename and a positive fileSizeBytes are required.'
       });
     }
+
+    const isSynthetic = Boolean(
+      isSyntheticQA ||
+      datasetType === DATASET_TYPES.SYNTHETIC_QA ||
+      originalFilename.toLowerCase().includes('smoke_test') ||
+      originalFilename.toLowerCase().includes('synthetic')
+    );
 
     const userFactoryId = (req.user?.factoryId?._id || req.user?.factoryId || '').toString();
 
@@ -440,13 +448,14 @@ router.post('/uploads/initiate', requireTechnicianOrManager, uploadRateLimiter, 
       totalChunks: Math.max(1, parseInt(totalChunks, 10)),
       chunkSizeBytes: parseInt(chunkSizeBytes, 10),
       receivedChunks: [],
-      datasetType,
+      datasetType: isSynthetic ? DATASET_TYPES.SYNTHETIC_QA : datasetType,
       machineId: machineId || null,
       title: title || path.basename(originalFilename).replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
       description,
       referenceDetails,
-      isSimulatorDerived: Boolean(isSimulatorDerived),
-      isDemoData: Boolean(isDemoData),
+      isSimulatorDerived: Boolean(isSimulatorDerived || datasetType === DATASET_TYPES.SIMULATOR),
+      isSyntheticQA: isSynthetic,
+      isDemoData: Boolean(isDemoData || isSynthetic || isSimulatorDerived || datasetType === DATASET_TYPES.SIMULATOR),
       uploaderId: req.user._id,
       factoryId: userFactoryId,
       expiresAt,
@@ -490,7 +499,8 @@ router.post(
       const { uploadId } = req.params;
       const rawIndex = req.headers['x-chunk-index'] || req.query.chunkIndex || req.body?.chunkIndex;
       const chunkIndex = parseInt(rawIndex, 10);
-      const expectedChunkSize = req.headers['x-chunk-size'] ? parseInt(req.headers['x-chunk-size'], 10) : undefined;
+      const rawChunkSize = req.headers['x-chunk-size'] || req.query.chunkSize || req.body?.chunkSize;
+      const expectedChunkSize = rawChunkSize ? parseInt(rawChunkSize, 10) : undefined;
 
       if (isNaN(chunkIndex) || chunkIndex < 0) {
         return res.status(400).json({
@@ -707,6 +717,7 @@ router.post('/uploads/:uploadId/complete', requireTechnicianOrManager, async (re
       fileChecksumSha256: assembled.fileChecksumSha256,
       referenceDetails: staged.referenceDetails,
       isSimulatorDerived: staged.isSimulatorDerived,
+      isSyntheticQA: staged.isSyntheticQA,
       isDemoData: staged.isDemoData,
       columns: columnMappings
     });
@@ -1134,8 +1145,9 @@ router.post('/confirm', requireTechnicianOrManager, async (req, res) => {
       labelDistribution: validation.labelDistribution,
       aiTaskCompatibility: validation.aiTaskCompatibility,
       referenceDetails: datasetType === DATASET_TYPES.REFERENCE ? referenceDetails : undefined,
-      isSimulatorDerived: Boolean(req.body.isSimulatorDerived),
-      isDemoData: Boolean(req.body.isDemoData)
+      isSimulatorDerived: Boolean(req.body.isSimulatorDerived || datasetType === DATASET_TYPES.SIMULATOR),
+      isSyntheticQA: Boolean(req.body.isSyntheticQA || datasetType === DATASET_TYPES.SYNTHETIC_QA),
+      isDemoData: Boolean(req.body.isDemoData || req.body.isSyntheticQA || req.body.isSimulatorDerived || datasetType === DATASET_TYPES.SYNTHETIC_QA || datasetType === DATASET_TYPES.SIMULATOR)
     });
 
     // Mark staged upload record as confirmed in MongoDB and in-memory map

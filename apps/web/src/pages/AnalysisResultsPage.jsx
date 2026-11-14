@@ -1098,11 +1098,32 @@ export default function AnalysisResultsPage() {
                         </span>
                       </div>
 
-                      {(selectedRun.isSimulatorDerived || selectedRun.datasetTitle?.includes('[SIMULATED]')) && (
+                      {(selectedRun.isSyntheticQA || selectedRun.datasetType === 'synthetic_qa' || selectedRun.datasetTitle?.toLowerCase().includes('synthetic') || selectedRun.datasetTitle?.toLowerCase().includes('smoke_test')) ? (
+                        <div>
+                          <span className="spec-label">Telemetry Provenance:</span>
+                          <span className="badge" style={{ backgroundColor: 'rgba(124, 58, 237, 0.15)', color: '#7c3aed', border: '1px solid rgba(124, 58, 237, 0.35)', fontSize: '0.72rem', fontWeight: 700 }}>
+                            SYNTHETIC / QA TEST DATA
+                          </span>
+                        </div>
+                      ) : (selectedRun.isSimulatorDerived || selectedRun.datasetTitle?.includes('[SIMULATED]')) ? (
                         <div>
                           <span className="spec-label">Telemetry Provenance:</span>
                           <span className="badge" style={{ backgroundColor: 'rgba(217, 119, 6, 0.15)', color: '#D97706', border: '1px solid rgba(217, 119, 6, 0.35)', fontSize: '0.72rem', fontWeight: 700 }}>
                             SIMULATED DIGITAL TWIN TELEMETRY
+                          </span>
+                        </div>
+                      ) : selectedRun.datasetType === 'reference' ? (
+                        <div>
+                          <span className="spec-label">Telemetry Provenance:</span>
+                          <span className="badge badge-info" style={{ fontSize: '0.72rem', fontWeight: 700 }}>
+                            RESEARCH BENCHMARK
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="spec-label">Telemetry Provenance:</span>
+                          <span className="badge badge-operational" style={{ fontSize: '0.72rem', fontWeight: 700 }}>
+                            OPERATIONAL PLANT TELEMETRY
                           </span>
                         </div>
                       )}
@@ -1619,7 +1640,30 @@ export default function AnalysisResultsPage() {
                     </div>
                   </Card>
 
-                  {/* Evaluation Metrics Grid */}
+                  {selectedModel.status === 'failed' ? (
+                    <div style={{ marginTop: '1.25rem' }}>
+                      <AlertCallout
+                        severity="critical"
+                        title="Model Training Failed — Missing Ground-Truth Labels"
+                        description={
+                          selectedModel.failureReason
+                            ? `Training pipeline terminated with error: "${selectedModel.failureReason}". Supervised Random Forest classification requires a dataset with verified ground-truth labels and at least two discrete fault classes. This dataset had 0 labels or 0 fault classes.`
+                            : 'Supervised Random Forest classification requires a dataset with verified ground-truth labels and at least two discrete fault classes. This dataset had 0 labels or 0 fault classes.'
+                        }
+                        action={
+                          <div style={{ marginTop: '0.65rem', fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                            <strong>Recovery & Next Steps:</strong>
+                            <ul style={{ margin: '0.35rem 0 0 1.25rem', padding: 0 }}>
+                              <li>To train a supervised multi-class fault classifier, select a dataset with labeled fault examples (e.g. SEU DDS Gearbox Specimen or CWRU Bearing Benchmark).</li>
+                              <li>For unlabelled operational or synthetic telemetry, train an unsupervised <strong>Isolation Forest Anomaly Detector</strong> instead.</li>
+                            </ul>
+                          </div>
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Evaluation Metrics Grid */}
                   {selectedModel.modelType === MODEL_TYPES.RANDOM_FOREST ? (
                     <div className="metrics-grid">
                       <MetricSummary
@@ -1854,6 +1898,8 @@ export default function AnalysisResultsPage() {
                       </Card>
                     </div>
                   </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

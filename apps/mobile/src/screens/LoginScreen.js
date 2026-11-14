@@ -26,8 +26,15 @@ export default function LoginScreen() {
     await login(email.trim(), password);
   };
 
-  const handleQuickDemo = async (role) => {
-    await quickDemoLogin(role);
+  const handleQuickDemo = (role) => {
+    const creds = {
+      [USER_ROLES.TECHNICIAN]: { email: 'tech@pune.bharatdynamics.demo', pass: 'Tech123!' },
+      [USER_ROLES.FACTORY_MANAGER]: { email: 'manager@pune.bharatdynamics.demo', pass: 'Manager123!' },
+      [USER_ROLES.VIEWER]: { email: 'viewer@pune.bharatdynamics.demo', pass: 'Viewer123!' }
+    };
+    const c = creds[role] || creds[USER_ROLES.TECHNICIAN];
+    setEmail(c.email);
+    setPassword(c.pass);
   };
 
   return (

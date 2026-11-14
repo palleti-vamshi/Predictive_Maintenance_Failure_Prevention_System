@@ -48,6 +48,7 @@ export default function DatasetUploadPage() {
   // Wizard state
   const [datasetType, setDatasetType] = useState(DATASET_TYPES.OPERATIONAL);
   const [isSimulatorDerived, setIsSimulatorDerived] = useState(false);
+  const [isSyntheticQA, setIsSyntheticQA] = useState(false);
   const [machines, setMachines] = useState([]);
   const [selectedMachineId, setSelectedMachineId] = useState('');
   const [title, setTitle] = useState('');
@@ -339,6 +340,13 @@ export default function DatasetUploadPage() {
     if (!title) {
       setTitle(file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
     }
+
+    // Automatically classify synthetic/smoke test data into the dedicated Synthetic QA category
+    if (name.includes('smoke_test') || name.includes('synthetic')) {
+      setDatasetType(DATASET_TYPES.SYNTHETIC_QA);
+      setIsSyntheticQA(true);
+      setIsSimulatorDerived(false);
+    }
   }
 
   // Pause chunked upload
@@ -430,45 +438,70 @@ export default function DatasetUploadPage() {
     const totalChunks = Math.max(1, Math.ceil(selectedFile.size / chunkSize));
 
     const isSim = Boolean(isSimulatorDerived || datasetType === 'simulator');
+    const isSynth = Boolean(isSyntheticQA || datasetType === DATASET_TYPES.SYNTHETIC_QA);
     const finalTitle = isSim && !title.trim().includes('[SIMULATED]')
       ? `[SIMULATED] ${title.trim()}`
       : (title.trim() || selectedFile.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
 
     try {
-      // 1. Initiate upload session
-      const initRes = await fetch(`${API_BASE}/datasets/uploads/initiate`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers
-        },
-        body: JSON.stringify({
-          originalFilename: selectedFile.name,
-          fileSizeBytes: selectedFile.size,
-          mimeType: selectedFile.type || 'text/csv',
-          totalChunks,
-          chunkSizeBytes: chunkSize,
-          datasetType: datasetType === 'simulator' ? DATASET_TYPES.OPERATIONAL : datasetType,
-          machineId: (datasetType === DATASET_TYPES.OPERATIONAL || datasetType === 'simulator') ? selectedMachineId : null,
-          title: finalTitle,
-          description: description.trim(),
-          referenceDetails: datasetType === DATASET_TYPES.REFERENCE ? refDetails : undefined,
-          isSimulatorDerived: isSim,
-          isDemoData: isSim
-        })
-      });
+      let uploadId = activeUploadIdRef.current;
+      let receivedSet = new Set();
 
-      const initData = await initRes.json();
-      if (!initRes.ok) {
-        throw new Error(initData.message || 'Failed to initiate upload session.');
+      // Check if resuming an existing upload session
+      if (uploadId) {
+        try {
+          const statusRes = await fetch(`${API_BASE}/datasets/uploads/${uploadId}/status`, {
+            credentials: 'include',
+            headers
+          });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            receivedSet = new Set(statusData.receivedChunks || []);
+          } else {
+            uploadId = null;
+          }
+        } catch {
+          uploadId = null;
+        }
       }
 
-      const { uploadId } = initData;
-      setActiveUploadId(uploadId);
-      activeUploadIdRef.current = uploadId;
+      // If no valid active session, initiate a new upload session
+      if (!uploadId) {
+        const initRes = await fetch(`${API_BASE}/datasets/uploads/initiate`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...headers
+          },
+          body: JSON.stringify({
+            originalFilename: selectedFile.name,
+            fileSizeBytes: selectedFile.size,
+            mimeType: selectedFile.type || 'text/csv',
+            totalChunks,
+            chunkSizeBytes: chunkSize,
+            datasetType: isSim ? DATASET_TYPES.SIMULATOR : (isSynth ? DATASET_TYPES.SYNTHETIC_QA : datasetType),
+            machineId: (datasetType === DATASET_TYPES.OPERATIONAL || isSim || isSynth) ? selectedMachineId : null,
+            title: finalTitle,
+            description: description.trim(),
+            referenceDetails: datasetType === DATASET_TYPES.REFERENCE ? refDetails : undefined,
+            isSimulatorDerived: isSim,
+            isSyntheticQA: isSynth,
+            isDemoData: Boolean(isSim || isSynth)
+          })
+        });
 
-      let receivedSet = new Set(initData.receivedChunks || []);
+        const initData = await initRes.json();
+        if (!initRes.ok) {
+          throw new Error(initData.message || 'Failed to initiate upload session.');
+        }
+
+        uploadId = initData.uploadId;
+        setActiveUploadId(uploadId);
+        activeUploadIdRef.current = uploadId;
+        receivedSet = new Set(initData.receivedChunks || []);
+      }
+
       let transferredBytes = Array.from(receivedSet).length * chunkSize;
       setUploadedBytes(transferredBytes);
       setUploadProgress(Math.round((transferredBytes / selectedFile.size) * 100));
@@ -521,17 +554,20 @@ export default function DatasetUploadPage() {
           if (isCancelledRef.current) break;
 
           try {
-            const chunkRes = await fetch(`${API_BASE}/datasets/uploads/${uploadId}/chunk?chunkIndex=${chunkIndex}`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/octet-stream',
-                'X-Chunk-Index': String(chunkIndex),
-                'X-Chunk-Size': String(chunkBlob.size),
-                ...headers
-              },
-              body: chunkBlob
-            });
+            const chunkRes = await fetch(
+              `${API_BASE}/datasets/uploads/${uploadId}/chunk?chunkIndex=${chunkIndex}&chunkSize=${chunkBlob.size}`,
+              {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/octet-stream',
+                  'X-Chunk-Index': String(chunkIndex),
+                  'X-Chunk-Size': String(chunkBlob.size),
+                  ...headers
+                },
+                body: chunkBlob
+              }
+            );
 
             if (chunkRes.ok) {
               chunkSuccess = true;
@@ -596,7 +632,11 @@ export default function DatasetUploadPage() {
       }
     } catch (err) {
       console.error('Chunked upload failed:', err);
-      setUploadError(err.message || 'Chunked file upload failed.');
+      let friendlyMsg = err.message || 'Chunked file upload failed.';
+      if (err.name === 'TypeError' && err.message?.includes('Failed to fetch')) {
+        friendlyMsg = 'Unable to reach MechGuard API server (connection refused or CORS preflight rejected). Please verify that the backend server is running on port 5001 and your network is active.';
+      }
+      setUploadError(friendlyMsg);
       setUploading(false);
     }
   }
@@ -1294,6 +1334,7 @@ export default function DatasetUploadPage() {
                         onChange={() => {
                           setDatasetType(DATASET_TYPES.REFERENCE);
                           setIsSimulatorDerived(false);
+                          setIsSyntheticQA(false);
                         }}
                         className="provenance-radio-input"
                       />
@@ -1315,10 +1356,45 @@ export default function DatasetUploadPage() {
                       </span>
                     </div>
                   </label>
+
+                  <label
+                    htmlFor="provenance-synthetic-qa"
+                    className={`provenance-card ${datasetType === DATASET_TYPES.SYNTHETIC_QA ? 'selected' : ''}`}
+                  >
+                    <div className="provenance-card-header">
+                      <input
+                        type="radio"
+                        name="datasetType"
+                        id="provenance-synthetic-qa"
+                        value={DATASET_TYPES.SYNTHETIC_QA}
+                        checked={datasetType === DATASET_TYPES.SYNTHETIC_QA}
+                        onChange={() => {
+                          setDatasetType(DATASET_TYPES.SYNTHETIC_QA);
+                          setIsSimulatorDerived(false);
+                          setIsSyntheticQA(true);
+                        }}
+                        className="provenance-radio-input"
+                      />
+                      <div className="provenance-badge-icon" style={{ background: 'rgba(124, 58, 237, 0.12)', color: '#7c3aed' }}>
+                        <Icon name="check" size={15} />
+                      </div>
+                    </div>
+                    <div className="provenance-card-body">
+                      <span className="provenance-title">Synthetic / QA Test Data</span>
+                      <p className="provenance-desc">
+                        Synthetic or simulated QA telemetry generated for testing pipelines and validating features. Strictly quarantined from live plant operations.
+                      </p>
+                    </div>
+                    <div className="provenance-card-footer">
+                      <span className="provenance-scope-tag" style={{ background: 'rgba(124, 58, 237, 0.15)', color: '#7c3aed', fontWeight: 700 }}>
+                        SYNTHETIC QA
+                      </span>
+                    </div>
+                  </label>
                 </div>
               </div>
 
-              {(datasetType === DATASET_TYPES.OPERATIONAL || datasetType === 'simulator') ? (
+              {(datasetType === DATASET_TYPES.OPERATIONAL || datasetType === 'simulator' || datasetType === DATASET_TYPES.SYNTHETIC_QA) ? (
                 <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                   <label className="form-label" htmlFor="machine-target-select">
                     Target Factory Machine Specimen *
@@ -1721,7 +1797,26 @@ export default function DatasetUploadPage() {
 
               {uploadError && (
                 <div style={{ marginTop: '0.85rem' }}>
-                  <AlertCallout severity="critical" title="Upload Failed" description={uploadError} />
+                  <AlertCallout
+                    severity="critical"
+                    title="Upload Interrupted"
+                    description={uploadError}
+                    action={
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setUploadError(null);
+                            handleChunkedUpload();
+                          }}
+                        >
+                          <Icon name="refresh" size={13} style={{ marginRight: '0.35rem' }} />
+                          Retry Resumable Upload
+                        </Button>
+                      </div>
+                    }
+                  />
                 </div>
               )}
 

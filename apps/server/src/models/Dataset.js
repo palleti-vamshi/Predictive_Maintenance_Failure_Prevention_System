@@ -181,6 +181,10 @@ const datasetSchema = new mongoose.Schema(
       type: Boolean,
       default: false
     },
+    isSyntheticQA: {
+      type: Boolean,
+      default: false
+    },
     isDemoData: {
       type: Boolean,
       default: false
