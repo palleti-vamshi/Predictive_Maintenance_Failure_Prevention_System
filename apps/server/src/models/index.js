@@ -9,6 +9,7 @@ export * from './Dataset.js';
 export * from './ModelArtifact.js';
 export * from './AnalysisRun.js';
 export * from './Alert.js';
+export * from './DailyMaintenanceReview.js';
 export * from './StagedUpload.js';
 export * from './DatasetJob.js';
 

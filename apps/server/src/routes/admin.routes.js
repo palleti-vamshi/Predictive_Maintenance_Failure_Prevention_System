@@ -5,6 +5,7 @@ import { MaintenanceWorkOrder } from '../models/MaintenanceWorkOrder.js';
 import { Alert } from '../models/Alert.js';
 import { AnalysisRun } from '../models/AnalysisRun.js';
 import { Dataset } from '../models/Dataset.js';
+import { DailyMaintenanceReview } from '../models/DailyMaintenanceReview.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireManager } from '../middleware/authorize.js';
 import { WORK_ORDER_STATUS } from '@predictive-maintenance/shared';
@@ -110,7 +111,7 @@ router.get('/audit-trail', async (req, res) => {
   try {
     const factoryId = req.user.factoryId?._id || req.user.factoryId;
 
-    const [workOrders, alerts, analysisRuns, datasets] = await Promise.all([
+    const [workOrders, alerts, analysisRuns, datasets, dailyReviews] = await Promise.all([
       MaintenanceWorkOrder.find({ factoryId })
         .populate('machineId', 'code name type')
         .populate('assignedTechnicianId', 'fullName role')
@@ -124,7 +125,8 @@ router.get('/audit-trail', async (req, res) => {
         .lean(),
       Dataset.find({ factoryId })
         .populate('machineId', 'code name type')
-        .lean()
+        .lean(),
+      DailyMaintenanceReview.find({ factoryId }).lean()
     ]);
 
     const events = [];
@@ -266,6 +268,42 @@ router.get('/audit-trail', async (req, res) => {
         description: `Ingested ${ds.rowCount || 0} rows across ${ds.columnMappings?.length || 0} mapped sensor channels. Provenance: ${ds.provenanceCategory}.`,
         metadata: { datasetId: ds._id, modality: ds.modality }
       });
+    }
+
+    // 5. Daily Maintenance Reviews & Manager Decisions
+    if (Array.isArray(dailyReviews)) {
+      for (const rev of dailyReviews) {
+        events.push({
+          id: `dmr_gen_${rev._id}`,
+          timestamp: rev.generatedAt || rev.createdAt,
+          type: 'daily_review_generated',
+          category: 'Maintenance Review',
+          actor: rev.generatedByName || 'Factory Manager',
+          role: 'factory_manager',
+          target: `Plant End-of-Day Review (${rev.reviewDate})`,
+          title: `Daily Maintenance Review: ${rev.reportNumber}`,
+          description: `Triaged ${rev.summary?.totalAlertsEvaluated || 0} alerts into ${rev.summary?.totalIssueGroups || 0} deduplicated issue groups (${rev.summary?.criticalUrgentCount || 0} critical, ${rev.summary?.newIssuesCount || 0} new, ${rev.summary?.recurringIssuesCount || 0} recurring).`,
+          metadata: { reportNumber: rev.reportNumber, reviewDate: rev.reviewDate, summary: rev.summary }
+        });
+
+        if (Array.isArray(rev.auditLog)) {
+          for (const al of rev.auditLog) {
+            if (al.action === 'report_generated') continue; // already pushed
+            events.push({
+              id: `dmr_audit_${al._id || Math.random()}`,
+              timestamp: al.timestamp,
+              type: al.action,
+              category: 'Maintenance Review',
+              actor: al.performedByName || 'Factory Manager',
+              role: al.performedByRole || 'factory_manager',
+              target: `Review ${rev.reportNumber}`,
+              title: `DMR Decision: ${al.action.replace(/_/g, ' ').toUpperCase()}`,
+              description: al.details,
+              metadata: al.metadata
+            });
+          }
+        }
+      }
     }
 
     // Sort descending by chronological timestamp

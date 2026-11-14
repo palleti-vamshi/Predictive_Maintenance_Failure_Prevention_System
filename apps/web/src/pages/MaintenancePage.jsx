@@ -128,6 +128,22 @@ export default function MaintenancePage() {
   const [cleanupError, setCleanupError] = useState(null);
   const [cleanupExecuting, setCleanupExecuting] = useState(false);
 
+  // End-of-Day Maintenance Review State
+  const [reviewDate, setReviewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dailyReview, setDailyReview] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
+  const [reviewFilter, setReviewFilter] = useState('all'); // 'all' | 'urgent' | 'new' | 'recurring' | 'unresolved' | 'linked'
+  const [selectedIssueGroup, setSelectedIssueGroup] = useState(null);
+  const [showGroupAssignModal, setShowGroupAssignModal] = useState(false);
+  const [showGroupDismissModal, setShowGroupDismissModal] = useState(false);
+  const [groupAssignTechId, setGroupAssignTechId] = useState('');
+  const [groupAssignPriority, setGroupAssignPriority] = useState(WORK_ORDER_PRIORITY.HIGH);
+  const [groupAssignDueDate, setGroupAssignDueDate] = useState('');
+  const [groupAssignNote, setGroupAssignNote] = useState('');
+  const [groupDismissReason, setGroupDismissReason] = useState('');
+  const [groupActionLoading, setGroupActionLoading] = useState(false);
+
   // New Work Order Form State (UX Pilot Page 7)
   const [newOrder, setNewOrder] = useState({
     machineCode: '',
@@ -308,6 +324,116 @@ export default function MaintenancePage() {
       return true;
     });
   }, [workOrders, activeTab, techSubTab, priorityFilter, searchQuery, isTech, isManager, user?._id]);
+
+  // Fetch Daily Maintenance Review for Target Date
+  const fetchDailyReview = useCallback(async (targetDate) => {
+    if (!isManager) return;
+    setReviewLoading(true);
+    setReviewError(null);
+    try {
+      const d = targetDate || reviewDate;
+      const res = await fetch(`${API_BASE}/maintenance-reviews/daily?date=${d}`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' }
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to load daily maintenance review.');
+      }
+      const data = await res.json();
+      setDailyReview(data.review);
+    } catch (err) {
+      console.error('[MaintenancePage:fetchDailyReview] Error:', err);
+      setReviewError(err.message);
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [isManager, reviewDate]);
+
+  useEffect(() => {
+    if (activeTab === 'daily_review' && isManager) {
+      fetchDailyReview(reviewDate);
+    }
+  }, [activeTab, reviewDate, isManager, fetchDailyReview]);
+
+  // Open Issue Group Assignment Modal
+  const openGroupAssignModal = (group) => {
+    setSelectedIssueGroup(group);
+    setGroupAssignTechId(eligibleTechs[0]?._id || '');
+    setGroupAssignPriority(group.severity === 'CRITICAL' ? WORK_ORDER_PRIORITY.URGENT : WORK_ORDER_PRIORITY.HIGH);
+    setGroupAssignDueDate(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    setGroupAssignNote(`Assigned from Daily Review: ${group.frequency} repeat alert(s) on ${group.machineCode}.`);
+    setShowGroupAssignModal(true);
+  };
+
+  // Submit Work Order Creation from Issue Group
+  const handleCreateWorkOrderFromGroup = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedIssueGroup || !dailyReview || !groupAssignTechId) return;
+    setGroupActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/maintenance-reviews/${dailyReview._id}/create-work-order`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          groupId: selectedIssueGroup.groupId,
+          assignedTechnicianId: groupAssignTechId,
+          priority: groupAssignPriority,
+          dueDate: groupAssignDueDate,
+          grantMachineAccess: true,
+          decisionNote: groupAssignNote || undefined
+        })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to create work order from issue group.');
+      }
+      const data = await res.json();
+      setActionSuccess(`Work order ${data.workOrder.orderNumber} successfully created and linked to issue group.`);
+      setTimeout(() => setActionSuccess(null), 5000);
+      setShowGroupAssignModal(false);
+      setSelectedIssueGroup(null);
+      fetchDailyReview(reviewDate);
+      fetchData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setGroupActionLoading(false);
+    }
+  };
+
+  // Submit Dismissal for Issue Group
+  const handleDismissIssueGroup = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedIssueGroup || !dailyReview) return;
+    setGroupActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/maintenance-reviews/${dailyReview._id}/dismiss-issue`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          groupId: selectedIssueGroup.groupId,
+          reason: groupDismissReason || 'Acknowledged and dismissed by manager review.'
+        })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to dismiss issue group.');
+      }
+      setActionSuccess(`Issue group "${selectedIssueGroup.faultLabel}" dismissed and alerts marked acknowledged.`);
+      setTimeout(() => setActionSuccess(null), 5000);
+      setShowGroupDismissModal(false);
+      setSelectedIssueGroup(null);
+      setGroupDismissReason('');
+      fetchDailyReview(reviewDate);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setGroupActionLoading(false);
+    }
+  };
 
   // Open Job Details Modal (UX Pilot Page 6)
   const openExecutionModal = (order) => {
@@ -913,6 +1039,25 @@ export default function MaintenancePage() {
                 Work Board ({workOrders.filter((o) => ![WORK_ORDER_STATUS.COMPLETED, WORK_ORDER_STATUS.REVIEWED].includes(o.status)).length})
               </button>
               <button
+                key="tab-daily-review"
+                type="button"
+                className={`filter-pill-btn ${activeTab === 'daily_review' ? 'active' : ''}`}
+                onClick={() => setActiveTab('daily_review')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <Icon name="check" size={13} color={activeTab === 'daily_review' ? '#ffffff' : '#0f766e'} />
+                <span>End-of-Day Review</span>
+                {dailyReview?.summary?.criticalUrgentCount > 0 && (
+                  <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.65rem', padding: '1px 5px', borderRadius: '10px', fontWeight: 700 }}>
+                    {dailyReview.summary.criticalUrgentCount} URGENT
+                  </span>
+                )}
+              </button>
+              <button
                 key="tab-create"
                 type="button"
                 className={`filter-pill-btn ${activeTab === 'create' ? 'active' : ''}`}
@@ -959,8 +1104,8 @@ export default function MaintenancePage() {
           )}
         </div>
 
-        {/* Search & Priority Controls (when not in create tab) */}
-        {activeTab !== 'create' && (
+        {/* Search & Priority Controls (when not in create or daily_review tab) */}
+        {activeTab !== 'create' && activeTab !== 'daily_review' && (
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div style={{ position: 'relative' }}>
               <input
@@ -1287,8 +1432,441 @@ export default function MaintenancePage() {
         </div>
       )}
 
+      {/* VIEW 3: END-OF-DAY MAINTENANCE REVIEW & ASSIGNMENT */}
+      {isManager && activeTab === 'daily_review' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Review Control Header */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--surface)',
+              padding: '1rem 1.25rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border-subtle)',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Icon name="calendar" size={16} color="var(--primary)" />
+                <span style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text-primary)' }}>Review Date:</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={reviewDate}
+                  onChange={(e) => {
+                    setReviewDate(e.target.value);
+                    fetchDailyReview(e.target.value);
+                  }}
+                  style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+                />
+              </div>
+              {dailyReview && (
+                <span className="badge badge-info" style={{ fontWeight: 600 }}>
+                  Report: {dailyReview.reportNumber}
+                </span>
+              )}
+              {dailyReview?.status && (
+                <span className={`badge badge-${dailyReview.status === 'completed' ? 'success' : 'warning'}`}>
+                  {dailyReview.status.replace(/_/g, ' ').toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fetchDailyReview(reviewDate)}
+                disabled={reviewLoading}
+              >
+                <Icon name="clock" size={13} color="var(--primary)" />
+                <span style={{ marginLeft: 4 }}>{reviewLoading ? 'Refreshing...' : 'Refresh Review'}</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Urgent Safety Escalation Alert */}
+          {dailyReview?.summary?.criticalUrgentCount > 0 && (
+            <div
+              style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1.5px solid #ef4444',
+                borderRadius: '8px',
+                padding: '0.85rem 1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.85rem'
+              }}
+            >
+              <div
+                style={{
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: 32,
+                  height: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <Icon name="alert" size={18} color="#ffffff" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#b91c1c', fontWeight: 700, fontSize: '0.92rem' }}>
+                  IMMEDIATE SAFETY ESCALATION ACTIVE: {dailyReview.summary.criticalUrgentCount} Critical Fault Condition(s)
+                </div>
+                <div style={{ color: '#7f1d1d', fontSize: '0.82rem', marginTop: '0.15rem' }}>
+                  Severe vibration deviation or critical thermal runaway requires prompt technician dispatch. Urgent safety conditions must not wait for batch review.
+                </div>
+              </div>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setReviewFilter('urgent')}
+              >
+                Inspect Critical Issues
+              </Button>
+            </div>
+          )}
+
+          {/* Loading or Error State */}
+          {reviewLoading && !dailyReview ? (
+            <Card>
+              <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                <p>Triaging and deduplicating plant alerts into daily maintenance summary...</p>
+              </div>
+            </Card>
+          ) : reviewError ? (
+            <AlertCallout severity="high" title="Error Loading Review" description={reviewError} />
+          ) : dailyReview ? (
+            <>
+              {/* KPI Summary Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Total Alerts Evaluated</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-primary)', marginTop: '0.2rem' }}>
+                    {dailyReview.summary.totalAlertsEvaluated}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>Raw telemetry triggers</div>
+                </div>
+
+                <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Deduplicated Issues</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary)', marginTop: '0.2rem' }}>
+                    {dailyReview.summary.totalIssueGroups}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>Consolidated machine faults</div>
+                </div>
+
+                <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#b91c1c', textTransform: 'uppercase', fontWeight: 600 }}>Critical / Urgent</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#ef4444', marginTop: '0.2rem' }}>
+                    {dailyReview.summary.criticalUrgentCount}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#b91c1c', marginTop: '0.15rem' }}>Immediate response</div>
+                </div>
+
+                <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#0369a1', textTransform: 'uppercase', fontWeight: 600 }}>New Issues</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0284c7', marginTop: '0.2rem' }}>
+                    {dailyReview.summary.newIssuesCount}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>First observed today</div>
+                </div>
+
+                <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#b45309', textTransform: 'uppercase', fontWeight: 600 }}>Recurring Issues</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#d97706', marginTop: '0.2rem' }}>
+                    {dailyReview.summary.recurringIssuesCount}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>Repeated in prior 14 days</div>
+                </div>
+
+                <div style={{ background: 'var(--surface)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontSize: '0.72rem', color: '#0f766e', textTransform: 'uppercase', fontWeight: 600 }}>Already Assigned</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#0f766e', marginTop: '0.2rem' }}>
+                    {dailyReview.summary.alreadyLinkedCount}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>Active work order linked</div>
+                </div>
+              </div>
+
+              {/* Sub-Category Filters */}
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${reviewFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setReviewFilter('all')}
+                >
+                  All Issue Groups ({dailyReview.issueGroups.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${reviewFilter === 'urgent' ? 'active' : ''}`}
+                  onClick={() => setReviewFilter('urgent')}
+                >
+                  Critical / Urgent ({dailyReview.summary.criticalUrgentCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${reviewFilter === 'new' ? 'active' : ''}`}
+                  onClick={() => setReviewFilter('new')}
+                >
+                  New Issues ({dailyReview.summary.newIssuesCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${reviewFilter === 'recurring' ? 'active' : ''}`}
+                  onClick={() => setReviewFilter('recurring')}
+                >
+                  Recurring ({dailyReview.summary.recurringIssuesCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${reviewFilter === 'unresolved' ? 'active' : ''}`}
+                  onClick={() => setReviewFilter('unresolved')}
+                >
+                  Unresolved Carryover ({dailyReview.summary.unresolvedCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${reviewFilter === 'linked' ? 'active' : ''}`}
+                  onClick={() => setReviewFilter('linked')}
+                >
+                  Already Assigned ({dailyReview.summary.alreadyLinkedCount})
+                </button>
+              </div>
+
+              {/* Issue Groups List */}
+              {dailyReview.issueGroups
+                .filter((g) => {
+                  if (reviewFilter === 'urgent') return g.severity === 'CRITICAL';
+                  if (reviewFilter === 'new') return g.category === 'new_issue' && !g.linkedWorkOrderId;
+                  if (reviewFilter === 'recurring') return g.category === 'recurring_issue' && !g.linkedWorkOrderId;
+                  if (reviewFilter === 'unresolved') return g.category === 'unresolved_item' && !g.linkedWorkOrderId;
+                  if (reviewFilter === 'linked') return g.category === 'already_linked' || g.linkedWorkOrderId;
+                  return true;
+                })
+                .length === 0 ? (
+                <Card>
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
+                    <p>No issue groups match the selected category for {reviewDate}.</p>
+                  </div>
+                </Card>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {dailyReview.issueGroups
+                    .filter((g) => {
+                      if (reviewFilter === 'urgent') return g.severity === 'CRITICAL';
+                      if (reviewFilter === 'new') return g.category === 'new_issue' && !g.linkedWorkOrderId;
+                      if (reviewFilter === 'recurring') return g.category === 'recurring_issue' && !g.linkedWorkOrderId;
+                      if (reviewFilter === 'unresolved') return g.category === 'unresolved_item' && !g.linkedWorkOrderId;
+                      if (reviewFilter === 'linked') return g.category === 'already_linked' || g.linkedWorkOrderId;
+                      return true;
+                    })
+                    .map((group) => {
+                      const isLinked = Boolean(group.linkedWorkOrderId);
+                      const isDismissed = group.managerDecision?.decision === 'dismissed';
+                      const isCritical = group.severity === 'CRITICAL';
+
+                      return (
+                        <div
+                          key={group.groupId}
+                          style={{
+                            background: 'var(--surface)',
+                            borderRadius: '8px',
+                            border: `1px solid ${isCritical ? '#fca5a5' : 'var(--border-subtle)'}`,
+                            padding: '1.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.85rem'
+                          }}
+                        >
+                          {/* Issue Group Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                                  {group.machineCode} — {group.faultLabel}
+                                </span>
+                                <span
+                                  className={`badge badge-${isCritical ? 'danger' : group.severity === 'WARNING' ? 'warning' : 'info'}`}
+                                  style={{ fontWeight: 700 }}
+                                >
+                                  {group.severity.toUpperCase()}
+                                </span>
+                                {group.requiresImmediateAttention && (
+                                  <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.68rem', padding: '2px 7px', borderRadius: '10px', fontWeight: 700 }}>
+                                    IMMEDIATE ACTION
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                                {group.machineName}
+                              </div>
+                            </div>
+
+                            {/* Category & Deduplication Pills */}
+                            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span
+                                style={{
+                                  background: group.category === 'new_issue' ? '#e0f2fe' : group.category === 'recurring_issue' ? '#fef3c7' : group.category === 'unresolved_item' ? '#f3e8ff' : '#ccfbf1',
+                                  color: group.category === 'new_issue' ? '#0369a1' : group.category === 'recurring_issue' ? '#b45309' : group.category === 'unresolved_item' ? '#7e22ce' : '#0f766e',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  padding: '2px 8px',
+                                  borderRadius: '6px'
+                                }}
+                              >
+                                {group.category === 'new_issue' && 'New Issue'}
+                                {group.category === 'recurring_issue' && 'Recurring Issue (14-day history)'}
+                                {group.category === 'unresolved_item' && 'Unresolved Carryover'}
+                                {group.category === 'already_linked' && 'Already Linked'}
+                              </span>
+
+                              <span style={{ background: 'var(--bg-subtle)', color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '6px' }}>
+                                {group.frequency} Alert{group.frequency !== 1 ? 's' : ''} Deduplicated
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Occurrence Timeline & Provenance */}
+                          <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                            <div>
+                              <strong>First Occurrence:</strong> {new Date(group.firstOccurrenceAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div>
+                              <strong>Last Occurrence:</strong> {new Date(group.lastOccurrenceAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            <div>
+                              <strong>Peak ML Score:</strong> {group.supportingReadings.peakScore} (Threshold: {group.supportingReadings.calibratedThreshold})
+                            </div>
+                          </div>
+
+                          {/* Supporting Sensor Readings */}
+                          <div style={{ background: 'var(--bg-subtle)', borderRadius: '6px', padding: '0.75rem 1rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <div style={{ fontSize: '0.82rem' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Peak Vibration: </span>
+                              <strong style={{ color: 'var(--text-primary)' }}>
+                                {group.supportingReadings.peakVibrationRms !== null ? `${group.supportingReadings.peakVibrationRms} mm/s` : 'N/A'}
+                              </strong>
+                            </div>
+
+                            <div style={{ fontSize: '0.82rem' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Peak Temperature: </span>
+                              <strong style={{ color: 'var(--text-primary)' }}>
+                                {group.supportingReadings.peakTemperatureC !== null ? `${group.supportingReadings.peakTemperatureC} °C` : 'N/A'}
+                              </strong>
+                            </div>
+
+                            {group.supportingReadings.peakSpeedRpm !== null && (
+                              <div style={{ fontSize: '0.82rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Shaft Speed: </span>
+                                <strong style={{ color: 'var(--text-primary)' }}>{group.supportingReadings.peakSpeedRpm} RPM</strong>
+                              </div>
+                            )}
+
+                            {group.supportingReadings.contributingSignals?.length > 0 && (
+                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Signals:</span>
+                                {group.supportingReadings.contributingSignals.map((s, idx) => (
+                                  <span key={idx} style={{ background: 'var(--surface)', border: '1px solid var(--border-subtle)', fontSize: '0.72rem', padding: '1px 6px', borderRadius: '4px' }}>
+                                    {s.signal} ({s.peakValue} {s.unit})
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer: Manager Decision Status & Action Buttons */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)' }}>
+                            <div>
+                              {isLinked ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                  <Icon name="check" size={14} color="#0f766e" />
+                                  <span style={{ fontSize: '0.84rem', fontWeight: 600, color: '#0f766e' }}>
+                                    Linked to Work Order: {group.linkedWorkOrderNumber || 'Active'}
+                                  </span>
+                                  {group.managerDecision?.decisionNote && (
+                                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                      · {group.managerDecision.decisionNote}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : isDismissed ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--text-muted)', fontSize: '0.84rem' }}>
+                                  <Icon name="close" size={13} color="var(--text-muted)" />
+                                  <span>Dismissed: {group.managerDecision?.decisionNote || 'No work order required.'}</span>
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                                  Pending manager triage · No work order created yet.
+                                </div>
+                              )}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              {!isLinked && !isDismissed && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedIssueGroup(group);
+                                      setShowGroupDismissModal(true);
+                                    }}
+                                  >
+                                    Dismiss / Acknowledge
+                                  </Button>
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    icon="plus"
+                                    onClick={() => openGroupAssignModal(group)}
+                                  >
+                                    Create & Assign Work Order
+                                  </Button>
+                                </>
+                              )}
+
+                              {isLinked && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const linkedOrder = workOrders.find((o) => (o._id || o.orderNumber) === (group.linkedWorkOrderId || group.linkedWorkOrderNumber));
+                                    if (linkedOrder) {
+                                      openExecutionModal(linkedOrder);
+                                    } else {
+                                      setActiveTab('board');
+                                      setSearchQuery(group.linkedWorkOrderNumber || group.machineCode);
+                                    }
+                                  }}
+                                >
+                                  View Linked Work Order
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      )}
+
       {/* VIEW 2: WORK BOARD / MY WORK / REQUESTS / HISTORY (UX Pilot Page 1 & 5) */}
-      {activeTab !== 'create' && (
+      {activeTab !== 'create' && activeTab !== 'daily_review' && (
         <>
           {loading ? (
             <Card>
@@ -2664,6 +3242,182 @@ export default function MaintenancePage() {
                 {cleanupExecuting ? 'Cleaning Test Records...' : `Purge ${cleanupPreview?.counts?.totalEligible ?? 0} Test Records`}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CREATE & ASSIGN WORK ORDER FROM ISSUE GROUP */}
+      {showGroupAssignModal && selectedIssueGroup && (
+        <div className="modal-backdrop" onClick={() => setShowGroupAssignModal(false)}>
+          <div className="modal-dialog" style={{ maxWidth: '620px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Icon name="wrench" size={20} color="var(--primary)" />
+                <h3 className="modal-title">Create & Assign Work Order</h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setShowGroupAssignModal(false)}
+                disabled={groupActionLoading}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWorkOrderFromGroup}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                {/* Issue Group Provenance Box */}
+                <div style={{ background: 'var(--bg-subtle)', borderRadius: '6px', padding: '0.85rem 1rem', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: '0.95rem' }}>
+                      {selectedIssueGroup.machineCode} — {selectedIssueGroup.faultLabel}
+                    </strong>
+                    <span className={`badge badge-${selectedIssueGroup.severity === 'CRITICAL' ? 'danger' : 'warning'}`}>
+                      {selectedIssueGroup.severity.toUpperCase()}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                    Deduplicates {selectedIssueGroup.frequency} repeat alerts into 1 unified work order to eliminate duplicate order generation.
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Assigned Technician</label>
+                  <select
+                    className="form-select"
+                    value={groupAssignTechId}
+                    onChange={(e) => setGroupAssignTechId(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Technician...</option>
+                    {eligibleTechs.map((t) => (
+                      <option key={t._id} value={t._id}>
+                        {t.fullName} ({t.activeOrderCount || 0} active orders)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Priority</label>
+                    <select
+                      className="form-select"
+                      value={groupAssignPriority}
+                      onChange={(e) => setGroupAssignPriority(e.target.value)}
+                    >
+                      <option value={WORK_ORDER_PRIORITY.URGENT}>Urgent (Immediate Safety)</option>
+                      <option value={WORK_ORDER_PRIORITY.HIGH}>High (Within 48h)</option>
+                      <option value={WORK_ORDER_PRIORITY.MEDIUM}>Medium (Within 5 days)</option>
+                      <option value={WORK_ORDER_PRIORITY.LOW}>Low (Routine)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Due Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={groupAssignDueDate}
+                      onChange={(e) => setGroupAssignDueDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Manager Instructions / Decision Notes</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={3}
+                    value={groupAssignNote}
+                    onChange={(e) => setGroupAssignNote(e.target.value)}
+                    placeholder="Enter dispatch instructions and physical inspection checklist..."
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowGroupAssignModal(false)}
+                  disabled={groupActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  icon="plus"
+                  disabled={groupActionLoading || !groupAssignTechId}
+                >
+                  {groupActionLoading ? 'Creating Order...' : 'Create & Assign Work Order'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DISMISS / ACKNOWLEDGE ISSUE GROUP */}
+      {showGroupDismissModal && selectedIssueGroup && (
+        <div className="modal-backdrop" onClick={() => setShowGroupDismissModal(false)}>
+          <div className="modal-dialog" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Icon name="check" size={20} color="#0f766e" />
+                <h3 className="modal-title">Dismiss Issue Group</h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setShowGroupDismissModal(false)}
+                disabled={groupActionLoading}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleDismissIssueGroup}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Document the engineering rationale for dismissing <strong>{selectedIssueGroup.machineCode} — {selectedIssueGroup.faultLabel}</strong> without creating a work order.
+                  All <strong>{selectedIssueGroup.frequency}</strong> underlying alerts in this group will be marked acknowledged.
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Dismissal Rationale / Observation Notes</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={3}
+                    value={groupDismissReason}
+                    onChange={(e) => setGroupDismissReason(e.target.value)}
+                    placeholder="e.g. Known sensor drift under scheduled recalibration. No physical gearbox wear identified."
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowGroupDismissModal(false)}
+                  disabled={groupActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={groupActionLoading || !groupDismissReason.trim()}
+                >
+                  {groupActionLoading ? 'Dismissing...' : 'Confirm Dismissal'}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

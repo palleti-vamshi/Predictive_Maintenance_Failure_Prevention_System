@@ -226,6 +226,18 @@ const maintenanceWorkOrderSchema = new mongoose.Schema(
       default: null,
       index: true
     },
+    sourceAlertIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Alert'
+      }
+    ],
+    maintenanceReviewId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'DailyMaintenanceReview',
+      default: null,
+      index: true
+    },
     sourceAnalysisRunId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'AnalysisRun',

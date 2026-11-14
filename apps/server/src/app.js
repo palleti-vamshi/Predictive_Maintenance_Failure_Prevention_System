@@ -15,6 +15,7 @@ import alertRoutes from './routes/alert.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import assistantRoutes from './routes/assistant.routes.js';
 import searchRoutes from './routes/search.routes.js';
+import dailyMaintenanceReviewRoutes from './routes/dailyMaintenanceReview.routes.js';
 import { corsOptions } from './config/cors.js';
 
 const app = express();
@@ -113,6 +114,8 @@ app.use('/api/alerts', alertRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/maintenance-reviews', dailyMaintenanceReviewRoutes);
+app.use('/api/maintenance/reviews', dailyMaintenanceReviewRoutes);
 
 // Health & Liveness Probes (Public)
 app.use('/api', healthRoutes);
